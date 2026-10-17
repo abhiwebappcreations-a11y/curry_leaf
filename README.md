@@ -366,8 +366,8 @@ The first release should prioritize stable local ordering, billing, printing, li
 
 The software's distribution and usage license has not yet been specified. Add the applicable legal license before publishing or distributing the source code.
 
-## Project Workflow & Coordination
+## Notes
 
-- Every time immediately push changes to GitHub and check GitHub regularly to stay connected to other agents' work.
-- If it is Agent 1, strictly perform Agent 1 backend and operational foundation work.
-- If it is Agent 2, strictly perform Agent 2 UI/UX, Flutter applications (Captain Android, Counter Windows), and Hinopt Admin work.
+This repository contains the official implementation of Hinopt Restaurant POS. Agent 2 covers UI/UX, Flutter applications (Captain Android and Counter Windows), and Hinopt Admin.
+
+Everytime immediately push changes to github always and check github always to stay connected to another agent work properly and app proper smooth going.

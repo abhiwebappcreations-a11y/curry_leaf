@@ -225,8 +225,7 @@ class PosProvider extends ChangeNotifier {
 
     try {
       final itemsToSend = _currentOrder!.draftItems;
-      final idempotencyKey =
-          'kot-sub-${_currentOrder!.id}-${DateTime.now().millisecondsSinceEpoch}';
+      final idempotencyKey = ApiService.generateUuidV4();
 
       final ticket = await _apiService.submitKot(
         orderId: _currentOrder!.id,

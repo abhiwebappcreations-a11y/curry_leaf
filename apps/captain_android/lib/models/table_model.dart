@@ -68,17 +68,18 @@ class RestaurantTable {
   }
 
   factory RestaurantTable.fromJson(Map<String, dynamic> json) {
+    final activeOrder = json['activeOrder'] as Map<String, dynamic>?;
     return RestaurantTable(
       id: json['id'] as String,
-      name: json['name'] as String,
+      name: (json['displayName'] ?? json['name'] ?? json['tableNumber'] ?? 'Table') as String,
       section: json['section'] as String? ?? 'Main Hall',
       capacity: json['capacity'] as int? ?? 4,
       status: TableStatus.values.firstWhere(
         (e) => e.name.toLowerCase() == (json['status'] as String? ?? 'available').toLowerCase(),
         orElse: () => TableStatus.available,
       ),
-      activeOrderId: json['activeOrderId'] as String?,
-      activeOrderTotalPaise: json['activeOrderTotalPaise'] as int? ?? 0,
+      activeOrderId: (json['activeOrderId'] ?? activeOrder?['orderId']) as String?,
+      activeOrderTotalPaise: (activeOrder?['totalPaise'] ?? json['activeOrderTotalPaise'] ?? 0) as int,
       occupiedSince: json['occupiedSince'] != null ? DateTime.tryParse(json['occupiedSince']) : null,
       guestCount: json['guestCount'] as int?,
     );

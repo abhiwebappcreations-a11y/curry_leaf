@@ -78,4 +78,23 @@ class ThermalPrinterConfig {
       lastTestPrintAt: lastTestPrintAt ?? this.lastTestPrintAt,
     );
   }
+
+  factory ThermalPrinterConfig.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String? ?? 'printer_01';
+    final role = (id.contains('kot') || id.contains('kitchen'))
+        ? PrinterRole.kitchenKot
+        : PrinterRole.counterBill;
+
+    return ThermalPrinterConfig(
+      id: id,
+      role: role,
+      name: json['name'] as String? ?? (role == PrinterRole.kitchenKot ? 'Kitchen KOT Thermal Printer' : 'Counter Bill Thermal Printer'),
+      connectionType: PrinterConnectionType.ethernet,
+      address: (json['target'] ?? json['address'] ?? '192.168.1.200') as String,
+      port: json['port'] as int? ?? 9100,
+      paperWidthMm: (json['paperWidth'] ?? json['paperWidthMm'] ?? 80) as int,
+      isConnected: json['status'] == 'ready' || json['status'] == 'connected' || (json['isConnected'] ?? true),
+      lastTestPrintAt: json['lastTestPrintAt'] != null ? DateTime.tryParse(json['lastTestPrintAt']) : null,
+    );
+  }
 }

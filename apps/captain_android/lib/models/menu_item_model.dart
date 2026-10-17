@@ -32,8 +32,14 @@ class MenuItem {
       isVeg: json['isVeg'] as bool? ?? true,
       isAvailable: json['isAvailable'] as bool? ?? true,
       description: json['description'] as String? ?? '',
-      variants: (json['variants'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      addons: (json['addons'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      variants: (json['variants'] as List<dynamic>?)?.map((e) {
+        if (e is Map) return (e['name'] ?? '').toString();
+        return e.toString();
+      }).where((s) => s.isNotEmpty).toList() ?? [],
+      addons: ((json['addOns'] ?? json['addons']) as List<dynamic>?)?.map((e) {
+        if (e is Map) return (e['name'] ?? '').toString();
+        return e.toString();
+      }).where((s) => s.isNotEmpty).toList() ?? [],
     );
   }
 

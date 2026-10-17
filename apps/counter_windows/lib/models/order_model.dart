@@ -89,19 +89,19 @@ class OrderItem {
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     return OrderItem(
-      id: json['id'] as String,
-      menuItemId: json['menuItemId'] as String,
-      name: json['name'] as String,
+      id: json['id'] as String? ?? 'item-${DateTime.now().millisecondsSinceEpoch}',
+      menuItemId: (json['menuItemId'] ?? json['id'] ?? '') as String,
+      name: (json['nameSnapshot'] ?? json['name'] ?? 'Item') as String,
       quantity: json['quantity'] as int? ?? 1,
-      pricePaise: json['pricePaise'] as int? ?? 0,
+      pricePaise: (json['pricePaiseSnapshot'] ?? json['pricePaise'] ?? 0) as int,
       isVeg: json['isVeg'] as bool? ?? true,
-      notes: json['notes'] as String?,
+      notes: (json['itemNotes'] ?? json['notes']) as String?,
       selectedVariant: json['selectedVariant'] as String?,
       selectedAddons: (json['selectedAddons'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      isDraft: json['isDraft'] as bool? ?? false,
+      isDraft: json['isDraft'] as bool? ?? (json['status'] == 'draft'),
       sentAt: json['sentAt'] != null ? DateTime.tryParse(json['sentAt']) : null,
       status: OrderItemStatus.values.firstWhere(
-        (e) => e.name.toLowerCase() == (json['status'] as String? ?? 'sentToKitchen').toLowerCase(),
+        (e) => e.name.toLowerCase() == (json['status'] as String? ?? 'sentToKitchen').replaceAll('_', '').toLowerCase(),
         orElse: () => OrderItemStatus.sentToKitchen,
       ),
     );

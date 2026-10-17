@@ -38,4 +38,28 @@ class MenuItem {
       description: description ?? this.description,
     );
   }
+
+  factory MenuItem.fromJson(Map<String, dynamic> json) {
+    return MenuItem(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      category: json['category'] as String? ?? 'General',
+      pricePaise: (json['pricePaise'] ?? json['pricePaiseSnapshot'] ?? 0) as int,
+      isVeg: json['isVeg'] as bool? ?? true,
+      isAvailable: json['isAvailable'] as bool? ?? true,
+      description: json['description'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'category': category,
+      'pricePaise': pricePaise,
+      'isVeg': isVeg,
+      'isAvailable': isAvailable,
+      'description': description,
+    };
+  }
 }

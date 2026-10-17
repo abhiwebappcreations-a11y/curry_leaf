@@ -5,6 +5,7 @@ import '../models/bill_model.dart';
 import '../models/printer_model.dart';
 import '../models/menu_model.dart';
 import '../services/mock_counter_data.dart';
+import '../services/api_client.dart';
 
 enum CounterTab {
   orders,
@@ -16,6 +17,8 @@ enum CounterTab {
 }
 
 class CounterProvider extends ChangeNotifier {
+  final ApiClient _apiClient = ApiClient();
+
   CounterTab _activeTab = CounterTab.orders;
 
   List<RestaurantTable> _tables = [];
@@ -35,16 +38,17 @@ class CounterProvider extends ChangeNotifier {
   String _selectedSection = 'All';
 
   // System Health
-  final bool _localServerHealthy = true;
-  final bool _databaseHealthy = true;
-  final String _licenseStatus = 'Active (Licensed to Hinopt Curry Leaf)';
-  final int _licenseDaysRemaining = 365;
+  bool _localServerHealthy = false;
+  bool _databaseHealthy = false;
+  String _licenseStatus = 'Checking...';
+  int _licenseDaysRemaining = 365;
 
   CounterProvider() {
     _initData();
   }
 
   // Getters
+  ApiClient get apiClient => _apiClient;
   CounterTab get activeTab => _activeTab;
   List<RestaurantTable> get tables => _tables;
   List<RestaurantOrder> get activeOrders => _activeOrders;
@@ -70,12 +74,48 @@ class CounterProvider extends ChangeNotifier {
   ThermalPrinterConfig? get kotPrinter =>
       _printers.where((p) => p.role == PrinterRole.kitchenKot).firstOrNull;
 
-  void _initData() {
+  Future<void> _initData() async {
+    // 1. Initial baseline to ensure seamless startup without layout flash
     _tables = MockCounterData.getTables();
     _activeOrders = MockCounterData.getActiveOrders();
     _settledBills = MockCounterData.getSettledBills();
     _printers = MockCounterData.getPrinters();
     _menuItems = MockCounterData.getMenuItems();
+
+    // 2. Fetch live data from Local API (http://127.0.0.1:4000/api)
+    await refreshFromLiveApi();
+  }
+
+  Future<void> refreshFromLiveApi() async {
+    try {
+      final health = await _apiClient.getHealth();
+      _localServerHealthy = health.isServerHealthy;
+      _databaseHealthy = health.isDatabaseHealthy;
+      _licenseStatus = health.licenseStatus;
+      _licenseDaysRemaining = health.daysRemaining;
+
+      final liveTables = await _apiClient.getTables();
+      if (liveTables != null && liveTables.isNotEmpty) {
+        _tables = liveTables;
+      }
+
+      final liveOrders = await _apiClient.getActiveOrders();
+      if (liveOrders != null && liveOrders.isNotEmpty) {
+        _activeOrders = liveOrders;
+      }
+
+      final livePrinters = await _apiClient.getPrinters();
+      if (livePrinters != null && livePrinters.isNotEmpty) {
+        _printers = livePrinters;
+      }
+
+      final liveMenu = await _apiClient.getMenu();
+      if (liveMenu != null && liveMenu.isNotEmpty) {
+        _menuItems = liveMenu;
+      }
+    } catch (_) {}
+
+    notifyListeners();
   }
 
   void setActiveTab(CounterTab tab) {
@@ -93,12 +133,24 @@ class CounterProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectOrder(RestaurantOrder order) {
+  Future<void> selectOrder(RestaurantOrder order) async {
     _selectedOrder = order;
-    _currentDraftBill = RestaurantBill.fromOrder(
-      order: order,
-      billNumber: 'INV-2026-00${_settledBills.length + 44}',
-    );
+
+    // Call POST /api/orders/:id/bill to finalize on backend if live, or fallback to local model
+    final liveBill = await _apiClient.generateBill(order.id);
+    if (liveBill != null) {
+      _currentDraftBill = liveBill.copyWith(
+        cashierName: 'Deepa',
+        tableName: order.tableName,
+      );
+    } else {
+      _currentDraftBill = RestaurantBill.fromOrder(
+        order: order,
+        billNumber: 'INV-2026-00${_settledBills.length + 44}',
+        cashierName: 'Deepa',
+      );
+    }
+
     _activeTab = CounterTab.billing;
     notifyListeners();
   }
@@ -133,6 +185,7 @@ class CounterProvider extends ChangeNotifier {
     required PaymentMethod method,
     String? reference,
   }) async {
+    // Duplicate click protection: blocks clicks if already in progress or bill is null
     if (_currentDraftBill == null || _isSettlingPayment) return false;
 
     _isSettlingPayment = true;
@@ -140,10 +193,18 @@ class CounterProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate transaction-safe database commit and print queue dispatch
-      await Future.delayed(const Duration(milliseconds: 500));
+      final billToSettle = _currentDraftBill!;
 
-      final settledBill = _currentDraftBill!.copyWith(
+      // Connect to Live API: POST /api/bills/:id/payments
+      await _apiClient.settlePayment(
+        billId: billToSettle.id,
+        method: method.name.toUpperCase(),
+        amountPaise: billToSettle.totalPaise,
+        reference: reference,
+      );
+
+      final settledBill = billToSettle.copyWith(
+        cashierName: 'Deepa',
         paymentMethod: method,
         paymentStatus: PaymentStatus.settled,
         paymentReference: reference,
@@ -180,9 +241,10 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
-  void reprintBill(RestaurantBill bill, String reason) {
+  Future<void> reprintBill(RestaurantBill bill, String reason) async {
     final index = _settledBills.indexWhere((b) => b.id == bill.id);
     if (index >= 0) {
+      await _apiClient.reprintBill(bill.id, reason: reason);
       final updated = bill.copyWith(
         isReprint: true,
         reprintCount: bill.reprintCount + 1,
@@ -212,7 +274,8 @@ class CounterProvider extends ChangeNotifier {
   Future<void> testPrint(PrinterRole role) async {
     final index = _printers.indexWhere((p) => p.role == role);
     if (index >= 0) {
-      await Future.delayed(const Duration(milliseconds: 400));
+      final printer = _printers[index];
+      await _apiClient.testPrint(printer.id);
       _printers[index] = _printers[index].copyWith(
         lastTestPrintAt: DateTime.now(),
         isConnected: true,
