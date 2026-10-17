@@ -5,7 +5,7 @@ import '../models/bill_model.dart';
 import '../models/printer_model.dart';
 import '../models/menu_model.dart';
 import '../services/mock_counter_data.dart';
-import '../services/api_client.dart';
+import '../services/counter_api_service.dart';
 
 enum CounterTab {
   orders,
@@ -17,7 +17,9 @@ enum CounterTab {
 }
 
 class CounterProvider extends ChangeNotifier {
-  final ApiClient _apiClient = ApiClient();
+  final CounterApiService _counterApiService = CounterApiService();
+  CounterApiService get apiService => _counterApiService;
+  CounterApiService get _apiClient => _counterApiService;
 
   CounterTab _activeTab = CounterTab.orders;
 

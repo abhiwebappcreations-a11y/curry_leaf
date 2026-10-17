@@ -45,6 +45,15 @@ class ApiService {
     return '${hexChars.sublist(0, 4).join()}-${hexChars.sublist(4, 6).join()}-${hexChars.sublist(6, 8).join()}-${hexChars.sublist(8, 10).join()}-${hexChars.sublist(10, 16).join()}';
   }
 
+  /// Unwraps backend { success: true, data: { ... } } response envelope
+  dynamic _unwrapResponse(http.Response response) {
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+      return decoded['data'];
+    }
+    return decoded;
+  }
+
   Future<bool> checkHealth() async {
     if (useDemoMode) return true;
     try {
@@ -67,12 +76,12 @@ class ApiService {
           .get(Uri.parse('$baseUrl/tables'), headers: _defaultHeaders)
           .timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
+        final data = _unwrapResponse(response);
         List<dynamic> list;
-        if (decoded is Map<String, dynamic>) {
-          list = (decoded['data']?['tables'] ?? decoded['tables'] ?? []) as List<dynamic>;
-        } else if (decoded is List) {
-          list = decoded;
+        if (data is Map<String, dynamic>) {
+          list = (data['tables'] ?? []) as List<dynamic>;
+        } else if (data is List) {
+          list = data;
         } else {
           list = [];
         }
@@ -94,10 +103,9 @@ class ApiService {
           .get(Uri.parse('$baseUrl/menu'), headers: _defaultHeaders)
           .timeout(const Duration(seconds: 4));
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
+        final data = _unwrapResponse(response);
         final List<MenuItem> parsedItems = [];
-        if (decoded is Map<String, dynamic>) {
-          final data = decoded['data'] ?? decoded;
+        if (data is Map<String, dynamic>) {
           if (data['menu'] is List) {
             // Hierarchical category listing
             for (var cat in data['menu'] as List) {
@@ -115,8 +123,8 @@ class ApiService {
               parsedItems.add(MenuItem.fromJson(item as Map<String, dynamic>));
             }
           }
-        } else if (decoded is List) {
-          for (var item in decoded) {
+        } else if (data is List) {
+          for (var item in data) {
             parsedItems.add(MenuItem.fromJson(item as Map<String, dynamic>));
           }
         }
@@ -186,8 +194,10 @@ class ApiService {
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final decoded = jsonDecode(response.body);
-        final kotJson = (decoded['data']?['kot'] ?? decoded['kot'] ?? decoded) as Map<String, dynamic>;
+        final data = _unwrapResponse(response);
+        final kotJson = (data is Map<String, dynamic> && data.containsKey('kot'))
+            ? data['kot'] as Map<String, dynamic>
+            : (data is Map<String, dynamic> ? data : <String, dynamic>{});
         kotJson['tableName'] = tableName;
         return KotTicket.fromJson(kotJson);
       }
