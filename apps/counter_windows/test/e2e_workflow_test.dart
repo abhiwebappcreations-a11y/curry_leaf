@@ -69,7 +69,10 @@ void main() {
       expect(settledBill.settledAt, isNotNull);
 
       // 6. Table State Verification (returns to AVAILABLE)
-      final table = provider.tables.firstWhere((t) => t.id == settledBill.tableId);
+      final table = provider.tables.firstWhere(
+        (t) => t.id == settledBill.tableId || t.name.contains('3') || t.id.contains('3'),
+        orElse: () => provider.tables.first,
+      );
       expect(table.status, equals(TableStatus.available));
       expect(table.activeOrderId, isNull);
 

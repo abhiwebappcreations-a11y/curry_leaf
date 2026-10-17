@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/table_model.dart';
 import '../models/menu_item_model.dart';
@@ -18,7 +19,13 @@ class ApiService {
     this.useDemoMode = false,    // Set default to false
   });
 
-  String get baseUrl => 'http://$host:$port/api';
+  String get baseUrl {
+    // When running inside a browser preview on the host machine, route to 127.0.0.1
+    if (kIsWeb && host == '192.168.1.100') {
+      return 'http://127.0.0.1:$port/api';
+    }
+    return 'http://$host:$port/api';
+  }
 
   Map<String, String> get _defaultHeaders => {
     'Content-Type': 'application/json',
