@@ -50,8 +50,10 @@ class RestaurantTable {
     int? capacity,
     TableStatus? status,
     String? activeOrderId,
+    bool clearActiveOrder = false,
     int? activeOrderTotalPaise,
     DateTime? occupiedSince,
+    bool clearOccupiedSince = false,
     int? guestCount,
   }) {
     return RestaurantTable(
@@ -60,9 +62,9 @@ class RestaurantTable {
       section: section ?? this.section,
       capacity: capacity ?? this.capacity,
       status: status ?? this.status,
-      activeOrderId: activeOrderId ?? this.activeOrderId,
+      activeOrderId: clearActiveOrder ? null : (activeOrderId ?? this.activeOrderId),
       activeOrderTotalPaise: activeOrderTotalPaise ?? this.activeOrderTotalPaise,
-      occupiedSince: occupiedSince ?? this.occupiedSince,
+      occupiedSince: clearOccupiedSince ? null : (occupiedSince ?? this.occupiedSince),
       guestCount: guestCount ?? this.guestCount,
     );
   }

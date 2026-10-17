@@ -219,9 +219,9 @@ class CounterProvider extends ChangeNotifier {
       if (tableIndex >= 0) {
         _tables[tableIndex] = _tables[tableIndex].copyWith(
           status: TableStatus.available,
-          activeOrderId: null,
+          clearActiveOrder: true,
           activeOrderTotalPaise: 0,
-          occupiedSince: null,
+          clearOccupiedSince: true,
         );
       }
 
