@@ -12,9 +12,14 @@
     "build:api": "npm.cmd --prefix services/local-api run build",
     "test:api": "npm.cmd --prefix services/local-api run test",
     "lint:api": "npm.cmd --prefix services/local-api run lint",
-    "start:printer": "npm.cmd --prefix services/print-service run start",
-    "dev:printer": "npm.cmd --prefix services/print-service run dev",
-    "build:printer": "npm.cmd --prefix services/print-service run build"
+    "migrate": "npm.cmd --prefix services/local-api run migrate",
+    "seed": "npm.cmd --prefix services/local-api run seed",
+    "license:generate-keys": "npm.cmd --prefix services/license-service run generate-keys",
+    "license:issue": "npm.cmd --prefix services/license-service run issue",
+    "license:verify": "npm.cmd --prefix services/license-service run verify",
+    "license:test": "npm.cmd --prefix services/license-service run test",
+    "license:build": "npm.cmd --prefix services/license-service run build",
+    "test:all": "npm.cmd --prefix services/local-api run test && npm.cmd --prefix services/license-service run test"
   },
   "keywords": [
     "restaurant-pos",

@@ -1,0 +1,27 @@
+{
+  "name": "@hinopt/license-service",
+  "version": "1.0.0",
+  "description": "Hinopt Cloud - Asymmetric License Issuance & Verification CLI",
+  "main": "dist/index.js",
+  "bin": {
+    "hinopt-license": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "generate-keys": "tsx src/cli.ts generate-keys",
+    "issue": "tsx src/cli.ts issue",
+    "verify": "tsx src/cli.ts verify"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -86,14 +86,20 @@ export class LicenseService {
     // Verify asymmetric signature with Hinopt Public Key if configured
     if (config.license.publicKeyPem) {
       try {
-        const verify = crypto.createVerify('SHA256');
-        verify.update(signedPayloadBase64);
-        verify.end();
+        const dataBuffer = Buffer.from(signedPayloadBase64);
+        const signatureBuffer = Buffer.from(signatureHex, 'hex');
 
-        const isSignatureValid = verify.verify(
-          config.license.publicKeyPem,
-          Buffer.from(signatureHex, 'hex')
-        );
+        let isSignatureValid = false;
+        try {
+          // Native Ed25519 verification (algorithm: null)
+          isSignatureValid = crypto.verify(null, dataBuffer, config.license.publicKeyPem, signatureBuffer);
+        } catch {
+          // Fallback to SHA256 verification for RSA / ECDSA
+          const verify = crypto.createVerify('SHA256');
+          verify.update(signedPayloadBase64);
+          verify.end();
+          isSignatureValid = verify.verify(config.license.publicKeyPem, signatureBuffer);
+        }
 
         if (!isSignatureValid) {
           throw new BadRequestError('Cryptographic license signature verification failed');
