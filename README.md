@@ -366,9 +366,8 @@ The first release should prioritize stable local ordering, billing, printing, li
 
 The software's distribution and usage license has not yet been specified. Add the applicable legal license before publishing or distributing the source code.
 
-
-
 ## Project Workflow & Coordination
 
 - Every time immediately push changes to GitHub and check GitHub regularly to stay connected to other agents' work.
 - If it is Agent 1, strictly perform Agent 1 backend and operational foundation work.
+- If it is Agent 2, strictly perform Agent 2 UI/UX, Flutter applications (Captain Android, Counter Windows), and Hinopt Admin work.

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hinopt Restaurant POS — Cloud Admin & License Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-header">
+        <div class="brand-logo-icon">H</div>
+        <div class="brand-text">
+          <h1>Hinopt Cloud</h1>
+          <span>License Operations</span>
+        </div>
+      </div>
+
+      <ul class="nav-links">
+        <li class="nav-item active" data-tab="overview">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Overview</span>
+        </li>
+        <li class="nav-item" data-tab="restaurants">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span>Restaurants</span>
+          <span class="nav-badge" id="badge-rest-count">4</span>
+        </li>
+        <li class="nav-item" data-tab="licenses">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+          <span>License Keys</span>
+          <span class="nav-badge warning" id="badge-expiring-count">1</span>
+        </li>
+        <li class="nav-item" data-tab="audit">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          <span>Audit Logs</span>
+        </li>
+        <li class="nav-item" data-tab="security">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Security & Keys</span>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="operator-profile">
+          <div class="avatar">HP</div>
+          <div>
+            <div style="font-weight: 700; color: white;">Hinopt Operator</div>
+            <div style="font-size: 10px; color: rgba(255,255,255,0.6);">admin@hinopt.com</div>
+          </div>
+        </div>
+        <div>Supabase Auth: Authenticated</div>
+        <div>Ed25519 Signing Service: Active</div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-wrapper">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-title-section">
+          <h2 id="header-title">Operations Overview & License Health</h2>
+        </div>
+        <div class="header-actions">
+          <div class="cloud-status-badge">
+            <span class="pulse-dot"></span>
+            <span>Supabase Cloud Sync: Live</span>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-register')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Register Restaurant</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Canvas -->
+      <div class="workspace-content">
+        
+        <!-- Tab 1: Overview -->
+        <section id="tab-overview" class="tab-view active">
+          <div class="kpi-grid">
+            <div class="kpi-card active">
+              <span class="kpi-label">Active Licenses</span>
+              <div class="kpi-value" id="kpi-active">0</div>
+              <span class="kpi-meta">Verified & operational</span>
+            </div>
+            <div class="kpi-card warning">
+              <span class="kpi-label">Expiring Soon (&lt; 30d)</span>
+              <div class="kpi-value" id="kpi-expiring">0</div>
+              <span class="kpi-meta">Requires renewal notice</span>
+            </div>
+            <div class="kpi-card danger">
+              <span class="kpi-label">Suspended Licenses</span>
+              <div class="kpi-value" id="kpi-suspended">0</div>
+              <span class="kpi-meta">Action pending reconciliation</span>
+            </div>
+            <div class="kpi-card info">
+              <span class="kpi-label">Total Installations</span>
+              <div class="kpi-value" id="kpi-total">0</div>
+              <span class="kpi-meta">Across 4 metro regions</span>
+            </div>
+          </div>
+
+          <div class="content-panel">
+            <div class="panel-header">
+              <h3>Registered Restaurant Installations</h3>
+              <button class="btn btn-outline btn-sm" onclick="switchTab('restaurants')">View All Directory</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Restaurant</th>
+                  <th>Primary Contact</th>
+                  <th>Installation HWID</th>
+                  <th>Status</th>
+                  <th>License Expiry</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="table-restaurants-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tab 2: Restaurants Directory -->
+        <section id="tab-restaurants" class="tab-view">
+          <div class="content-panel">
+            <div class="panel-header">
+              <div class="search-input-group">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="search-restaurants" placeholder="Search by restaurant name, city, HWID...">
+              </div>
+              <button class="btn btn-primary" onclick="openModal('modal-register')">+ Add Restaurant</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Restaurant</th>
+                  <th>Contact Details</th>
+                  <th>Counter PC HWID</th>
+                  <th>License Status</th>
+                  <th>Expiry Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="table-restaurants-full-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tab 3: Licenses Management -->
+        <section id="tab-licenses" class="tab-view">
+          <div class="content-panel">
+            <div class="panel-header">
+              <h3>Cryptographic License Tokens & Renewal Controls</h3>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Restaurant</th>
+                  <th>License Key Token</th>
+                  <th>Status</th>
+                  <th>Valid Until</th>
+                  <th>Management Actions</th>
+                </tr>
+              </thead>
+              <tbody id="table-licenses-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tab 4: Audit Logs -->
+        <section id="tab-audit" class="tab-view">
+          <div class="content-panel">
+            <div class="panel-header">
+              <h3>Security & License Activity Log (Immutable Supabase Ledger)</h3>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Action Event</th>
+                  <th>Target Restaurant</th>
+                  <th>Event Details</th>
+                  <th>Operator</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="table-audit-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tab 5: Security & Keys -->
+        <section id="tab-security" class="tab-view">
+          <div class="content-panel" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 12px;">Asymmetric License Cryptography (Ed25519)</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+              Hinopt uses digital signatures with public-key cryptography. The cloud service signs the restaurant's Hardware ID and expiry date with a trusted private key. The local Counter PC verifies the signature using the embedded public verification key without needing continuous internet connectivity.
+            </p>
+            <div style="background: var(--surface-muted); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+              <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Ed25519 Public Verification Key:</div>
+              <code style="font-size: 11px; word-break: break-all; color: var(--primary);">MCowBQYDK2VwAyEANk8J2qE7V3xS8pY9zK1mR4uW0oP6aL3cB5fE7gH9iJk=</code>
+            </div>
+            <div style="margin-top: 20px; font-size: 13px; color: var(--text-secondary);">
+              <strong>Architecture Safety Guarantee:</strong> Neither the Captain Android APK nor the Counter Windows client contains Supabase service-role keys or signing private keys. Client installations only hold verification logic.
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Register Restaurant -->
+  <div class="modal-overlay" id="modal-register">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Register New Restaurant Client</h3>
+        <button class="modal-close" onclick="closeModal('modal-register')">&times;</button>
+      </div>
+      <form id="form-register-restaurant">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Restaurant Business Name</label>
+            <input type="text" id="reg-name" class="form-input" placeholder="e.g. Biryani House Premium" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Location (City, State)</label>
+            <input type="text" id="reg-city" class="form-input" placeholder="e.g. Hyderabad, Telangana" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Owner / Manager Name</label>
+            <input type="text" id="reg-contact" class="form-input" placeholder="e.g. Suresh Varma" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Phone / WhatsApp</label>
+            <input type="text" id="reg-phone" class="form-input" placeholder="+91 98490 00000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Counter PC Hardware ID (HWID)</label>
+            <input type="text" id="reg-hwid" class="form-input" placeholder="e.g. WIN-HWID-3918B22">
+            <small style="color: var(--text-muted); font-size: 11px;">Obtained from Counter PC diagnostic screen.</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Installation Notes</label>
+            <textarea id="reg-notes" class="form-textarea" rows="2" placeholder="e.g. 1 Counter PC, 4 Captain devices, 2 printers"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modal-register')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save & Issue 1-Yr License</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: View License JSON -->
+  <div class="modal-overlay" id="modal-license-details">
+    <div class="modal-card" style="width: 600px;">
+      <div class="modal-header">
+        <h3>Signed License Token: <span id="modal-license-name"></span></h3>
+        <button class="modal-close" onclick="closeModal('modal-license-details')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">
+          This JSON payload is digitally signed. Place this file into the restaurant Counter PC directory (<code>config/license.json</code>) or load it via the Counter Settings screen.
+        </p>
+        <pre class="code-box" id="modal-license-json"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-license-details')">Close</button>
+        <button type="button" class="btn btn-primary" id="modal-download-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Download license.json</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/mock_data.js"></script>
+  <script src="js/license_service.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
