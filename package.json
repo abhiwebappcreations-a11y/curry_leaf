@@ -1,0 +1,28 @@
+{
+  "name": "hinopt-restaurant-pos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hinopt Restaurant POS - Offline-first restaurant POS with central licensing",
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "start:api": "npm.cmd --prefix services/local-api run start",
+    "dev:api": "npm.cmd --prefix services/local-api run dev",
+    "build:api": "npm.cmd --prefix services/local-api run build",
+    "test:api": "npm.cmd --prefix services/local-api run test",
+    "lint:api": "npm.cmd --prefix services/local-api run lint",
+    "start:printer": "npm.cmd --prefix services/print-service run start",
+    "dev:printer": "npm.cmd --prefix services/print-service run dev",
+    "build:printer": "npm.cmd --prefix services/print-service run build"
+  },
+  "keywords": [
+    "restaurant-pos",
+    "offline-first",
+    "point-of-sale",
+    "kot",
+    "thermal-printer"
+  ],
+  "author": "Hinopt",
+  "license": "UNLICENSED"
+}
