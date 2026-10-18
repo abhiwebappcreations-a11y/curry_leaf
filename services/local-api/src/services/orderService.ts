@@ -51,6 +51,7 @@ export class OrderService {
       id: orderId,
       orderNumber: this.generateOrderNumber(),
       tableId: table.id,
+      tableName: table.displayName || table.tableNumber,
       captainDeviceId: deviceId,
       status: 'active',
       customerNotes: input.customerNotes,
@@ -84,20 +85,41 @@ export class OrderService {
     if (!order) {
       throw new NotFoundError('Order', orderId);
     }
+    if (!order.tableName) {
+      const table = inMemoryStore.tables.get(order.tableId);
+      if (table) {
+        order.tableName = table.displayName || table.tableNumber;
+      } else {
+        order.tableName = order.tableId.replace(/^(tab_|tbl_)/i, 'Table ').toUpperCase();
+      }
+    }
     return order;
   }
 
   public static async listOrders(status?: string, tableId?: string): Promise<OrderRecord[]> {
     let list = Array.from(inMemoryStore.orders.values());
     if (status) {
-      list = list.filter((o) => o.status === status);
+      const allowed = status.split(',').map((s) => s.trim().toLowerCase());
+      list = list.filter((o) => allowed.includes(o.status.toLowerCase()));
     }
     if (tableId) {
       list = list.filter((o) => o.tableId === tableId);
     }
-    return list.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    return list
+      .map((order) => {
+        if (!order.tableName) {
+          const table = inMemoryStore.tables.get(order.tableId);
+          if (table) {
+            order.tableName = table.displayName || table.tableNumber;
+          } else {
+            order.tableName = order.tableId.replace(/^(tab_|tbl_)/i, 'Table ').toUpperCase();
+          }
+        }
+        return order;
+      })
+      .sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
   }
 
   public static async addItemsToOrder(

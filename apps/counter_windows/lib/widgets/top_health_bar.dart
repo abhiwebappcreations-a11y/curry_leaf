@@ -132,6 +132,52 @@ class _TopHealthBarState extends State<TopHealthBar> {
                     isOk: true,
                     icon: Icons.verified_user_outlined,
                   ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'Refresh Live Orders & Tables',
+                    child: InkWell(
+                      onTap: provider.isRefreshing
+                          ? null
+                          : () => provider.refreshFromLiveApi(isManual: true),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.5),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (provider.isRefreshing)
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.8,
+                                  color: AppColors.accent,
+                                ),
+                              )
+                            else
+                              const Icon(Icons.refresh, size: 13, color: AppColors.accent),
+                            const SizedBox(width: 4),
+                            Text(
+                              provider.isRefreshing ? 'Refreshing...' : 'Refresh',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Text(
                     _currentTime,

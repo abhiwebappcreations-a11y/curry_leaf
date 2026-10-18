@@ -105,26 +105,37 @@ class ActiveOrdersView extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Orders List
+              // Orders List with Pull-to-Refresh
               Expanded(
-                child: orders.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No active orders right now. New captain orders will appear here automatically.',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                          textAlign: TextAlign.center,
+                child: RefreshIndicator(
+                  onRefresh: () => provider.refreshFromLiveApi(isManual: true),
+                  color: AppColors.accent,
+                  child: orders.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 100),
+                            Center(
+                              child: Text(
+                                'No active orders right now. New captain orders will appear here automatically.\n\nPull down to refresh.',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: orders.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final order = orders[index];
+                            return isMobile
+                                ? _buildMobileOrderCard(context, provider, order, currencyFormatter)
+                                : _buildDesktopOrderRow(context, provider, order, currencyFormatter);
+                          },
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: orders.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final order = orders[index];
-                          return isMobile
-                              ? _buildMobileOrderCard(context, provider, order, currencyFormatter)
-                              : _buildDesktopOrderRow(context, provider, order, currencyFormatter);
-                        },
-                      ),
+                ),
               ),
             ],
           ),

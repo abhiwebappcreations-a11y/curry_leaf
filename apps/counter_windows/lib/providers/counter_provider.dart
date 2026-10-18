@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/table_model.dart';
 import '../models/order_model.dart';
@@ -45,8 +46,13 @@ class CounterProvider extends ChangeNotifier {
   String _licenseStatus = 'Checking...';
   int _licenseDaysRemaining = 365;
 
+  // Background Auto-Polling & Pull-to-Refresh
+  Timer? _autoPollTimer;
+  bool _isRefreshing = false;
+
   CounterProvider() {
     _initData();
+    _startAutoPolling();
   }
 
   // Getters
@@ -71,12 +77,12 @@ class CounterProvider extends ChangeNotifier {
   int get licenseDaysRemaining => _licenseDaysRemaining;
   String get serverHost => _counterApiService.host;
   int get serverPort => _counterApiService.port;
+  bool get isRefreshing => _isRefreshing;
 
   Future<void> setServerHost(String host, [int port = 4000]) async {
     _counterApiService.updateHost(host, port);
     notifyListeners();
-    await refreshFromLiveApi();
-    notifyListeners();
+    await refreshFromLiveApi(isManual: true);
   }
 
   ThermalPrinterConfig? get billPrinter =>
@@ -94,10 +100,56 @@ class CounterProvider extends ChangeNotifier {
     _menuItems = MockCounterData.getMenuItems();
 
     // 2. Fetch live data from Local API (http://127.0.0.1:4000/api)
-    await refreshFromLiveApi();
+    await refreshFromLiveApi(isManual: false);
   }
 
-  Future<void> refreshFromLiveApi() async {
+  void _startAutoPolling() {
+    _autoPollTimer?.cancel();
+    // Auto-poll every 4 seconds to detect live captain orders & table status updates
+    _autoPollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_isRefreshing && !_isSettlingPayment) {
+        _pollActiveState();
+      }
+    });
+  }
+
+  void _stopAutoPolling() {
+    _autoPollTimer?.cancel();
+    _autoPollTimer = null;
+  }
+
+  /// Periodic background lightweight poll for orders, tables, and server health
+  Future<void> _pollActiveState() async {
+    try {
+      final health = await _apiClient.getHealth();
+      _localServerHealthy = health.isServerHealthy;
+      _databaseHealthy = health.isDatabaseHealthy;
+      _licenseStatus = health.licenseStatus;
+      _licenseDaysRemaining = health.daysRemaining;
+
+      if (_localServerHealthy) {
+        final liveTables = await _apiClient.getTables();
+        if (liveTables != null) {
+          _tables = liveTables;
+        }
+
+        final tableMap = {for (var t in _tables) t.id: t.name};
+        final liveOrders = await _apiClient.getActiveOrders(tableIdToName: tableMap);
+        if (liveOrders != null) {
+          _activeOrders = liveOrders;
+        }
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  /// Full refresh (invoked manually by button, pull-to-refresh, or host reconfiguration)
+  Future<void> refreshFromLiveApi({bool isManual = false}) async {
+    if (isManual) {
+      _isRefreshing = true;
+      notifyListeners();
+    }
+
     try {
       final health = await _apiClient.getHealth();
       _localServerHealthy = health.isServerHealthy;
@@ -110,8 +162,9 @@ class CounterProvider extends ChangeNotifier {
         _tables = liveTables;
       }
 
-      final liveOrders = await _apiClient.getActiveOrders();
-      if (liveOrders != null && liveOrders.isNotEmpty) {
+      final tableMap = {for (var t in _tables) t.id: t.name};
+      final liveOrders = await _apiClient.getActiveOrders(tableIdToName: tableMap);
+      if (liveOrders != null) {
         _activeOrders = liveOrders;
       }
 
@@ -124,9 +177,12 @@ class CounterProvider extends ChangeNotifier {
       if (liveMenu != null && liveMenu.isNotEmpty) {
         _menuItems = liveMenu;
       }
-    } catch (_) {}
-
-    notifyListeners();
+    } catch (_) {} finally {
+      if (isManual) {
+        _isRefreshing = false;
+      }
+      notifyListeners();
+    }
   }
 
   void setActiveTab(CounterTab tab) {
@@ -252,24 +308,23 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> reprintBill(RestaurantBill bill, String reason) async {
+  void reprintBill(RestaurantBill bill, String reason) {
     final index = _settledBills.indexWhere((b) => b.id == bill.id);
     if (index >= 0) {
-      await _apiClient.reprintBill(bill.id, reason: reason);
-      final updated = bill.copyWith(
+      _settledBills[index] = _settledBills[index].copyWith(
         isReprint: true,
-        reprintCount: bill.reprintCount + 1,
+        reprintCount: _settledBills[index].reprintCount + 1,
       );
-      _settledBills[index] = updated;
       notifyListeners();
     }
+    _apiClient.reprintBill(bill.id, reason: reason);
   }
 
   void toggleMenuItemAvailability(String id) {
     final index = _menuItems.indexWhere((m) => m.id == id);
     if (index >= 0) {
-      final item = _menuItems[index];
-      _menuItems[index] = item.copyWith(isAvailable: !item.isAvailable);
+      final current = _menuItems[index];
+      _menuItems[index] = current.copyWith(isAvailable: !current.isAvailable);
       notifyListeners();
     }
   }
@@ -283,11 +338,11 @@ class CounterProvider extends ChangeNotifier {
   }
 
   Future<void> testPrint(PrinterRole role) async {
-    final index = _printers.indexWhere((p) => p.role == role);
-    if (index >= 0) {
-      final printer = _printers[index];
+    final printer = _printers.where((p) => p.role == role).firstOrNull;
+    if (printer != null) {
       await _apiClient.testPrint(printer.id);
-      _printers[index] = _printers[index].copyWith(
+      final index = _printers.indexOf(printer);
+      _printers[index] = printer.copyWith(
         lastTestPrintAt: DateTime.now(),
         isConnected: true,
       );
@@ -295,39 +350,34 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
-  void updatePrinter(ThermalPrinterConfig config) {
-    final index = _printers.indexWhere((p) => p.id == config.id);
-    if (index >= 0) {
-      _printers[index] = config;
-      notifyListeners();
-    }
+  @override
+  void dispose() {
+    _stopAutoPolling();
+    super.dispose();
   }
 
-  // Reports
+  // Financial Metrics
   double get totalSalesRupees {
-    final paise = _settledBills.fold(0, (sum, b) => sum + b.totalPaise);
-    return paise / 100.0;
+    return _settledBills.fold(0.0, (sum, bill) => sum + bill.totalRupees);
   }
 
   double get totalGstRupees {
-    final paise = _settledBills.fold(0, (sum, b) => sum + b.cgstPaise + b.sgstPaise);
-    return paise / 100.0;
+    return _settledBills.fold(0.0, (sum, bill) => sum + bill.totalGstRupees);
   }
 
   double get totalDiscountsRupees {
-    final paise = _settledBills.fold(0, (sum, b) => sum + b.discountPaise);
-    return paise / 100.0;
+    return _settledBills.fold(0.0, (sum, bill) => sum + bill.discountRupees);
   }
 
   Map<PaymentMethod, double> get salesByMethod {
-    final map = <PaymentMethod, double>{
+    final map = {
       PaymentMethod.cash: 0.0,
       PaymentMethod.upi: 0.0,
       PaymentMethod.card: 0.0,
       PaymentMethod.split: 0.0,
     };
-    for (var b in _settledBills) {
-      map[b.paymentMethod] = (map[b.paymentMethod] ?? 0) + b.totalRupees;
+    for (final bill in _settledBills) {
+      map[bill.paymentMethod] = (map[bill.paymentMethod] ?? 0.0) + bill.totalRupees;
     }
     return map;
   }

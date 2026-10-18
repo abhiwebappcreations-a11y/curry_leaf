@@ -68,6 +68,7 @@ export interface OrderRecord {
   id: string;
   orderNumber: string;
   tableId: string;
+  tableName?: string;
   captainDeviceId?: string;
   status: 'draft' | 'active' | 'preparing' | 'ready' | 'billed' | 'settled' | 'cancelled';
   customerNotes?: string;
@@ -403,6 +404,118 @@ export class InMemoryStore {
         features: ['pos', 'kot', 'billing', 'reports'],
       },
     };
+
+    // 7. Seed active live orders for real-time counter & captain processing
+    const order1: OrderRecord = {
+      id: 'ord_live_101',
+      orderNumber: 'ORD-101',
+      tableId: 'tab_t2',
+      tableName: 'Table 2',
+      guestCount: 2,
+      status: 'preparing',
+      subtotalPaise: 41000,
+      taxPaise: 2050,
+      totalPaise: 43050,
+      version: 1,
+      createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      items: [
+        {
+          id: 'item_rec_1',
+          orderId: 'ord_live_101',
+          menuItemId: 'item_chicken_65',
+          nameSnapshot: 'Chicken 65 (Curry Leaf Special)',
+          unitPricePaise: 29000,
+          quantity: 1,
+          totalPaise: 29000,
+          taxPaise: 1450,
+          status: 'preparing',
+          kotPrinted: true,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'item_rec_2',
+          orderId: 'ord_live_101',
+          menuItemId: 'item_masala_chaas',
+          nameSnapshot: 'Spiced Buttermilk (Neer Moru)',
+          unitPricePaise: 6000,
+          quantity: 2,
+          totalPaise: 12000,
+          taxPaise: 600,
+          status: 'ready',
+          kotPrinted: true,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    const order2: OrderRecord = {
+      id: 'ord_live_102',
+      orderNumber: 'ORD-102',
+      tableId: 'tab_t4',
+      tableName: 'Table 4',
+      guestCount: 4,
+      status: 'active',
+      subtotalPaise: 120000,
+      taxPaise: 6000,
+      totalPaise: 126000,
+      version: 1,
+      createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      items: [
+        {
+          id: 'item_rec_3',
+          orderId: 'ord_live_102',
+          menuItemId: 'item_chicken_biryani',
+          nameSnapshot: 'Ambur Chicken Dum Biryani',
+          unitPricePaise: 32000,
+          quantity: 2,
+          totalPaise: 64000,
+          taxPaise: 3200,
+          status: 'preparing',
+          kotPrinted: true,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'item_rec_4',
+          orderId: 'ord_live_102',
+          menuItemId: 'item_butter_naan',
+          nameSnapshot: 'Butter Garlic Naan',
+          unitPricePaise: 7000,
+          quantity: 4,
+          totalPaise: 28000,
+          taxPaise: 1400,
+          status: 'preparing',
+          kotPrinted: true,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'item_rec_5',
+          orderId: 'ord_live_102',
+          menuItemId: 'item_paneer_butter_masala',
+          nameSnapshot: 'Paneer Butter Masala',
+          unitPricePaise: 28000,
+          quantity: 1,
+          totalPaise: 28000,
+          taxPaise: 1400,
+          status: 'pending',
+          kotPrinted: true,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    this.orders.set(order1.id, order1);
+    this.orders.set(order2.id, order2);
+
+    const t2 = this.tables.get('tab_t2');
+    if (t2) {
+      t2.status = 'occupied';
+    }
+    const t4 = this.tables.get('tab_t4');
+    if (t4) {
+      t4.status = 'occupied';
+    }
   }
 }
 

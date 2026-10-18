@@ -131,28 +131,40 @@ class TablesFloorView extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Tables Grid
+              // Tables Grid with Pull-to-Refresh
               Expanded(
-                child: filteredTables.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No tables found in this section.',
-                          style: TextStyle(color: AppColors.textSecondary),
+                child: RefreshIndicator(
+                  onRefresh: () => provider.refreshFromLiveApi(isManual: true),
+                  color: AppColors.accent,
+                  child: filteredTables.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 100),
+                            Center(
+                              child: Text(
+                                'No tables found in this section.\n\nPull down to refresh.',
+                                style: TextStyle(color: AppColors.textSecondary),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        )
+                      : GridView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: childAspectRatio,
+                          ),
+                          itemCount: filteredTables.length,
+                          itemBuilder: (context, index) {
+                            final table = filteredTables[index];
+                            return _buildTableCard(context, provider, table, currencyFormatter, isMobile);
+                          },
                         ),
-                      )
-                    : GridView.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: childAspectRatio,
-                        ),
-                        itemCount: filteredTables.length,
-                        itemBuilder: (context, index) {
-                          final table = filteredTables[index];
-                          return _buildTableCard(context, provider, table, currencyFormatter, isMobile);
-                        },
-                      ),
+                ),
               ),
             ],
           ),

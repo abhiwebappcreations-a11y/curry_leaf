@@ -130,26 +130,68 @@ class CounterApiService {
     return null;
   }
 
-  Future<List<RestaurantOrder>?> getActiveOrders() async {
+  Future<List<RestaurantOrder>?> getActiveOrders({Map<String, String>? tableIdToName}) async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/orders?status=active'), headers: headers)
+      // 1. Fetch active, preparing, and ready orders from Local API
+      http.Response response = await http
+          .get(Uri.parse('$baseUrl/orders?status=active,preparing,ready'), headers: headers)
           .timeout(const Duration(seconds: 4));
+
+      List<dynamic> list = [];
 
       if (response.statusCode == 200) {
         final data = unwrapResponse(response);
-        List<dynamic> list;
         if (data is Map<String, dynamic>) {
           list = (data['orders'] ?? []) as List<dynamic>;
         } else if (data is List) {
           list = data;
-        } else {
-          list = [];
-        }
-        if (list.isNotEmpty) {
-          return list.map((json) => RestaurantOrder.fromJson(json as Map<String, dynamic>)).toList();
         }
       }
+
+      // 2. Fallback: If comma-separated filter returned empty, fetch all and filter locally
+      if (list.isEmpty) {
+        try {
+          final allResponse = await http
+              .get(Uri.parse('$baseUrl/orders'), headers: headers)
+              .timeout(const Duration(seconds: 4));
+          if (allResponse.statusCode == 200) {
+            final allData = unwrapResponse(allResponse);
+            final rawList = (allData is Map<String, dynamic> ? allData['orders'] : allData) as List<dynamic>? ?? [];
+            list = rawList.where((o) {
+              if (o is! Map) return false;
+              final st = (o['status'] ?? '').toString().toLowerCase();
+              return st == 'active' || st == 'preparing' || st == 'ready' || st == 'draft';
+            }).toList();
+          }
+        } catch (_) {}
+      }
+
+      // 3. Map orders and populate table names
+      final orders = list.map((json) {
+        final map = Map<String, dynamic>.from(json as Map);
+        final tableId = (map['tableId'] ?? '').toString();
+
+        final currentName = (map['tableName'] ?? '').toString().trim();
+        if (currentName.isEmpty || currentName.toLowerCase() == tableId.toLowerCase()) {
+          if (tableIdToName != null && tableIdToName.containsKey(tableId)) {
+            map['tableName'] = tableIdToName[tableId];
+          } else if (tableId.isNotEmpty) {
+            if (tableId.startsWith('tab_t')) {
+              map['tableName'] = 'Table ${tableId.substring(5)}';
+            } else if (tableId.startsWith('tbl_')) {
+              map['tableName'] = 'Table ${tableId.substring(4)}';
+            } else {
+              map['tableName'] = tableId.toUpperCase();
+            }
+          } else {
+            map['tableName'] = 'Table';
+          }
+        }
+
+        return RestaurantOrder.fromJson(map);
+      }).toList();
+
+      return orders;
     } catch (_) {}
     return null;
   }
