@@ -69,6 +69,15 @@ class CounterProvider extends ChangeNotifier {
   bool get databaseHealthy => _databaseHealthy;
   String get licenseStatus => _licenseStatus;
   int get licenseDaysRemaining => _licenseDaysRemaining;
+  String get serverHost => _counterApiService.host;
+  int get serverPort => _counterApiService.port;
+
+  Future<void> setServerHost(String host, [int port = 4000]) async {
+    _counterApiService.updateHost(host, port);
+    notifyListeners();
+    await refreshFromLiveApi();
+    notifyListeners();
+  }
 
   ThermalPrinterConfig? get billPrinter =>
       _printers.where((p) => p.role == PrinterRole.counterBill).firstOrNull;

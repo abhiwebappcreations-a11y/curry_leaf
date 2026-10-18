@@ -13,84 +13,151 @@ class TablesFloorView extends StatelessWidget {
     final provider = context.watch<CounterProvider>();
     final currencyFormatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹ ', decimalDigits: 0);
 
-    return Container(
-      color: AppColors.background,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 650;
+        final horizontalPadding = isMobile ? 12.0 : 24.0;
+        final verticalPadding = isMobile ? 12.0 : 20.0;
+
+        int crossAxisCount;
+        double childAspectRatio;
+        if (constraints.maxWidth < 480) {
+          crossAxisCount = 2;
+          childAspectRatio = 1.12;
+        } else if (constraints.maxWidth < 800) {
+          crossAxisCount = 3;
+          childAspectRatio = 1.25;
+        } else {
+          crossAxisCount = 4;
+          childAspectRatio = 1.35;
+        }
+
+        final filteredTables = provider.tables
+            .where((t) => provider.selectedSection == 'All' || t.section == provider.selectedSection)
+            .toList();
+
+        return Container(
+          color: AppColors.background,
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Floor Plan & Dining Tables',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.5,
+              // Header
+              if (isMobile) ...[
+                const Text(
+                  'Floor Plan & Dining Tables',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Real-time dining table seating and order totals',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['All', 'Main Hall', 'AC Dining', 'Rooftop', 'Takeaway'].map((sec) {
+                      final isSelected = provider.selectedSection == sec;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(sec),
+                          selected: isSelected,
+                          selectedColor: AppColors.primary,
+                          backgroundColor: AppColors.surface,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                          onSelected: (_) => provider.setSection(sec),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Floor Plan & Dining Tables',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Real-time seating status across all dining sections',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Real-time seating status across all dining sections',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-              // Section filter
-              Row(
-                children: ['All', 'Main Hall', 'AC Dining', 'Rooftop', 'Takeaway'].map((sec) {
-                  final isSelected = provider.selectedSection == sec;
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: ChoiceChip(
-                      label: Text(sec),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary,
-                      backgroundColor: AppColors.surface,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    Row(
+                      children: ['All', 'Main Hall', 'AC Dining', 'Rooftop', 'Takeaway'].map((sec) {
+                        final isSelected = provider.selectedSection == sec;
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: ChoiceChip(
+                            label: Text(sec),
+                            selected: isSelected,
+                            selectedColor: AppColors.primary,
+                            backgroundColor: AppColors.surface,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                            onSelected: (_) => provider.setSection(sec),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Tables Grid
+              Expanded(
+                child: filteredTables.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No tables found in this section.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      )
+                    : GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: childAspectRatio,
+                        ),
+                        itemCount: filteredTables.length,
+                        itemBuilder: (context, index) {
+                          final table = filteredTables[index];
+                          return _buildTableCard(context, provider, table, currencyFormatter, isMobile);
+                        },
                       ),
-                      onSelected: (_) => provider.setSection(sec),
-                    ),
-                  );
-                }).toList(),
               ),
             ],
           ),
-
-          const SizedBox(height: 20),
-
-          // Tables Grid
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-                childAspectRatio: 1.35,
-              ),
-              itemCount: provider.tables
-                  .where((t) => provider.selectedSection == 'All' || t.section == provider.selectedSection)
-                  .length,
-              itemBuilder: (context, index) {
-                final filtered = provider.tables
-                    .where((t) => provider.selectedSection == 'All' || t.section == provider.selectedSection)
-                    .toList();
-                final table = filtered[index];
-                return _buildTableCard(context, provider, table, currencyFormatter);
-              },
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -99,6 +166,7 @@ class TablesFloorView extends StatelessWidget {
     CounterProvider provider,
     RestaurantTable table,
     NumberFormat currencyFormatter,
+    bool isMobile,
   ) {
     Color statusColor;
     Color statusBg;
@@ -118,7 +186,7 @@ class TablesFloorView extends StatelessWidget {
       case TableStatus.billed:
         statusColor = AppColors.billed;
         statusBg = AppColors.billedBg;
-        statusLabel = 'Bill Printed';
+        statusLabel = 'Billed';
         break;
       case TableStatus.reserved:
         statusColor = AppColors.warning;
@@ -134,18 +202,18 @@ class TablesFloorView extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isOccupied ? statusColor.withOpacity(0.4) : AppColors.border,
+          color: isOccupied ? statusColor.withValues(alpha: 0.4) : AppColors.border,
           width: isOccupied ? 1.5 : 1,
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Color(0x08000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isMobile ? 10 : 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -155,18 +223,26 @@ class TablesFloorView extends StatelessWidget {
             children: [
               Text(
                 table.name,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   statusLabel,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor),
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
                 ),
               ),
             ],
@@ -175,24 +251,27 @@ class TablesFloorView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${table.section} • ${table.capacity} Seats',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              Expanded(
+                child: Text(
+                  '${table.section} • ${table.capacity}S',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (table.activeOrderTotalPaise > 0)
                 Text(
                   currencyFormatter.format(table.activeOrderTotalRupees),
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: TextStyle(
+                    fontSize: isMobile ? 13 : 15,
                     fontWeight: FontWeight.w800,
                     color: AppColors.primary,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
             ],
           ),
 
-          const Divider(color: AppColors.borderLight, height: 8),
+          const Divider(color: AppColors.borderLight, height: 6),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -201,13 +280,14 @@ class TablesFloorView extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () => provider.selectOrderByTableId(table.id),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    minimumSize: const Size(80, 30),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    minimumSize: const Size(60, 26),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text('View Bill', style: TextStyle(fontSize: 11)),
                 )
               else
-                const Text('No Active Order', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                const Text('Free', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
             ],
           ),
         ],

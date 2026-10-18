@@ -5,7 +5,8 @@ import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
 
 class SidebarNavigation extends StatelessWidget {
-  const SidebarNavigation({super.key});
+  final bool isDrawer;
+  const SidebarNavigation({super.key, this.isDrawer = false});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +25,7 @@ class SidebarNavigation extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Row(
@@ -124,7 +125,7 @@ class SidebarNavigation extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,8 +150,8 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'v1.0.0 (Native Windows) • Local LAN',
-                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10),
+                  'v1.0.0 (POS Terminal) • Local LAN',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
                 ),
               ],
             ),
@@ -172,10 +173,15 @@ class SidebarNavigation extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       child: Material(
-        color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
+        color: isSelected ? Colors.white.withValues(alpha: 0.12) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
-          onTap: () => context.read<CounterProvider>().setActiveTab(tab),
+          onTap: () {
+            context.read<CounterProvider>().setActiveTab(tab);
+            if (isDrawer) {
+              Navigator.of(context).pop();
+            }
+          },
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

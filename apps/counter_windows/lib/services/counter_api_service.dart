@@ -22,9 +22,21 @@ class SystemHealthInfo {
 }
 
 class CounterApiService {
-  final String baseUrl;
+  String baseUrl;
+  String host;
+  int port;
 
-  CounterApiService({this.baseUrl = 'http://localhost:4000/api'});
+  CounterApiService({
+    this.host = '127.0.0.1',
+    this.port = 4000,
+    String? baseUrl,
+  }) : baseUrl = baseUrl ?? 'http://127.0.0.1:4000/api';
+
+  void updateHost(String newHost, [int newPort = 4000]) {
+    host = newHost.trim();
+    port = newPort;
+    baseUrl = 'http://$host:$port/api';
+  }
 
   Map<String, String> get headers => {
     'Content-Type': 'application/json',

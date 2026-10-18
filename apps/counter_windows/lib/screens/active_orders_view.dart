@@ -11,7 +11,7 @@ class ActiveOrdersView extends StatelessWidget {
   String _formatElapsed(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 60) {
-      return '${diff.inMinutes} mins ago';
+      return '${diff.inMinutes}m ago';
     }
     return '${diff.inHours}h ${diff.inMinutes % 60}m ago';
   }
@@ -26,73 +26,114 @@ class ActiveOrdersView extends StatelessWidget {
       decimalDigits: 0,
     );
 
-    return Container(
-      color: AppColors.background,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section Title & Search
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 680;
+        final horizontalPadding = isMobile ? 12.0 : 24.0;
+        final verticalPadding = isMobile ? 12.0 : 20.0;
+
+        return Container(
+          color: AppColors.background,
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Section Title & Search
+              if (isMobile) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Active Service Orders',
+                      'Active Orders',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${orders.length} tables currently dining • Real-time orders sent by Captains',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      overflow: TextOverflow.ellipsis,
+                    ElevatedButton.icon(
+                      onPressed: () => provider.setActiveTab(CounterTab.tables),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('New Table'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => provider.setActiveTab(CounterTab.tables),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('New Table / Order'),
+                const SizedBox(height: 4),
+                Text(
+                  '${orders.length} dining tables active in service',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Active Service Orders',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${orders.length} tables currently dining • Real-time orders sent by Captains',
+                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => provider.setActiveTab(CounterTab.tables),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('New Table / Order'),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Orders List
+              Expanded(
+                child: orders.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No active orders right now. New captain orders will appear here automatically.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: orders.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final order = orders[index];
+                          return isMobile
+                              ? _buildMobileOrderCard(context, provider, order, currencyFormatter)
+                              : _buildDesktopOrderRow(context, provider, order, currencyFormatter);
+                        },
+                      ),
               ),
             ],
           ),
-
-          const SizedBox(height: 20),
-
-          // Orders Grid / Cards
-          Expanded(
-            child: orders.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No active orders right now. New captain orders will appear here automatically.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                    ),
-                  )
-                : ListView.separated(
-                    itemCount: orders.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final order = orders[index];
-                      return _buildOrderRow(context, provider, order, currencyFormatter);
-                    },
-                  ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildOrderRow(
+  Widget _buildMobileOrderCard(
     BuildContext context,
     CounterProvider provider,
     RestaurantOrder order,
@@ -103,11 +144,152 @@ class ActiveOrdersView extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Color(0x0A000000),
             blurRadius: 6,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Table Badge, Order # & Time, Total Amount
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  order.tableName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Order #${order.id}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.infoBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'KOT',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.info,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '${order.guestCount} Guests • ${_formatElapsed(order.createdAt)}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                currencyFormatter.format(order.totalRupees),
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // Items Chips Wrap
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: order.activeItems.map((item) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Text(
+                  '${item.quantity}x ${item.name}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+
+          // Action Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => provider.selectOrder(order),
+              icon: const Icon(Icons.receipt, size: 16),
+              label: const Text('Finalize Bill & Settle'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopOrderRow(
+    BuildContext context,
+    CounterProvider provider,
+    RestaurantOrder order,
+    NumberFormat currencyFormatter,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -166,9 +348,9 @@ class ActiveOrdersView extends StatelessWidget {
                         color: AppColors.infoBg,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
+                      child: const Text(
                         'KOT IN KITCHEN',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: AppColors.info,

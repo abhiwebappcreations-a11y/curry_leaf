@@ -12,59 +12,78 @@ class PrinterSettingsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
 
-    return Container(
-      color: AppColors.background,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          const Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 700;
+        final padding = isMobile ? 12.0 : 24.0;
+
+        return Container(
+          color: AppColors.background,
+          padding: EdgeInsets.all(padding),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Thermal Printer Configurations',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.5,
-                ),
+              // Header
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Thermal Printer Configurations',
+                    style: TextStyle(
+                      fontSize: isMobile ? 19 : 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    isMobile
+                        ? 'Durable print queues for Counter & Kitchen thermal printers'
+                        : 'Independent durable queues and settings for Counter Bill Printer and Kitchen KOT Printer',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
               ),
-              SizedBox(height: 4),
-              Text(
-                'Independent durable queues and settings for Counter Bill Printer and Kitchen KOT Printer',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+
+              const SizedBox(height: 16),
+
+              // Cards Layout: Vertical ListView on Mobile, Two-Column Row on Desktop
+              Expanded(
+                child: isMobile
+                    ? ListView(
+                        children: provider.printers.map((printer) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: _buildPrinterCard(context, provider, printer, isMobile: true),
+                          );
+                        }).toList(),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: provider.printers.map((printer) {
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: _buildPrinterCard(context, provider, printer, isMobile: false),
+                            ),
+                          );
+                        }).toList(),
+                      ),
               ),
             ],
           ),
-
-          const SizedBox(height: 20),
-
-          // Two Column Cards: Bill Printer on Left, KOT Printer on Right
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: provider.printers.map((printer) {
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: _buildPrinterCard(context, provider, printer),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildPrinterCard(
     BuildContext context,
     CounterProvider provider,
-    ThermalPrinterConfig printer,
-  ) {
+    ThermalPrinterConfig printer, {
+    required bool isMobile,
+  }) {
     final isBill = printer.role == PrinterRole.counterBill;
     final lastTestStr = printer.lastTestPrintAt != null
         ? DateFormat('hh:mm a').format(printer.lastTestPrintAt!)
@@ -77,15 +96,16 @@ class PrinterSettingsView extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: isMobile ? MainAxisSize.min : MainAxisSize.max,
         children: [
           // Header Row
           Row(
@@ -114,6 +134,7 @@ class PrinterSettingsView extends StatelessWidget {
                     Text(
                       printer.name,
                       style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -151,22 +172,25 @@ class PrinterSettingsView extends StatelessWidget {
             ],
           ),
 
-          const Divider(color: AppColors.borderLight, height: 24),
+          const Divider(color: AppColors.borderLight, height: 20),
 
           // Configuration Details
           _buildConfigItem('Hardware Connection', printer.connectionType.label, Icons.cable),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildConfigItem('Port / IP Address', printer.address, Icons.lan),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildConfigItem('Paper Width', '${printer.paperWidthMm}mm Thermal Paper (Standard 80mm)', Icons.straighten),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildConfigItem('Last Test Print', lastTestStr, Icons.history),
 
-          const Spacer(),
+          if (isMobile)
+            const SizedBox(height: 16)
+          else
+            const Spacer(),
 
-          const Divider(color: AppColors.borderLight, height: 24),
+          const Divider(color: AppColors.borderLight, height: 20),
 
-          // Test Print Button
+          // Test Print Button & Reconnect Button
           Row(
             children: [
               Expanded(
@@ -181,7 +205,9 @@ class PrinterSettingsView extends StatelessWidget {
                             children: [
                               const Icon(Icons.check_circle, color: Colors.white),
                               const SizedBox(width: 8),
-                              Text('Test ticket printed successfully on ${printer.name}!'),
+                              Expanded(
+                                child: Text('Test ticket printed successfully on ${printer.name}!'),
+                              ),
                             ],
                           ),
                         ),
@@ -192,17 +218,20 @@ class PrinterSettingsView extends StatelessWidget {
                   label: const Text('Send Test Print'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Printer connection refreshed.')),
                   );
                 },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
                 child: const Text('Reconnect'),
               ),
             ],
@@ -214,7 +243,7 @@ class PrinterSettingsView extends StatelessWidget {
 
   Widget _buildConfigItem(String label, String value, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(8),
@@ -223,12 +252,18 @@ class PrinterSettingsView extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: AppColors.textSecondary),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),

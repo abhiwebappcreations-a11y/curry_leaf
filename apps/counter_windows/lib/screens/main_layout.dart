@@ -39,19 +39,41 @@ class MainLayout extends StatelessWidget {
         break;
     }
 
-    return Scaffold(
-      body: Column(
-        children: [
-          const TopHealthBar(),
-          Expanded(
-            child: Row(
-              children: [
-                const SidebarNavigation(),
-                Expanded(child: content),
-              ],
-            ),
+    final isCompact = MediaQuery.sizeOf(context).width < 768;
+
+    if (isCompact) {
+      return Scaffold(
+        drawer: const Drawer(
+          child: SafeArea(
+            child: SidebarNavigation(isDrawer: true),
           ),
-        ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              const TopHealthBar(showMenuButton: true),
+              Expanded(child: content),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            const TopHealthBar(showMenuButton: false),
+            Expanded(
+              child: Row(
+                children: [
+                  const SidebarNavigation(),
+                  Expanded(child: content),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

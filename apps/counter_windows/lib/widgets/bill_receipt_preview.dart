@@ -23,14 +23,15 @@ class BillReceiptPreview extends StatelessWidget {
     final dateStr = DateFormat('dd-MM-yyyy hh:mm a').format(bill.createdAt);
 
     return Container(
-      width: 340,
+      constraints: const BoxConstraints(maxWidth: 360),
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
