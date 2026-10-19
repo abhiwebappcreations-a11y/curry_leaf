@@ -103,6 +103,122 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
     );
   }
 
+  void _showAddItemToBillDialog(
+    BuildContext context,
+    CounterProvider provider,
+    RestaurantBill bill,
+  ) {
+    String query = '';
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          final filtered = provider.menuItems.where((item) {
+            if (!item.isAvailable) return false;
+            if (query.isEmpty) return true;
+            return item.name.toLowerCase().contains(query.toLowerCase()) ||
+                item.category.toLowerCase().contains(query.toLowerCase());
+          }).toList();
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Row(
+              children: [
+                const Icon(Icons.add_shopping_cart, color: AppColors.primary, size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  'Add Dish to ${bill.tableName}',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              height: 400,
+              child: Column(
+                children: [
+                  TextField(
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search dishes by name or category...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: (val) => setState(() => query = val),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No matching dishes found.',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final item = filtered[index];
+                              return ListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                leading: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: item.isVeg ? AppColors.veg : AppColors.nonVeg,
+                                  ),
+                                ),
+                                title: Text(
+                                  item.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                ),
+                                subtitle: Text(
+                                  '${item.category} • ₹ ${(item.pricePaise / 100).round()}',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                ),
+                                trailing: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    minimumSize: const Size(50, 28),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () {
+                                    provider.addItemToCurrentBill(item, 1);
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Added 1x ${item.name} to ${bill.tableName}'),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('ADD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
@@ -269,6 +385,18 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
                   label: Text(bill.discountPaise > 0 ? 'Edit Disc' : 'Add Disc', style: const TextStyle(fontSize: 11)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ElevatedButton.icon(
+                  onPressed: () => _showAddItemToBillDialog(context, provider, bill),
+                  icon: const Icon(Icons.add_shopping_cart, size: 14),
+                  label: const Text('Add Dish', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    elevation: 0,
                   ),
                 ),
               ],

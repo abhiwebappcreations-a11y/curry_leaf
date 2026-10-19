@@ -273,6 +273,47 @@ class CounterProvider extends ChangeNotifier {
     );
   }
 
+  /// Cashier adds an extra item directly to the active bill from Counter
+  void addItemToCurrentBill(MenuItem menuItem, int quantity) {
+    if (_currentDraftBill == null) return;
+    final itemTotal = menuItem.pricePaise * quantity;
+    final newItem = BillItemSnapshot(
+      name: menuItem.name,
+      quantity: quantity,
+      unitPricePaise: menuItem.pricePaise,
+      totalPaise: itemTotal,
+    );
+
+    final updatedItems = List<BillItemSnapshot>.from(_currentDraftBill!.items);
+    final existingIndex = updatedItems.indexWhere((i) => i.name.toLowerCase() == menuItem.name.toLowerCase());
+    if (existingIndex >= 0) {
+      final existing = updatedItems[existingIndex];
+      final newQty = existing.quantity + quantity;
+      updatedItems[existingIndex] = BillItemSnapshot(
+        name: existing.name,
+        quantity: newQty,
+        unitPricePaise: existing.unitPricePaise,
+        totalPaise: existing.unitPricePaise * newQty,
+      );
+    } else {
+      updatedItems.add(newItem);
+    }
+
+    final newSubtotal = updatedItems.fold<int>(0, (sum, i) => sum + i.totalPaise);
+    final taxable = (newSubtotal - _currentDraftBill!.discountPaise).clamp(0, double.infinity).toInt();
+    final cgst = (taxable * 0.025).round();
+    final sgst = (taxable * 0.025).round();
+
+    _currentDraftBill = _currentDraftBill!.copyWith(
+      items: updatedItems,
+      subtotalPaise: newSubtotal,
+      cgstPaise: cgst,
+      sgstPaise: sgst,
+      totalPaise: taxable + cgst + sgst,
+    );
+    notifyListeners();
+  }
+
   /// Manually syncs or re-fetches the current draft bill with latest order items & prices
   Future<void> refreshCurrentBill() async {
     if (_currentDraftBill == null) return;
