@@ -58,7 +58,7 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
     final posProvider = context.read<PosProvider>();
 
     try {
-      final success = await posProvider.apiService.checkHealth();
+      final success = await posProvider.apiService.checkHealth(customHost: host, customPort: port);
       if (!mounted) return;
       setState(() {
         _isTesting = false;

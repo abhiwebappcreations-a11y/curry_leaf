@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
+import 'server_connection_dialog.dart';
 
 class TopHealthBar extends StatefulWidget {
   final bool showMenuButton;
@@ -198,101 +199,10 @@ class _TopHealthBarState extends State<TopHealthBar> {
   }
 
   void _showServerDialog(BuildContext context, CounterProvider provider) {
-    final hostController = TextEditingController(text: provider.serverHost);
-    final portController = TextEditingController(text: provider.serverPort.toString());
-
     showDialog(
       context: context,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          backgroundColor: AppColors.primaryDark,
-          title: const Row(
-            children: [
-              Icon(Icons.wifi_tethering, color: AppColors.accent, size: 24),
-              SizedBox(width: 10),
-              Text(
-                'POS Server Connection',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Enter the IP address of the Windows Counter PC hosting the local API server:',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: hostController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Server IP / Hostname',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  hintText: 'e.g. 192.168.1.100 or 127.0.0.1',
-                  hintStyle: const TextStyle(color: Colors.white30),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: const Icon(Icons.computer, color: AppColors.accent),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: portController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Port',
-                  labelStyle: const TextStyle(color: Colors.white70),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: const Icon(Icons.numbers, color: AppColors.accent),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ActionChip(
-                    label: const Text('127.0.0.1', style: TextStyle(fontSize: 11)),
-                    onPressed: () => hostController.text = '127.0.0.1',
-                  ),
-                  ActionChip(
-                    label: const Text('10.0.2.2 (Emulator)', style: TextStyle(fontSize: 11)),
-                    onPressed: () => hostController.text = '10.0.2.2',
-                  ),
-                  ActionChip(
-                    label: const Text('192.168.1.100', style: TextStyle(fontSize: 11)),
-                    onPressed: () => hostController.text = '192.168.1.100',
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-              onPressed: () {
-                final host = hostController.text.trim();
-                final port = int.tryParse(portController.text.trim()) ?? 4000;
-                provider.setServerHost(host, port);
-                Navigator.of(dialogCtx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Connecting to POS server at http://$host:$port/api...'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-              child: const Text('Save & Connect', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
+      barrierDismissible: true,
+      builder: (dialogCtx) => ServerConnectionDialog(provider: provider),
     );
   }
 

@@ -85,6 +85,10 @@ class CounterProvider extends ChangeNotifier {
     await refreshFromLiveApi(isManual: true);
   }
 
+  Future<bool> testServerConnection(String host, int port) async {
+    return _counterApiService.checkHealthFor(host, port);
+  }
+
   ThermalPrinterConfig? get billPrinter =>
       _printers.where((p) => p.role == PrinterRole.counterBill).firstOrNull;
 
@@ -138,6 +142,16 @@ class CounterProvider extends ChangeNotifier {
         if (liveOrders != null) {
           _activeOrders = liveOrders;
         }
+
+        // Auto-sync open bill with latest order changes
+        if (_currentDraftBill != null && !_isSettlingPayment) {
+          final activeOrder = _activeOrders.where((o) => o.id == _currentDraftBill!.orderId).firstOrNull;
+          if (activeOrder != null &&
+              (activeOrder.activeItems.length != _currentDraftBill!.items.length ||
+               activeOrder.subtotalPaise != _currentDraftBill!.subtotalPaise)) {
+            _syncDraftBillFromOrder(activeOrder);
+          }
+        }
         notifyListeners();
       }
     } catch (_) {}
@@ -166,6 +180,14 @@ class CounterProvider extends ChangeNotifier {
       final liveOrders = await _apiClient.getActiveOrders(tableIdToName: tableMap);
       if (liveOrders != null) {
         _activeOrders = liveOrders;
+      }
+
+      // Sync open bill if any
+      if (_currentDraftBill != null && !_isSettlingPayment) {
+        final activeOrder = _activeOrders.where((o) => o.id == _currentDraftBill!.orderId).firstOrNull;
+        if (activeOrder != null) {
+          _syncDraftBillFromOrder(activeOrder);
+        }
       }
 
       final livePrinters = await _apiClient.getPrinters();
@@ -229,7 +251,57 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
-  void applyDiscount(int discountPaise, String reason) {
+  void _syncDraftBillFromOrder(RestaurantOrder activeOrder) {
+    if (_currentDraftBill == null) return;
+    final discount = _currentDraftBill!.discountPaise;
+    final reason = _currentDraftBill!.discountReason;
+    final updated = RestaurantBill.fromOrder(
+      order: activeOrder,
+      billNumber: _currentDraftBill!.billNumber,
+      cashierName: _currentDraftBill!.cashierName,
+    );
+    final taxable = (updated.subtotalPaise - discount).clamp(0, double.infinity).toInt();
+    final cgst = (taxable * 0.025).round();
+    final sgst = (taxable * 0.025).round();
+    _currentDraftBill = updated.copyWith(
+      id: _currentDraftBill!.id,
+      discountPaise: discount,
+      discountReason: reason,
+      cgstPaise: cgst,
+      sgstPaise: sgst,
+      totalPaise: taxable + cgst + sgst,
+    );
+  }
+
+  /// Manually syncs or re-fetches the current draft bill with latest order items & prices
+  Future<void> refreshCurrentBill() async {
+    if (_currentDraftBill == null) return;
+    final orderId = _currentDraftBill!.orderId;
+
+    if (_localServerHealthy) {
+      final liveBill = await _apiClient.generateBill(
+        orderId,
+        discountPaise: _currentDraftBill!.discountPaise,
+      );
+      if (liveBill != null) {
+        _currentDraftBill = liveBill.copyWith(
+          discountReason: _currentDraftBill!.discountReason,
+          cashierName: _currentDraftBill!.cashierName,
+          tableName: _currentDraftBill!.tableName,
+        );
+        notifyListeners();
+        return;
+      }
+    }
+
+    final activeOrder = _activeOrders.where((o) => o.id == orderId).firstOrNull;
+    if (activeOrder != null) {
+      _syncDraftBillFromOrder(activeOrder);
+      notifyListeners();
+    }
+  }
+
+  Future<void> applyDiscount(int discountPaise, String reason) async {
     if (_currentDraftBill == null) return;
 
     final subtotal = _currentDraftBill!.subtotalPaise;
@@ -246,6 +318,24 @@ class CounterProvider extends ChangeNotifier {
       totalPaise: total,
     );
     notifyListeners();
+
+    // Persist discount update to backend if online
+    if (_localServerHealthy) {
+      try {
+        final liveBill = await _apiClient.generateBill(
+          _currentDraftBill!.orderId,
+          discountPaise: discountPaise,
+        );
+        if (liveBill != null) {
+          _currentDraftBill = liveBill.copyWith(
+            discountReason: reason,
+            cashierName: _currentDraftBill!.cashierName,
+            tableName: _currentDraftBill!.tableName,
+          );
+          notifyListeners();
+        }
+      } catch (_) {}
+    }
   }
 
   Future<bool> settlePayment({
@@ -324,9 +414,50 @@ class CounterProvider extends ChangeNotifier {
     final index = _menuItems.indexWhere((m) => m.id == id);
     if (index >= 0) {
       final current = _menuItems[index];
-      _menuItems[index] = current.copyWith(isAvailable: !current.isAvailable);
+      final newStatus = !current.isAvailable;
+      _menuItems[index] = current.copyWith(isAvailable: newStatus);
       notifyListeners();
+      _apiClient.toggleMenuItemAvailability(id, newStatus);
     }
+  }
+
+  Future<bool> addNewMenuItem({
+    required String name,
+    required String category,
+    required int pricePaise,
+    required bool isVeg,
+    String? description,
+    String? imageUrl,
+  }) async {
+    final created = await _apiClient.createMenuItem(
+      name: name,
+      category: category,
+      pricePaise: pricePaise,
+      isVeg: isVeg,
+      description: description,
+      imageUrl: imageUrl,
+    );
+
+    if (created != null) {
+      _menuItems.insert(0, created);
+      notifyListeners();
+      return true;
+    }
+
+    // Local fallback if offline
+    final localItem = MenuItem(
+      id: 'm-${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      category: category,
+      pricePaise: pricePaise,
+      isVeg: isVeg,
+      description: description ?? '',
+      imageUrl: imageUrl,
+      isAvailable: true,
+    );
+    _menuItems.insert(0, localItem);
+    notifyListeners();
+    return true;
   }
 
   void updateMenuItemPrice(String id, int newPricePaise) {

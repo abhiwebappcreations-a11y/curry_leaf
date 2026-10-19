@@ -6,6 +6,7 @@ class MenuItem {
   final bool isVeg;
   final bool isAvailable;
   final String description;
+  final String? imageUrl;
 
   MenuItem({
     required this.id,
@@ -15,6 +16,7 @@ class MenuItem {
     required this.isVeg,
     this.isAvailable = true,
     this.description = '',
+    this.imageUrl,
   });
 
   double get priceRupees => pricePaise / 100.0;
@@ -27,6 +29,7 @@ class MenuItem {
     bool? isVeg,
     bool? isAvailable,
     String? description,
+    String? imageUrl,
   }) {
     return MenuItem(
       id: id ?? this.id,
@@ -36,6 +39,7 @@ class MenuItem {
       isVeg: isVeg ?? this.isVeg,
       isAvailable: isAvailable ?? this.isAvailable,
       description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -48,6 +52,7 @@ class MenuItem {
       isVeg: json['isVeg'] as bool? ?? true,
       isAvailable: json['isAvailable'] as bool? ?? true,
       description: json['description'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 
@@ -60,6 +65,7 @@ class MenuItem {
       'isVeg': isVeg,
       'isAvailable': isAvailable,
       'description': description,
+      'imageUrl': imageUrl,
     };
   }
 }

@@ -27,13 +27,18 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
   }
 
   void _showDiscountDialog(BuildContext context, CounterProvider provider) {
-    final amountController = TextEditingController();
-    final reasonController = TextEditingController();
+    final existingRupees = (provider.currentDraftBill?.discountPaise ?? 0) ~/ 100;
+    final amountController = TextEditingController(text: existingRupees > 0 ? '$existingRupees' : '');
+    final reasonController = TextEditingController(text: provider.currentDraftBill?.discountReason ?? '');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Apply Manager Discount'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text(
+          'Apply / Edit Discount',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,31 +49,54 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
               controller: amountController,
               keyboardType: TextInputType.number,
               autofocus: true,
-              decoration: const InputDecoration(hintText: 'e.g. 100'),
+              cursorColor: AppColors.primary,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'e.g. 100 or 0 to clear',
+                prefixText: '₹ ',
+                prefixStyle: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             const Text('Reason / Authorization:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             TextField(
               controller: reasonController,
+              cursorColor: AppColors.primary,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
               decoration: const InputDecoration(hintText: 'e.g. Regular Guest / Promotional'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () {
-              final rupees = int.tryParse(amountController.text.trim()) ?? 0;
+              final text = amountController.text.trim();
+              final rupees = int.tryParse(text) ?? 0;
               final reason = reasonController.text.trim().isNotEmpty
                   ? reasonController.text.trim()
-                  : 'Manager Discount';
-              if (rupees > 0) {
-                provider.applyDiscount(rupees * 100, reason);
-                Navigator.pop(ctx);
-              }
+                  : (rupees == 0 ? '' : 'Manager Discount');
+              provider.applyDiscount(rupees * 100, reason);
+              Navigator.pop(ctx);
             },
-            child: const Text('Apply Discount'),
+            child: const Text('Update Discount', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -215,13 +243,35 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
                 ],
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: () => _showDiscountDialog(context, provider),
-              icon: const Icon(Icons.discount_outlined, size: 14),
-              label: Text(bill.discountPaise > 0 ? 'Edit Disc' : 'Add Disc', style: const TextStyle(fontSize: 11)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    provider.refreshCurrentBill();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bill synced with latest order items.'),
+                        duration: Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.sync_rounded, size: 20),
+                  tooltip: 'Sync Bill with Latest Order Items',
+                  color: AppColors.primary,
+                  splashRadius: 18,
+                ),
+                const SizedBox(width: 4),
+                OutlinedButton.icon(
+                  onPressed: () => _showDiscountDialog(context, provider),
+                  icon: const Icon(Icons.discount_outlined, size: 14),
+                  label: Text(bill.discountPaise > 0 ? 'Edit Disc' : 'Add Disc', style: const TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

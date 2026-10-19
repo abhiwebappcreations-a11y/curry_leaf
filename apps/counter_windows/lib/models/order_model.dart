@@ -151,6 +151,8 @@ class RestaurantOrder {
     return activeItems.fold(0, (sum, item) => sum + item.totalPaise);
   }
 
+  int get subtotalPaise => totalPaise;
+
   double get totalRupees => totalPaise / 100.0;
 
   RestaurantOrder copyWith({

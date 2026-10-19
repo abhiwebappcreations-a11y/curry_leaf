@@ -31,7 +31,7 @@ describe('Hinopt Restaurant POS - Local API Integration Suite', () => {
     expect(res.body.data.tables[0]).toHaveProperty('tableNumber');
   });
 
-  it('GET /api/menu - returns hierarchical menu with variants & addons', async () => {
+  it('GET /api/menu - returns hierarchical menu with variants & addons and imageUrls', async () => {
     const res = await request(app)
       .get('/api/menu')
       .set('X-Device-Id', 'dev_captain_01')
@@ -44,6 +44,28 @@ describe('Hinopt Restaurant POS - Local API Integration Suite', () => {
     expect(starterCategory).toBeDefined();
     expect(starterCategory.items.length).toBeGreaterThan(0);
     expect(starterCategory.items[0].pricePaise).toBeGreaterThan(0);
+    expect(starterCategory.items[0]).toHaveProperty('imageUrl');
+  });
+
+  it('POST /api/menu/items - Counter creates a new dish with image and details', async () => {
+    const res = await request(app)
+      .post('/api/menu/items')
+      .set('X-Device-Id', 'dev_counter_01')
+      .set('X-Api-Key', 'counter_dev_token')
+      .send({
+        name: 'Ghee Podi Idli',
+        categoryId: 'cat_starters',
+        description: 'Mini button idlis tossed in gun powder and desi ghee',
+        pricePaise: 18000,
+        isVeg: true,
+        imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.item.name).toBe('Ghee Podi Idli');
+    expect(res.body.data.item.imageUrl).toBe('https://images.unsplash.com/photo-1589301760014-d929f3979dbc');
+    expect(res.body.data.item.pricePaise).toBe(18000);
   });
 
   let createdOrderId: string;

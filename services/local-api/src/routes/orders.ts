@@ -1,7 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { inMemoryStore } from '../db/inMemoryStore.js';
 import { OrderService } from '../services/orderService.js';
 import { KotService } from '../services/kotService.js';
+import { BillingService } from '../services/billingService.js';
 import { authenticateDevice, requireRole } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
@@ -85,6 +87,21 @@ ordersRouter.get('/:id', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
+// POST /api/orders/:id/bill - Generate or update bill for order
+ordersRouter.post('/:id/bill', requireRole('counter', 'admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bill = await BillingService.finalizeBill(req.params.id as string, req.body, req.device?.id);
+    res.status(201).json({
+      success: true,
+      data: {
+        bill,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 const addItemsSchema = z.object({
   items: z.array(createOrderItemSchema).min(1),
 });
@@ -140,14 +157,44 @@ ordersRouter.patch(
 // POST /api/orders/:id/kot - Send draft items to kitchen (triggers KOT generation & print)
 ordersRouter.post('/:id/kot', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const kot = await KotService.sendToKitchen(req.params.id as string, req.device?.id);
-    const order = await OrderService.getOrderById(req.params.id as string);
+    let orderId = req.params.id as string;
+    let order = inMemoryStore.orders.get(orderId);
+
+    // If order is not found by ID, but tableId is provided, check active order or auto-create
+    if (!order && req.body?.tableId) {
+      const table = inMemoryStore.tables.get(req.body.tableId);
+      if (table?.activeOrderId && inMemoryStore.orders.has(table.activeOrderId)) {
+        orderId = table.activeOrderId;
+        order = inMemoryStore.orders.get(orderId);
+      } else {
+        const newOrder = await OrderService.createOrder(
+          {
+            tableId: req.body.tableId,
+            items: req.body.items,
+          },
+          req.device?.id
+        );
+        orderId = newOrder.id;
+        order = newOrder;
+      }
+    }
+
+    // If items were passed in body and order already exists, ensure draft items are appended
+    if (order && req.body?.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
+      const hasDrafts = order.items.some((i) => i.status === 'draft');
+      if (!hasDrafts) {
+        await OrderService.addItemsToOrder(orderId, req.body.items);
+      }
+    }
+
+    const kot = await KotService.sendToKitchen(orderId, req.device?.id);
+    const updatedOrder = await OrderService.getOrderById(orderId);
 
     res.status(201).json({
       success: true,
       data: {
         kot,
-        order,
+        order: updatedOrder,
       },
     });
   } catch (err) {

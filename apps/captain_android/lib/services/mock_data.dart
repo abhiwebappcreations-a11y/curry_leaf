@@ -91,12 +91,24 @@ class MockData {
     return [
       // Starters
       MenuItem(
+        id: 'm-19',
+        name: 'Curry Leaf Paneer 65',
+        category: 'Starters',
+        pricePaise: 24000,
+        isVeg: true,
+        description: 'Crisp cottage cheese cubes tossed in spicy tempering with fresh curry leaves.',
+        imageUrl: 'https://images.unsplash.com/photo-1567184109-775c97b8782a?auto=format&fit=crop&w=600&q=80',
+        variants: ['Half', 'Full'],
+        addons: ['Extra Chilli Dip'],
+      ),
+      MenuItem(
         id: 'm-1',
         name: 'Paneer Tikka Angara',
         category: 'Starters',
         pricePaise: 28000, // ₹ 280
         isVeg: true,
         description: 'Charcoal grilled cottage cheese marinated in fiery spices and yoghurt.',
+        imageUrl: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?auto=format&fit=crop&w=600&q=80',
         variants: ['Mild', 'Medium Spicy', 'Extra Spicy'],
         addons: ['Extra Mint Chutney', 'Extra Onion Salad'],
       ),
@@ -107,15 +119,26 @@ class MockData {
         pricePaise: 24000, // ₹ 240
         isVeg: true,
         description: 'Golden fried sweet corn tossed with bell peppers and black pepper.',
+        imageUrl: 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-3',
-        name: 'Chicken Ghee Roast',
+        name: 'Kundapura Chicken Ghee Roast',
         category: 'Starters',
         pricePaise: 36000, // ₹ 360
         isVeg: false,
         description: 'Mangalorean delicacy cooked in pure desi ghee and fiery Byadgi chillies.',
-        variants: ['Bone-in', 'Boneless'],
+        imageUrl: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=600&q=80',
+        variants: ['Half', 'Full'],
+      ),
+      MenuItem(
+        id: 'm-20',
+        name: 'Guntur Chilli Chicken Fry',
+        category: 'Starters',
+        pricePaise: 32000,
+        isVeg: false,
+        description: 'Andhra-style spiced boneless chicken tossed with fiery green chillies and curry leaves.',
+        imageUrl: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-4',
@@ -124,6 +147,28 @@ class MockData {
         pricePaise: 42000, // ₹ 420
         isVeg: false,
         description: 'Finely minced spiced mutton skewered and roasted in traditional tandoor.',
+        imageUrl: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?auto=format&fit=crop&w=600&q=80',
+      ),
+
+      // Tandoor & Grills
+      MenuItem(
+        id: 'm-21',
+        name: 'Tandoori Murgh (Clay Oven)',
+        category: 'Tandoor',
+        pricePaise: 38000,
+        isVeg: false,
+        description: 'Classic whole spring chicken marinated in Kashmiri chilli yogurt and whole spices.',
+        imageUrl: 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?auto=format&fit=crop&w=600&q=80',
+        variants: ['Half', 'Full'],
+      ),
+      MenuItem(
+        id: 'm-22',
+        name: 'Tandoori Malai Broccoli',
+        category: 'Tandoor',
+        pricePaise: 29000,
+        isVeg: true,
+        description: 'Fresh broccoli florets steeped in cheese, cardamom cream, and chargrilled.',
+        imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80',
       ),
 
       // Biryani & Rice
@@ -134,6 +179,7 @@ class MockData {
         pricePaise: 38000, // ₹ 380
         isVeg: false,
         description: 'Aromatic aged basmati rice layered with marinated tender chicken and saffron.',
+        imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80',
         variants: ['Regular', 'Double Masala'],
         addons: ['Extra Mirchi Ka Salan', 'Extra Raita', 'Boiled Egg'],
       ),
@@ -144,6 +190,7 @@ class MockData {
         pricePaise: 48000, // ₹ 480
         isVeg: false,
         description: 'Slow-cooked succulent mutton shank layered with flavored basmati rice.',
+        imageUrl: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-7',
@@ -152,6 +199,7 @@ class MockData {
         pricePaise: 31000, // ₹ 310
         isVeg: true,
         description: 'Garden fresh vegetables and paneer cooked in aromatic spices and saffron dum.',
+        imageUrl: 'https://images.unsplash.com/photo-1642821373181-696a54913e93?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-8',
@@ -160,6 +208,7 @@ class MockData {
         pricePaise: 22000, // ₹ 220
         isVeg: true,
         description: 'Cumin tempered basmati rice served with yellow lentils and garlic tadka.',
+        imageUrl: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=600&q=80',
       ),
 
       // Curries & Gravies
@@ -170,6 +219,7 @@ class MockData {
         pricePaise: 39000, // ₹ 390
         isVeg: false,
         description: 'Clay oven cooked chicken in velvety tomato-butter gravy with fenugreek.',
+        imageUrl: 'https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?auto=format&fit=crop&w=600&q=80',
         variants: ['Sweet & Mild', 'Traditional Spicy'],
       ),
       MenuItem(
@@ -179,6 +229,16 @@ class MockData {
         pricePaise: 32000, // ₹ 320
         isVeg: true,
         description: 'Soft cottage cheese simmered in a rich tomato, butter, and cashew sauce.',
+        imageUrl: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=600&q=80',
+      ),
+      MenuItem(
+        id: 'm-26',
+        name: 'Curry Leaf Country Chicken Curry',
+        category: 'Curries',
+        pricePaise: 35000,
+        isVeg: false,
+        description: 'Homestyle chicken simmered with ground spices, shallots, and fresh curry leaves.',
+        imageUrl: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-11',
@@ -187,6 +247,7 @@ class MockData {
         pricePaise: 29000, // ₹ 290
         isVeg: true,
         description: 'Whole black lentils simmered overnight with cream, butter, and garlic.',
+        imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-12',
@@ -195,6 +256,7 @@ class MockData {
         pricePaise: 46000, // ₹ 460
         isVeg: false,
         description: 'Tender braised mutton chunks cooked with Kashmiri chillies and aromatic herbs.',
+        imageUrl: 'https://images.unsplash.com/photo-1545247181-516773cae7be?auto=format&fit=crop&w=600&q=80',
       ),
 
       // Breads
@@ -205,6 +267,7 @@ class MockData {
         pricePaise: 7500, // ₹ 75
         isVeg: true,
         description: 'Tandoori refined flour bread glazed with garlic butter and fresh cilantro.',
+        imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-14',
@@ -213,6 +276,7 @@ class MockData {
         pricePaise: 3500, // ₹ 35
         isVeg: true,
         description: 'Whole wheat flatbread baked in clay oven topped with butter.',
+        imageUrl: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-15',
@@ -221,9 +285,10 @@ class MockData {
         pricePaise: 11000, // ₹ 110
         isVeg: true,
         description: 'Stuffed with mozzarella cheese and chopped green chillies.',
+        imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
       ),
 
-      // Beverages & Desserts
+      // Beverages
       MenuItem(
         id: 'm-16',
         name: 'Royal Kesaria Lassi',
@@ -231,6 +296,16 @@ class MockData {
         pricePaise: 12000, // ₹ 120
         isVeg: true,
         description: 'Thick churned sweet yogurt drink flavored with saffron and crushed pistachios.',
+        imageUrl: 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=600&q=80',
+      ),
+      MenuItem(
+        id: 'm-23',
+        name: 'Spiced Buttermilk (Neer Moru)',
+        category: 'Beverages',
+        pricePaise: 6000,
+        isVeg: true,
+        description: 'Refreshing churned yogurt tempered with ginger, green chilli, and curry leaves.',
+        imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
       ),
       MenuItem(
         id: 'm-17',
@@ -239,7 +314,10 @@ class MockData {
         pricePaise: 8000, // ₹ 80
         isVeg: true,
         description: 'Refreshing chilled soda with freshly squeezed lime juice.',
+        imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
       ),
+
+      // Desserts
       MenuItem(
         id: 'm-18',
         name: 'Gulab Jamun with Rabri',
@@ -247,6 +325,25 @@ class MockData {
         pricePaise: 15000, // ₹ 150
         isVeg: true,
         description: 'Warm fried milk dumplings served with chilled condensed milk rabri.',
+        imageUrl: 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?auto=format&fit=crop&w=600&q=80',
+      ),
+      MenuItem(
+        id: 'm-24',
+        name: 'Royal Matka Kesar Kulfi',
+        category: 'Desserts',
+        pricePaise: 13000,
+        isVeg: true,
+        description: 'Traditional slow-reduced milk kulfi infused with saffron and crunchy pistachios.',
+        imageUrl: 'https://images.unsplash.com/photo-1505394033641-40c6ad1178d7?auto=format&fit=crop&w=600&q=80',
+      ),
+      MenuItem(
+        id: 'm-25',
+        name: 'Elaneer Payasam (Tender Coconut)',
+        category: 'Desserts',
+        pricePaise: 16000,
+        isVeg: true,
+        description: 'South Indian coastal specialty dessert made with fresh tender coconut pulp and condensed milk.',
+        imageUrl: 'https://images.unsplash.com/photo-1579954115545-a95591f28bfc?auto=format&fit=crop&w=600&q=80',
       ),
     ];
   }

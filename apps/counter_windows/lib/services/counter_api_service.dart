@@ -106,6 +106,19 @@ class CounterApiService {
     );
   }
 
+  /// Pings /api/health for a specific host and port to verify reachability
+  Future<bool> checkHealthFor(String testHost, int testPort) async {
+    try {
+      final testUrl = 'http://${testHost.trim()}:$testPort/api/health';
+      final response = await http
+          .get(Uri.parse(testUrl), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<RestaurantTable>?> getTables() async {
     try {
       final response = await http
@@ -257,11 +270,60 @@ class CounterApiService {
     return null;
   }
 
+  Future<MenuItem?> createMenuItem({
+    required String name,
+    required String category,
+    required int pricePaise,
+    required bool isVeg,
+    String? description,
+    String? imageUrl,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/menu/items'),
+        headers: headers,
+        body: jsonEncode({
+          'name': name,
+          'categoryId': category,
+          'pricePaise': pricePaise,
+          'isVeg': isVeg,
+          'description': description ?? '',
+          'imageUrl': imageUrl,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = unwrapResponse(response);
+        final itemJson = (data is Map<String, dynamic> && data['item'] != null)
+            ? data['item'] as Map<String, dynamic>
+            : data as Map<String, dynamic>;
+        return MenuItem.fromJson(itemJson);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> toggleMenuItemAvailability(String id, bool isAvailable) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/menu/items/$id/availability'),
+        headers: headers,
+        body: jsonEncode({
+          'isAvailable': isAvailable,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<RestaurantBill?> generateBill(String orderId, {int discountPaise = 0}) async {
     final idempotencyKey = generateUuidV4();
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/orders/$orderId/bill'),
+        Uri.parse('$baseUrl/billing/orders/$orderId/bill'),
         headers: {
           ...headers,
           'Idempotency-Key': idempotencyKey,

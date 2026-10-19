@@ -297,7 +297,7 @@ class OrderScreen extends StatelessWidget {
                             crossAxisCount: crossAxisCount,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
-                            childAspectRatio: 0.95,
+                            childAspectRatio: 0.74,
                           ),
                           itemCount: provider.filteredMenu.length,
                           itemBuilder: (context, index) {

@@ -90,5 +90,30 @@ void main() {
       // App remains responsive and retains fallback stability
       expect(provider.tables.isNotEmpty, isTrue);
     });
+
+    test('E2E: Auto-creates server order when sending draft to kitchen', () async {
+      final provider = PosProvider();
+      await provider.init();
+
+      final table = provider.tables.first;
+      provider.selectTable(table);
+
+      final paneer = MenuItem(
+        id: 'item_paneer_65',
+        name: 'Curry Leaf Paneer 65',
+        category: 'Starters',
+        pricePaise: 24000,
+        isVeg: true,
+      );
+
+      provider.addItemToDraft(paneer, quantity: 1, notes: 'Extra crispy');
+      expect(provider.currentOrder!.draftItems.length, equals(1));
+
+      final ticket = await provider.sendDraftToKitchen();
+      expect(ticket, isNotNull);
+      expect(provider.currentOrder!.draftItems.isEmpty, isTrue);
+      expect(provider.currentOrder!.status, equals('IN_KITCHEN'));
+      expect(provider.currentTable!.status, equals(TableStatus.occupied));
+    });
   });
 }

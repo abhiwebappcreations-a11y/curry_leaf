@@ -6,6 +6,7 @@ class MenuItem {
   final bool isVeg;
   final bool isAvailable;
   final String description;
+  final String? imageUrl;
   final List<String> variants;
   final List<String> addons;
 
@@ -17,6 +18,7 @@ class MenuItem {
     required this.isVeg,
     this.isAvailable = true,
     this.description = '',
+    this.imageUrl,
     this.variants = const [],
     this.addons = const [],
   });
@@ -32,6 +34,7 @@ class MenuItem {
       isVeg: json['isVeg'] as bool? ?? true,
       isAvailable: json['isAvailable'] as bool? ?? true,
       description: json['description'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
       variants: (json['variants'] as List<dynamic>?)?.map((e) {
         if (e is Map) return (e['name'] ?? '').toString();
         return e.toString();
@@ -52,6 +55,7 @@ class MenuItem {
       'isVeg': isVeg,
       'isAvailable': isAvailable,
       'description': description,
+      'imageUrl': imageUrl,
       'variants': variants,
       'addons': addons,
     };

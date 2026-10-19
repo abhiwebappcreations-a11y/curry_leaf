@@ -93,3 +93,100 @@ menuRouter.patch(
     }
   }
 );
+
+const createMenuItemSchema = z.object({
+  name: z.string().min(1),
+  categoryId: z.string().min(1),
+  shortCode: z.string().optional(),
+  description: z.string().optional(),
+  pricePaise: z.number().int().positive(),
+  taxRatePercent: z.number().min(0).default(5.0),
+  isAvailable: z.boolean().default(true),
+  isVeg: z.boolean().default(true),
+  imageUrl: z.string().optional(),
+  variants: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        pricePaise: z.number().int(),
+      })
+    )
+    .default([]),
+  addOns: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        pricePaise: z.number().int(),
+      })
+    )
+    .default([]),
+});
+
+// POST /api/menu/items - Add a new menu item (Counter / Admin)
+menuRouter.post(
+  '/items',
+  requireRole('counter', 'admin'),
+  validateBody(createMenuItemSchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const {
+        name,
+        categoryId,
+        shortCode,
+        description,
+        pricePaise,
+        taxRatePercent,
+        isAvailable,
+        isVeg,
+        imageUrl,
+        variants,
+        addOns,
+      } = req.body;
+
+      // Verify category exists or fallback
+      let targetCategoryId = categoryId;
+      const catById = inMemoryStore.categories.get(categoryId);
+      if (!catById) {
+        const found = Array.from(inMemoryStore.categories.values()).find(
+          (c) => c.name.toLowerCase() === categoryId.toLowerCase()
+        );
+        if (found) {
+          targetCategoryId = found.id;
+        } else if (inMemoryStore.categories.size > 0) {
+          targetCategoryId = Array.from(inMemoryStore.categories.values())[0].id;
+        }
+      }
+
+      const id = `item_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const newItem: MenuItemRecord = {
+        id,
+        categoryId: targetCategoryId,
+        name,
+        shortCode: shortCode || name.substring(0, 3).toUpperCase(),
+        description: description || '',
+        pricePaise,
+        taxRatePercent: taxRatePercent ?? 5.0,
+        isAvailable: isAvailable ?? true,
+        isVeg: isVeg ?? true,
+        imageUrl: imageUrl || undefined,
+        variants: variants || [],
+        addOns: addOns || [],
+        sortOrder: inMemoryStore.menuItems.size + 1,
+      };
+
+      inMemoryStore.menuItems.set(newItem.id, newItem);
+
+      res.status(201).json({
+        success: true,
+        data: {
+          item: newItem,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/table_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
+import 'server_connection_dialog.dart';
 
 class SidebarNavigation extends StatelessWidget {
   final bool isDrawer;
@@ -121,7 +122,7 @@ class SidebarNavigation extends StatelessWidget {
             ),
           ),
 
-          // Version / Licensing Footer
+          // Version / Licensing Footer & Server Connection
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -130,6 +131,70 @@ class SidebarNavigation extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Quick Server Connection Tile
+                InkWell(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (ctx) => ServerConnectionDialog(provider: provider),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: provider.localServerHealthy
+                            ? AppColors.success.withValues(alpha: 0.4)
+                            : AppColors.warning.withValues(alpha: 0.4),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: provider.localServerHealthy ? AppColors.success : AppColors.warning,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                provider.localServerHealthy ? 'Server Online' : 'Server Offline',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${provider.serverHost}:${provider.serverPort}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  fontSize: 10,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.settings_outlined, size: 14, color: Colors.white54),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 const Row(
                   children: [
                     Icon(Icons.shield_outlined, size: 14, color: AppColors.accent),

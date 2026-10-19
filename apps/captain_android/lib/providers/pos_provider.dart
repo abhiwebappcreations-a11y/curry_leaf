@@ -117,7 +117,7 @@ class PosProvider extends ChangeNotifier {
     } else {
       // Start a fresh draft order for this table
       _currentOrder = RestaurantOrder(
-        id: 'ord-${DateTime.now().millisecondsSinceEpoch}',
+        id: table.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
         tableId: table.id,
         tableName: table.name,
         items: [],
@@ -227,8 +227,40 @@ class PosProvider extends ChangeNotifier {
       final itemsToSend = _currentOrder!.draftItems;
       final idempotencyKey = ApiService.generateUuidV4();
 
+      String activeOrderId = _currentOrder!.id;
+      final serverTableOrderId = _currentTable?.activeOrderId;
+      final isLocalDraftOrder = activeOrderId.startsWith('ord-');
+
+      // Automatically create or attach items to server order before dispatching KOT
+      if (!_apiService.useDemoMode) {
+        if (serverTableOrderId != null && serverTableOrderId.isNotEmpty) {
+          activeOrderId = serverTableOrderId;
+          await _apiService.addItemsToOrder(
+            orderId: activeOrderId,
+            items: itemsToSend,
+          );
+        } else if (isLocalDraftOrder) {
+          // No active order yet: call POST /api/orders first with draft items
+          final createdOrderId = await _apiService.createOrder(
+            tableId: _currentTable!.id,
+            guestCount: _currentOrder!.guestCount,
+            initialItems: itemsToSend,
+          );
+
+          if (createdOrderId != null && createdOrderId.isNotEmpty) {
+            activeOrderId = createdOrderId;
+          }
+        } else {
+          // Order ID is already from server, append new items
+          await _apiService.addItemsToOrder(
+            orderId: activeOrderId,
+            items: itemsToSend,
+          );
+        }
+      }
+
       final ticket = await _apiService.submitKot(
-        orderId: _currentOrder!.id,
+        orderId: activeOrderId,
         tableId: _currentTable!.id,
         tableName: _currentTable!.name,
         itemsToSend: itemsToSend,
@@ -249,6 +281,7 @@ class PosProvider extends ChangeNotifier {
       }).toList();
 
       _currentOrder = _currentOrder!.copyWith(
+        id: activeOrderId,
         items: updatedItems,
         status: 'IN_KITCHEN',
       );
@@ -259,7 +292,7 @@ class PosProvider extends ChangeNotifier {
       if (tableIndex >= 0) {
         _tables[tableIndex] = _tables[tableIndex].copyWith(
           status: TableStatus.occupied,
-          activeOrderId: _currentOrder!.id,
+          activeOrderId: activeOrderId,
           activeOrderTotalPaise: _currentOrder!.totalPaise,
           occupiedSince: _tables[tableIndex].occupiedSince ?? now,
         );

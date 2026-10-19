@@ -13,7 +13,7 @@ void main() {
       // 1. Order Intake & Review
       expect(provider.activeOrders.isNotEmpty, isTrue);
       final activeOrder = provider.activeOrders.first;
-      expect(activeOrder.status, isIn(['IN_KITCHEN', 'ACTIVE', 'preparing']));
+      expect(activeOrder.status.toLowerCase(), isIn(['in_kitchen', 'active', 'preparing']));
 
       // 2. Select Order to Generate Bill
       await provider.selectOrder(activeOrder);
@@ -83,6 +83,7 @@ void main() {
       expect(billPrinter, isNotNull);
       expect(billPrinter!.isConnected, isTrue);
       expect(billPrinter.lastTestPrintAt, isNotNull);
+      provider.dispose();
     });
   });
 }

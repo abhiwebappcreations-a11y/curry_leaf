@@ -30,5 +30,8 @@ void main() {
     expect(find.text('Tables / Floor'), findsOneWidget);
     expect(find.text('Billing & Till'), findsOneWidget);
     expect(find.text('Thermal Printers'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    provider.dispose();
   });
 }

@@ -14,14 +14,14 @@ class ApiService {
   bool useDemoMode;
 
   ApiService({
-    this.host = '192.168.1.100', // Set to local Counter PC IP or load from SharedPreferences
+    this.host = '192.168.29.116', // Default to Counter PC IP (fallback: 192.168.1.100)
     this.port = 4000,
     this.useDemoMode = false,    // Set default to false
   });
 
   String get baseUrl {
     // When running inside a browser preview on the host machine, route to 127.0.0.1
-    if (kIsWeb && host == '192.168.1.100') {
+    if (kIsWeb && (host == '192.168.1.100' || host == '192.168.29.116')) {
       return 'http://127.0.0.1:$port/api';
     }
     return 'http://$host:$port/api';
@@ -54,11 +54,19 @@ class ApiService {
     return decoded;
   }
 
-  Future<bool> checkHealth() async {
+  Future<bool> checkHealth({String? customHost, int? customPort}) async {
     if (useDemoMode) return true;
+    final targetHost = customHost ?? host;
+    final targetPort = customPort ?? port;
+    String url;
+    if (kIsWeb && (targetHost == '192.168.1.100' || targetHost == '192.168.29.116')) {
+      url = 'http://127.0.0.1:$targetPort/api/health';
+    } else {
+      url = 'http://$targetHost:$targetPort/api/health';
+    }
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/health'), headers: _defaultHeaders)
+          .get(Uri.parse(url), headers: _defaultHeaders)
           .timeout(const Duration(seconds: 3));
       return response.statusCode == 200;
     } catch (_) {
@@ -136,6 +144,89 @@ class ApiService {
     return MockData.getInitialMenu();
   }
 
+  List<Map<String, dynamic>> _formatOrderItems(List<OrderItem> items) {
+    return items.map((item) => {
+      'menuItemId': item.menuItemId,
+      'quantity': item.quantity,
+      'itemNotes': item.notes ?? '',
+      'selectedVariants': item.selectedVariant != null
+          ? [{'id': 'v1', 'name': item.selectedVariant!, 'pricePaise': 0}]
+          : [],
+      'selectedAddons': item.selectedAddons
+          .map((a) => {'id': a, 'name': a, 'pricePaise': 0})
+          .toList(),
+    }).toList();
+  }
+
+  /// Creates a new order on the server for the specified table.
+  /// If the table already has an active order (409 Conflict), extracts and returns activeOrderId.
+  Future<String?> createOrder({
+    required String tableId,
+    int? guestCount,
+    List<OrderItem>? initialItems,
+    String? customerNotes,
+  }) async {
+    if (useDemoMode) return 'ord-demo-${DateTime.now().millisecondsSinceEpoch}';
+
+    try {
+      final body = <String, dynamic>{
+        'tableId': tableId,
+        if (guestCount != null && guestCount > 0) 'guestCount': guestCount,
+        if (customerNotes != null && customerNotes.isNotEmpty) 'customerNotes': customerNotes,
+        if (initialItems != null && initialItems.isNotEmpty)
+          'items': _formatOrderItems(initialItems),
+      };
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/orders'),
+            headers: _defaultHeaders,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = _unwrapResponse(response);
+        if (data is Map<String, dynamic> && data['order'] != null) {
+          return data['order']['id'] as String?;
+        }
+      } else if (response.statusCode == 409) {
+        // Table already has active order on server
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final errorData = decoded['error'] ?? decoded['data'];
+          if (errorData is Map<String, dynamic> && errorData['activeOrderId'] != null) {
+            return errorData['activeOrderId'] as String;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Appends draft items to an existing order on the server
+  Future<bool> addItemsToOrder({
+    required String orderId,
+    required List<OrderItem> items,
+  }) async {
+    if (useDemoMode) return true;
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/orders/$orderId/items'),
+            headers: _defaultHeaders,
+            body: jsonEncode({
+              'items': _formatOrderItems(items),
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<KotTicket> submitKot({
     required String orderId,
     required String tableId,
@@ -169,19 +260,7 @@ class ApiService {
       'Idempotency-Key': idempotencyKey,
     };
 
-    // Contract: items must send menuItemId, quantity, notes, plus integer paise snapshots
-    final payloadItems = itemsToSend.map((item) => {
-      'menuItemId': item.menuItemId,
-      'quantity': item.quantity,
-      'notes': item.notes ?? '',
-      'itemNotes': item.notes ?? '',
-      'selectedVariants': item.selectedVariant != null
-          ? [{'id': 'v1', 'name': item.selectedVariant!, 'pricePaise': 0}]
-          : [],
-      'selectedAddons': item.selectedAddons
-          .map((a) => {'id': a, 'name': a, 'pricePaise': 0})
-          .toList(),
-    }).toList();
+    final payloadItems = _formatOrderItems(itemsToSend);
 
     try {
       final response = await http.post(

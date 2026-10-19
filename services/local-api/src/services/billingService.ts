@@ -57,6 +57,50 @@ export class BillingService {
       (b) => b.orderId === order.id && b.status !== 'voided'
     );
     if (existingBill) {
+      if (existingBill.status === 'settled') {
+        return existingBill;
+      }
+      // If the bill is not yet settled, update it with latest order items & discount
+      const discountPaise = input.discountPaise !== undefined ? input.discountPaise : existingBill.discountPaise;
+      let subtotalPaise = 0;
+      let taxPaise = 0;
+      const now = new Date().toISOString();
+      const updatedItems: BillItemRecord[] = billableItems.map((item) => {
+        const itemTotal = item.pricePaiseSnapshot * item.quantity;
+        const itemTax = calculateTaxPaise(itemTotal, item.taxRateSnapshot);
+        subtotalPaise += itemTotal;
+        taxPaise += itemTax;
+
+        return {
+          id: `bi_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          billId: existingBill.id,
+          menuItemId: item.menuItemId,
+          nameSnapshot: item.nameSnapshot,
+          unitPricePaise: item.pricePaiseSnapshot,
+          quantity: item.quantity,
+          totalPaise: itemTotal,
+          taxPaise: itemTax,
+          optionsSnapshot: {
+            variants: item.selectedVariants,
+            addons: item.selectedAddons,
+          },
+          createdAt: now,
+        };
+      });
+
+      existingBill.items = updatedItems;
+      existingBill.subtotalPaise = subtotalPaise;
+      existingBill.taxPaise = taxPaise;
+      existingBill.discountPaise = discountPaise;
+      existingBill.totalPaise = Math.max(0, subtotalPaise + taxPaise - discountPaise);
+      existingBill.finalizedAt = now;
+
+      order.subtotalPaise = subtotalPaise;
+      order.taxPaise = taxPaise;
+      order.discountPaise = discountPaise;
+      order.totalPaise = existingBill.totalPaise;
+      order.updatedAt = now;
+
       return existingBill;
     }
 
