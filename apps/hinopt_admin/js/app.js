@@ -6,10 +6,41 @@ document.addEventListener('DOMContentLoaded', function () {
 let currentTab = 'overview';
 let activeFilter = '';
 
-function initApp() {
+async function initApp() {
   setupNavigation();
   setupEventListeners();
   renderAll();
+
+  if (window.SupabaseClient) {
+    try {
+      const liveRests = await window.SupabaseClient.fetchRestaurants();
+      const liveLics = await window.SupabaseClient.fetchLicenses();
+      if (liveRests && liveRests.length > 0) {
+        const merged = liveRests.map(r => {
+          const lic = (liveLics || []).find(l => l.restaurant_id === r.id);
+          return {
+            id: r.id,
+            name: r.name,
+            city: r.city,
+            contactName: r.contact_name,
+            phone: r.phone,
+            hwid: r.hwid,
+            licenseKey: lic ? lic.license_key : (r.id),
+            status: lic ? lic.status : 'ACTIVE',
+            issuedAt: lic && lic.valid_from ? lic.valid_from.split('T')[0] : '2026-10-17',
+            expiresAt: lic && lic.valid_until ? lic.valid_until.split('T')[0] : '2027-10-17',
+            counterIp: r.counter_ip || '192.168.1.100',
+            notes: r.notes || ''
+          };
+        });
+        window.HinoptData.restaurants = merged;
+        renderAll();
+        console.log('[Hinopt Admin] Live Supabase cloud records synced successfully');
+      }
+    } catch (e) {
+      console.warn('[Hinopt Admin] Live sync fallback:', e);
+    }
+  }
 }
 
 function setupNavigation() {

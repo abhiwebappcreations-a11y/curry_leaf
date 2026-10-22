@@ -63,6 +63,9 @@ window.LicenseService = {
       details: `Renewed license for ${years} Year(s). New expiry date: ${newExpiryStr}`
     });
 
+    if (window.SupabaseClient) {
+      window.SupabaseClient.updateLicenseStatus(restaurant.licenseKey, "ACTIVE", newExpiry.toISOString());
+    }
     return true;
   },
 
@@ -82,6 +85,12 @@ window.LicenseService = {
       details: `${isSuspending ? 'Suspended' : 'Reactivated'} license. Reason: ${reason}`
     });
 
+    if (window.SupabaseClient) {
+      window.SupabaseClient.updateLicenseStatus(restaurant.licenseKey, "ACTIVE", newExpiry.toISOString());
+    }
+    if (window.SupabaseClient) {
+      window.SupabaseClient.updateLicenseStatus(restaurant.licenseKey, restaurant.status);
+    }
     return true;
   },
 
