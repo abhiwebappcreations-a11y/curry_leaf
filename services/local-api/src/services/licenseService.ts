@@ -37,6 +37,55 @@ export class LicenseService {
 
     const now = Date.now();
     const expiryTime = new Date(license.validUntil).getTime();
+    const validFromTime = new Date(license.validFrom).getTime();
+
+    // Anti-Tamper Check 1: System clock is set to before license issuance
+    if (now < validFromTime) {
+      logger.warn({ now: new Date(now).toISOString(), validFrom: license.validFrom }, 'Clock rollback detected before validFrom');
+      return {
+        isValid: false,
+        status: 'suspended',
+        restaurantId: license.restaurantId,
+        restaurantName: license.restaurantName,
+        licenseKey: license.licenseKey,
+        validFrom: license.validFrom,
+        validUntil: license.validUntil,
+        daysRemaining: 0,
+        isOfflineGraceActive: false,
+        features: [],
+      };
+    }
+
+    // Anti-Tamper Check 2: System clock is set backwards behind existing transactions
+    let latestRecordedTimeMs = new Date(license.lastVerifiedAt).getTime();
+    for (const order of inMemoryStore.orders.values()) {
+      const orderTime = new Date(order.createdAt).getTime();
+      if (orderTime > latestRecordedTimeMs) latestRecordedTimeMs = orderTime;
+    }
+    for (const bill of inMemoryStore.bills.values()) {
+      const billTime = new Date(bill.createdAt).getTime();
+      if (billTime > latestRecordedTimeMs) latestRecordedTimeMs = billTime;
+    }
+
+    if (now < latestRecordedTimeMs - 5 * 60 * 1000) {
+      logger.warn(
+        { now: new Date(now).toISOString(), latestRecordedTime: new Date(latestRecordedTimeMs).toISOString() },
+        'System clock rollback detected! Local time is behind historical transactions.'
+      );
+      return {
+        isValid: false,
+        status: 'suspended',
+        restaurantId: license.restaurantId,
+        restaurantName: license.restaurantName,
+        licenseKey: license.licenseKey,
+        validFrom: license.validFrom,
+        validUntil: license.validUntil,
+        daysRemaining: 0,
+        isOfflineGraceActive: false,
+        features: [],
+      };
+    }
+
     const diffMs = expiryTime - now;
     const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
