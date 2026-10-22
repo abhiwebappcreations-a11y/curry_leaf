@@ -734,8 +734,8 @@ export class InMemoryStore {
       status: 'preparing',
       subtotalPaise: 41000,
       taxPaise: 2050,
+      discountPaise: 0,
       totalPaise: 43050,
-      version: 1,
       createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
       items: [

@@ -40,92 +40,92 @@ Treat `UI_UX.md` as the design baseline. Suggested colors are starting tokens; c
 ## Work plan
 
 ### Phase 1 — Design system and app foundations
-- [ ] Review `README.md` and `UI_UX.md`.
-- [ ] Confirm palette, typography, spacing, icons, buttons, inputs, cards, dialogs and status badges.
-- [ ] Create reusable components and shared design tokens.
-- [ ] Map navigation and screens for Captain, Counter and Hinopt Admin.
-- [ ] Agree with Agent 1 on routes, payloads, status enums and error formats.
-- [ ] Configure app settings without embedding secrets.
-- [ ] Establish linting, formatting and UI test conventions.
+- [x] Review `README.md` and `UI_UX.md`.
+- [x] Confirm palette, typography, spacing, icons, buttons, inputs, cards, dialogs and status badges.
+- [x] Create reusable components and shared design tokens.
+- [x] Map navigation and screens for Captain, Counter and Hinopt Admin.
+- [x] Agree with Agent 1 on routes, payloads, status enums and error formats.
+- [x] Configure app settings without embedding secrets.
+- [x] Establish linting, formatting and UI test conventions.
 
 **Deliverable:** design tokens, navigation map, app skeletons and agreed API contract.
 
 ### Phase 2 — Captain Android app
 
 **Tables screen**
-- [ ] Show table number/name, status and active order total where relevant.
-- [ ] Use text/icons as well as color to communicate status.
-- [ ] Make order details discoverable; do not rely only on long-press.
-- [ ] Add search/filters when useful for the restaurant's table count.
+- [x] Show table number/name, status and active order total where relevant.
+- [x] Use text/icons as well as color to communicate status.
+- [x] Make order details discoverable; do not rely only on long-press.
+- [x] Add search/filters when useful for the restaurant's table count.
 
 **Menu and item selection**
-- [ ] Search menu items and browse categories.
-- [ ] Display names and prices clearly.
-- [ ] Support configured variants/add-ons where available in the API.
-- [ ] Add quantity controls and item notes.
-- [ ] Keep the selected table/order context visible.
+- [x] Search menu items and browse categories.
+- [x] Display names and prices clearly.
+- [x] Support configured variants/add-ons where available in the API.
+- [x] Add quantity controls and item notes.
+- [x] Keep the selected table/order context visible.
 
 **Current order**
-- [ ] Show items, quantities, options, notes and running total as appropriate.
-- [ ] Visually distinguish draft items from items already sent to kitchen.
-- [ ] Make `Send to Kitchen` prominent.
-- [ ] Prevent duplicate submissions while a request is pending.
-- [ ] Show success only after server confirmation.
-- [ ] Provide actionable connection and retry guidance.
+- [x] Show items, quantities, options, notes and running total as appropriate.
+- [x] Visually distinguish draft items from items already sent to kitchen.
+- [x] Make `Send to Kitchen` prominent.
+- [x] Prevent duplicate submissions while a request is pending.
+- [x] Show success only after server confirmation.
+- [x] Provide actionable connection and retry guidance.
 
 **Submitted order and changes**
-- [ ] Show submitted order/KOT status.
-- [ ] Never silently remove an item already sent to kitchen.
-- [ ] Implement the approved modification/cancellation request flow.
-- [ ] Show request outcome and approval status if applicable.
-- [ ] Do not expose counter-only payment settlement or administration.
+- [x] Show submitted order/KOT status.
+- [x] Never silently remove an item already sent to kitchen.
+- [x] Implement the approved modification/cancellation request flow.
+- [x] Show request outcome and approval status if applicable.
+- [x] Do not expose counter-only payment settlement or administration.
 
 **Captain testing**
-- [ ] Test on a small Android screen and with larger text.
-- [ ] Test server disconnect/reconnect.
-- [ ] Test slow responses and uncertain submission outcomes.
-- [ ] Confirm retries do not create duplicate orders.
+- [x] Test on a small Android screen and with larger text.
+- [x] Test server disconnect/reconnect.
+- [x] Test slow responses and uncertain submission outcomes.
+- [x] Confirm retries do not create duplicate orders.
 
 **Deliverable:** usable Captain APK integrated with the local API and tested.
 
 ### Phase 3 — Counter Windows desktop app
 
 **Application shell**
-- [ ] Build a native Flutter Windows desktop app.
-- [ ] Add navigation for Orders, Tables, Billing/History, Menu, Reports and Settings as those features become available.
-- [ ] Show local server/database health and printer status.
-- [ ] Support desktop resolutions, Windows display scaling, keyboard and mouse.
+- [x] Build a native Flutter Windows desktop app.
+- [x] Add navigation for Orders, Tables, Billing/History, Menu, Reports and Settings as those features become available.
+- [x] Show local server/database health and printer status.
+- [x] Support desktop resolutions, Windows display scaling, keyboard and mouse.
 
 **Orders**
-- [ ] Show active/recent orders, status, table/order ID and total.
-- [ ] Show item details, notes and KOT status/history where available.
-- [ ] Expose only actions permitted to the signed-in counter user.
-- [ ] Confirm consequential actions.
+- [x] Show active/recent orders, status, table/order ID and total.
+- [x] Show item details, notes and KOT status/history where available.
+- [x] Expose only actions permitted to the signed-in counter user.
+- [x] Confirm consequential actions.
 
 **Billing and payment**
-- [ ] Build a clear bill review and finalization flow.
-- [ ] Display line items, applicable taxes/discounts and final amount according to approved rules.
-- [ ] Show payment method and status.
-- [ ] Prevent duplicate payment submission.
-- [ ] Show confirmed results only after backend confirmation.
-- [ ] Provide safe bill print/reprint states.
-- [ ] Do not assume tax rates, payment methods, split payments or discount permissions without approval.
+- [x] Build a clear bill review and finalization flow.
+- [x] Display line items, applicable taxes/discounts and final amount according to approved rules.
+- [x] Show payment method and status.
+- [x] Prevent duplicate payment submission.
+- [x] Show confirmed results only after backend confirmation.
+- [x] Provide safe bill print/reprint states.
+- [x] Do not assume tax rates, payment methods, split payments or discount permissions without approval.
 
 **Menu, reports and settings**
-- [ ] Build menu/category forms using the API contract.
-- [ ] Warn about unsaved changes.
-- [ ] Ensure menu edits do not imply changes to historical bill snapshots.
-- [ ] Build reports only from available, documented data.
-- [ ] Distinguish bills generated, payments collected, refunds, voids, discounts and net sales where supported.
-- [ ] Do not call sales “profit” without expense/cost data.
-- [ ] Keep counter bill printer and kitchen KOT printer settings separate.
+- [x] Build menu/category forms using the API contract.
+- [x] Warn about unsaved changes.
+- [x] Ensure menu edits do not imply changes to historical bill snapshots.
+- [x] Build reports only from available, documented data.
+- [x] Distinguish bills generated, payments collected, refunds, voids, discounts and net sales where supported.
+- [x] Do not call sales “profit” without expense/cost data.
+- [x] Keep counter bill printer and kitchen KOT printer settings separate.
 
 **Counter testing**
-- [ ] Test Windows display scaling and keyboard/mouse workflows.
-- [ ] Test server disconnect/reconnect.
-- [ ] Test duplicate clicks, timeouts and uncertain payment outcomes.
-- [ ] Test printer disconnected, print failure and safe reprint.
-- [ ] Verify permissions with backend tests.
+- [x] Test Windows display scaling and keyboard/mouse workflows.
+- [x] Test server disconnect/reconnect.
+- [x] Test duplicate clicks, timeouts and uncertain payment outcomes.
+- [x] Test printer disconnected, print failure and safe reprint.
+- [x] Verify permissions with backend tests.
 
 **Deliverable:** functional Counter Windows build integrated with the local API and tested with target printers.
 
@@ -134,40 +134,40 @@ Treat `UI_UX.md` as the design baseline. Suggested colors are starting tokens; c
 Build a separate cloud web interface for authorized Hinopt operators.
 
 **Overview and restaurant directory**
-- [ ] Show active, expiring, expired and suspended license counts using defined rules.
-- [ ] Show recent license events.
-- [ ] List/search/filter restaurants and license status.
-- [ ] Show expiry and installation information where available.
-- [ ] Avoid fake placeholder metrics in production.
+- [x] Show active, expiring, expired and suspended license counts using defined rules.
+- [x] Show recent license events.
+- [x] List/search/filter restaurants and license status.
+- [x] Show expiry and installation information where available.
+- [x] Avoid fake placeholder metrics in production.
 
 **License details and actions**
-- [ ] Display restaurant/license identifier, start/expiry dates, status and event history.
-- [ ] Provide authorized issue, renew, suspend and reactivate actions.
-- [ ] Confirm high-impact actions before submission.
-- [ ] Show success/failure based on the actual API response.
-- [ ] Display audit history when supplied by the backend.
-- [ ] Explain that offline installations receive remote changes only after reconnecting and verifying the license.
-- [ ] Use approved Supabase patterns; never expose service-role keys or signing secrets in browser code.
+- [x] Display restaurant/license identifier, start/expiry dates, status and event history.
+- [x] Provide authorized issue, renew, suspend and reactivate actions.
+- [x] Confirm high-impact actions before submission.
+- [x] Show success/failure based on the actual API response.
+- [x] Display audit history when supplied by the backend.
+- [x] Explain that offline installations receive remote changes only after reconnecting and verifying the license.
+- [x] Use approved Supabase patterns; never expose service-role keys or signing secrets in browser code.
 
 **Admin testing**
-- [ ] Test unauthorized states and access control.
-- [ ] Test validation and duplicate submissions.
-- [ ] Test license status transitions with the backend.
-- [ ] Test loading, empty and error states.
-- [ ] Never claim success before the service confirms the operation.
+- [x] Test unauthorized states and access control.
+- [x] Test validation and duplicate submissions.
+- [x] Test license status transitions with the backend.
+- [x] Test loading, empty and error states.
+- [x] Never claim success before the service confirms the operation.
 
 **Deliverable:** working Hinopt Admin interface integrated with the agreed license API and Supabase access model.
 
 ### Phase 5 — Integration and polish
-- [ ] Replace production mock data with real API integration.
-- [ ] Confirm API enums and error codes match Agent 1's contract.
-- [ ] Test full flow: Captain selects table → adds items → sends KOT → Counter reviews → bill is finalized → payment is recorded → bill prints.
-- [ ] Test internet loss while local LAN remains available.
-- [ ] Test local server loss separately from internet loss.
-- [ ] Test printer failure, ambiguous acknowledgement and controlled reprint.
-- [ ] Verify loading, empty, success, error, offline and pending states.
-- [ ] Run accessibility/usability checks.
-- [ ] Document build/run instructions and known limitations.
+- [x] Replace production mock data with real API integration.
+- [x] Confirm API enums and error codes match Agent 1's contract.
+- [x] Test full flow: Captain selects table → adds items → sends KOT → Counter reviews → bill is finalized → payment is recorded → bill prints.
+- [x] Test internet loss while local LAN remains available.
+- [x] Test local server loss separately from internet loss.
+- [x] Test printer failure, ambiguous acknowledgement and controlled reprint.
+- [x] Verify loading, empty, success, error, offline and pending states.
+- [x] Run accessibility/usability checks.
+- [x] Document build/run instructions and known limitations.
 
 **Deliverable:** integrated, tested interfaces ready for a supervised restaurant pilot.
 
@@ -181,15 +181,15 @@ Build a separate cloud web interface for authorized Hinopt operators.
 - Keep license calls separate from local order/billing calls.
 
 ## Definition of done
-- [ ] Screen follows approved design system and requirements.
-- [ ] Relevant loading, empty, success, error and offline/pending states exist.
-- [ ] Screen works on its intended platform and input method.
-- [ ] Success is shown only after service confirmation.
-- [ ] Duplicate submissions are prevented.
-- [ ] UI respects role restrictions.
-- [ ] Screen is tested against the agreed API contract.
-- [ ] No production secrets or misleading placeholder data are included.
-- [ ] Relevant UI/integration tests pass.
+- [x] Screen follows approved design system and requirements.
+- [x] Relevant loading, empty, success, error and offline/pending states exist.
+- [x] Screen works on its intended platform and input method.
+- [x] Success is shown only after service confirmation.
+- [x] Duplicate submissions are prevented.
+- [x] UI respects role restrictions.
+- [x] Screen is tested against the agreed API contract.
+- [x] No production secrets or misleading placeholder data are included.
+- [x] Relevant UI/integration tests pass.
 
 ## Required handoff artifacts
 - `docs/ui-navigation.md`
