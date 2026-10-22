@@ -75,6 +75,10 @@ class CounterProvider extends ChangeNotifier {
   bool get databaseHealthy => _databaseHealthy;
   String get licenseStatus => _licenseStatus;
   int get licenseDaysRemaining => _licenseDaysRemaining;
+  bool get isLicenseLocked =>
+      _licenseStatus.toLowerCase() == 'expired' ||
+      _licenseStatus.toLowerCase() == 'suspended' ||
+      (_licenseStatus.toLowerCase() != 'active' && _licenseDaysRemaining <= 0);
   String get serverHost => _counterApiService.host;
   int get serverPort => _counterApiService.port;
   bool get isRefreshing => _isRefreshing;

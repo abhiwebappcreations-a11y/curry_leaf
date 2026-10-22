@@ -279,8 +279,15 @@ class ApiService {
             : (data is Map<String, dynamic> ? data : <String, dynamic>{});
         kotJson['tableName'] = tableName;
         return KotTicket.fromJson(kotJson);
+      } else if (response.statusCode == 402) {
+        final decoded = jsonDecode(response.body);
+        final msg = decoded['error']?['message'] ?? 'Hinopt POS subscription has expired. Operations are stopped.';
+        throw Exception(msg);
       }
-    } catch (_) {
+    } catch (e) {
+      if (e.toString().contains('subscription has expired') || e.toString().contains('license')) {
+        rethrow;
+      }
       // In offline resilience mode, return confirmed local KOT ticket
     }
 

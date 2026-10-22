@@ -195,7 +195,9 @@ class PrinterSettingsView extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () async {
+                  onPressed: provider.isLicenseLocked
+                      ? null
+                      : () async {
                     await provider.testPrint(printer.role);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(

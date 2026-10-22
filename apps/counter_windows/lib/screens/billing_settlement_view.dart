@@ -670,7 +670,7 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
 
           // Big Settlement Button
           ElevatedButton.icon(
-            onPressed: provider.isSettlingPayment
+            onPressed: (provider.isSettlingPayment || provider.isLicenseLocked)
                 ? null
                 : () async {
                     final success = await provider.settlePayment(
@@ -704,9 +704,11 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
                   )
                 : const Icon(Icons.check_circle_outline, size: 20),
             label: Text(
-              provider.isSettlingPayment
-                  ? 'COMMITTING...'
-                  : 'SETTLE & PRINT (${currencyFormatter.format(totalRupees)})',
+              provider.isLicenseLocked
+                  ? 'SUBSCRIPTION EXPIRED -- LOCKED'
+                  : provider.isSettlingPayment
+                      ? 'COMMITTING...'
+                      : 'SETTLE & PRINT (${currencyFormatter.format(totalRupees)})',
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             ),
             style: ElevatedButton.styleFrom(

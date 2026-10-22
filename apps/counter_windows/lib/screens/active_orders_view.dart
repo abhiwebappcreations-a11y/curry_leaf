@@ -53,7 +53,7 @@ class ActiveOrdersView extends StatelessWidget {
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: () => provider.setActiveTab(CounterTab.tables),
+                      onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('New Table'),
                       style: ElevatedButton.styleFrom(
@@ -95,7 +95,7 @@ class ActiveOrdersView extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
-                      onPressed: () => provider.setActiveTab(CounterTab.tables),
+                      onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text('New Table / Order'),
                     ),
@@ -271,7 +271,7 @@ class ActiveOrdersView extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => provider.selectOrder(order),
+              onPressed: provider.isLicenseLocked ? null : () => provider.selectOrder(order),
               icon: const Icon(Icons.receipt, size: 16),
               label: const Text('Finalize Bill & Settle'),
               style: ElevatedButton.styleFrom(
@@ -426,7 +426,7 @@ class ActiveOrdersView extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ElevatedButton.icon(
-                onPressed: () => provider.selectOrder(order),
+                onPressed: provider.isLicenseLocked ? null : () => provider.selectOrder(order),
                 icon: const Icon(Icons.receipt, size: 16),
                 label: const Text('Finalize Bill & Settle'),
                 style: ElevatedButton.styleFrom(

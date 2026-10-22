@@ -252,20 +252,40 @@ class OrderSummarySheet extends StatelessWidget {
                   onPressed: provider.isSubmittingKot
                       ? null
                       : () async {
-                          final ticket = await provider.sendDraftToKitchen();
-                          if (context.mounted && ticket != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: AppColors.success,
-                                content: Row(
-                                  children: [
-                                    const Icon(Icons.check_circle, color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Text('Order dispatched! ${ticket.kotNumber} printed to kitchen.'),
-                                  ],
+                          try {
+                            final ticket = await provider.sendDraftToKitchen();
+                            if (context.mounted && ticket != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AppColors.success,
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle, color: Colors.white),
+                                      const SizedBox(width: 8),
+                                      Text('Order dispatched! ${ticket.kotNumber} printed to kitchen.'),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AppColors.error,
+                                  duration: const Duration(seconds: 4),
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.lock, color: Colors.white),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(e.toString().replaceAll('Exception: ', '')),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
                           }
                         },
                   style: ElevatedButton.styleFrom(

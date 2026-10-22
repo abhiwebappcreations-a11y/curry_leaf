@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PrintService } from '../services/printService.js';
 import { config } from '../config/index.js';
-import { authenticateDevice, requireRole } from '../middleware/auth.js';
+import { authenticateDevice, requireRole, requireActiveLicense } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const printersRouter = Router();
@@ -43,6 +43,7 @@ const testPrintSchema = z.object({
 // POST /api/printers/test-print - Trigger test print (Counter / Admin only)
 printersRouter.post(
   '/test-print',
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   validateBody(testPrintSchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -94,6 +95,7 @@ printersRouter.get('/jobs', async (req: Request, res: Response, next: NextFuncti
 // POST /api/printers/jobs/:id/retry - Retry failed print job (Counter / Admin only)
 printersRouter.post(
   '/jobs/:id/retry',
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

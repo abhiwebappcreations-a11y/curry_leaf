@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { BillingService } from '../services/billingService.js';
-import { authenticateDevice, requireRole } from '../middleware/auth.js';
+import { authenticateDevice, requireRole, requireActiveLicense } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const billingRouter = Router();
@@ -15,6 +15,7 @@ const finalizeBillSchema = z.object({
 // POST /orders/:id/bill or /bills/orders/:id/bill - Finalize bill
 billingRouter.post(
   ['/orders/:id/bill', '/bills/orders/:id/bill'],
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   validateBody(finalizeBillSchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -80,6 +81,7 @@ const settlePaymentSchema = z.object({
 // POST /:id/payments or /bills/:id/payments - Settle payment (Counter / Admin only)
 billingRouter.post(
   ['/:id/payments', '/bills/:id/payments'],
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   validateBody(settlePaymentSchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -102,6 +104,7 @@ billingRouter.post(
 // POST /:id/reprint or /bills/:id/reprint - Safe reprint with REPRINT watermark
 billingRouter.post(
   ['/:id/reprint', '/bills/:id/reprint'],
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -123,6 +126,7 @@ const voidBillSchema = z.object({
 // POST /:id/void or /bills/:id/void - Void bill with auditable reason
 billingRouter.post(
   ['/:id/void', '/bills/:id/void'],
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   validateBody(voidBillSchema),
   async (req: Request, res: Response, next: NextFunction) => {

@@ -235,6 +235,58 @@ describe('Hinopt Restaurant POS - Local API Integration Suite', () => {
     expect(dupRes.body.data.payment.id).toBe(res.body.data.payment.id);
   });
 
+  it('Enforces subscription expiry: rejects orders, KOTs, billing, payments, and printing when license is expired or suspended', async () => {
+    // 1. Temporarily mark license as expired
+    const originalLicense = inMemoryStore.license;
+    inMemoryStore.license = {
+      ...originalLicense!,
+      status: 'expired',
+      validUntil: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    // Attempting to create order must be blocked with 402
+    const orderRes = await request(app)
+      .post('/api/orders')
+      .set('X-Device-Id', 'dev_captain_01')
+      .set('X-Api-Key', 'captain_dev_token_01')
+      .send({ tableId: 'tab_t3', items: [{ menuItemId: 'item_paneer_65', quantity: 1 }] });
+
+    expect(orderRes.status).toBe(402);
+    expect(orderRes.body.error.code).toBe('LICENSE_EXPIRED');
+
+    // Attempting to send KOT must be blocked with 402
+    const kotRes = await request(app)
+      .post('/api/orders/ord_live_101/kot')
+      .set('X-Device-Id', 'dev_captain_01')
+      .set('X-Api-Key', 'captain_dev_token_01');
+
+    expect(kotRes.status).toBe(402);
+    expect(kotRes.body.error.code).toBe('LICENSE_EXPIRED');
+
+    // Attempting to finalize bill must be blocked with 402
+    const billRes = await request(app)
+      .post('/api/billing/orders/ord_live_101/bill')
+      .set('X-Device-Id', 'dev_counter_01')
+      .set('X-Api-Key', 'counter_dev_token')
+      .send({});
+
+    expect(billRes.status).toBe(402);
+    expect(billRes.body.error.code).toBe('LICENSE_EXPIRED');
+
+    // Attempting to test print must be blocked with 402
+    const printRes = await request(app)
+      .post('/api/printers/test-print')
+      .set('X-Device-Id', 'dev_counter_01')
+      .set('X-Api-Key', 'counter_dev_token')
+      .send({ targetPrinter: 'counter_bill' });
+
+    expect(printRes.status).toBe(402);
+    expect(printRes.body.error.code).toBe('LICENSE_EXPIRED');
+
+    // Restore active license
+    inMemoryStore.license = originalLicense;
+  });
+
   it('GET /api/reports/daily-summary - Daily sales and breakdown in integer paise', async () => {
     const res = await request(app)
       .get('/api/reports/daily-summary')

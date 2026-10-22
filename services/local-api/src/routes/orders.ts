@@ -4,7 +4,7 @@ import { inMemoryStore } from '../db/inMemoryStore.js';
 import { OrderService } from '../services/orderService.js';
 import { KotService } from '../services/kotService.js';
 import { BillingService } from '../services/billingService.js';
-import { authenticateDevice, requireRole } from '../middleware/auth.js';
+import { authenticateDevice, requireRole, requireActiveLicense } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
 export const ordersRouter = Router();
@@ -33,6 +33,7 @@ const createOrderSchema = z.object({
 // POST /api/orders - Create new order
 ordersRouter.post(
   '/',
+  requireActiveLicense,
   validateBody(createOrderSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -88,7 +89,7 @@ ordersRouter.get('/:id', async (req: Request, res: Response, next: NextFunction)
 });
 
 // POST /api/orders/:id/bill - Generate or update bill for order
-ordersRouter.post('/:id/bill', requireRole('counter', 'admin'), async (req: Request, res: Response, next: NextFunction) => {
+ordersRouter.post('/:id/bill', requireActiveLicense, requireRole('counter', 'admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bill = await BillingService.finalizeBill(req.params.id as string, req.body, req.device?.id);
     res.status(201).json({
@@ -109,6 +110,7 @@ const addItemsSchema = z.object({
 // POST /api/orders/:id/items - Append new items
 ordersRouter.post(
   '/:id/items',
+  requireActiveLicense,
   validateBody(addItemsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -133,6 +135,7 @@ const updateDraftItemSchema = z.object({
 // PATCH /api/orders/:id/items/:itemId - Update draft item
 ordersRouter.patch(
   '/:id/items/:itemId',
+  requireActiveLicense,
   validateBody(updateDraftItemSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -155,7 +158,7 @@ ordersRouter.patch(
 );
 
 // POST /api/orders/:id/kot - Send draft items to kitchen (triggers KOT generation & print)
-ordersRouter.post('/:id/kot', async (req: Request, res: Response, next: NextFunction) => {
+ordersRouter.post('/:id/kot', requireActiveLicense, async (req: Request, res: Response, next: NextFunction) => {
   try {
     let orderId = req.params.id as string;
     let order = inMemoryStore.orders.get(orderId);
@@ -209,6 +212,7 @@ const cancelItemSchema = z.object({
 // POST /api/orders/:id/items/:itemId/cancel - Auditable cancellation workflow
 ordersRouter.post(
   '/:id/items/:itemId/cancel',
+  requireActiveLicense,
   requireRole('counter', 'admin'),
   validateBody(cancelItemSchema),
   async (req: Request, res: Response, next: NextFunction) => {

@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
-import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
+import { UnauthorizedError, ForbiddenError, LicenseExpiredError } from '../utils/errors.js';
+import { LicenseService } from '../services/licenseService.js';
 import { inMemoryStore, DeviceRecord } from '../db/inMemoryStore.js';
 
 export interface AuthenticatedDevice {
@@ -92,4 +93,20 @@ export function requireRole(...allowedRoles: Array<'captain' | 'counter' | 'admi
 
     next();
   };
+}
+
+
+export async function requireActiveLicense(req: Request, res: Response, next: NextFunction) {
+  try {
+    const licenseStatus = await LicenseService.getLicenseStatus();
+    if (!licenseStatus.isValid) {
+      const msg = licenseStatus.status === 'suspended'
+        ? 'Hinopt POS subscription is suspended. KOT, billing, and ordering are disabled.'
+        : 'Hinopt POS subscription has expired. KOT, billing, and ordering are disabled. Please renew with Hinopt Admin.';
+      return next(new LicenseExpiredError(msg));
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
