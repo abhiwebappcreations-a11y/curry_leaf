@@ -1,15 +1,6 @@
 {
   "tables": [
     {
-      "id": "tab_t1",
-      "tableNumber": "T1",
-      "displayName": "Table 1",
-      "section": "Main Dining",
-      "capacity": 4,
-      "status": "available",
-      "sortOrder": 1
-    },
-    {
       "id": "tab_t2",
       "tableNumber": "T2",
       "displayName": "Table 2",
@@ -20,15 +11,6 @@
       "activeOrderId": "ord_live_101"
     },
     {
-      "id": "tab_t3",
-      "tableNumber": "T3",
-      "displayName": "Table 3",
-      "section": "Main Dining",
-      "capacity": 4,
-      "status": "available",
-      "sortOrder": 3
-    },
-    {
       "id": "tab_t4",
       "tableNumber": "T4",
       "displayName": "Table 4",
@@ -37,6 +19,24 @@
       "status": "occupied",
       "sortOrder": 4,
       "activeOrderId": "ord_live_102"
+    },
+    {
+      "id": "tab_t1",
+      "tableNumber": "T1",
+      "displayName": "Table 1",
+      "section": "Main Dining",
+      "capacity": 4,
+      "status": "available",
+      "sortOrder": 1
+    },
+    {
+      "id": "tab_t3",
+      "tableNumber": "T3",
+      "displayName": "Table 3",
+      "section": "Main Dining",
+      "capacity": 4,
+      "status": "available",
+      "sortOrder": 3
     },
     {
       "id": "tab_t5",
@@ -682,7 +682,7 @@
       "sortOrder": 28
     },
     {
-      "id": "item_1792772515340_150",
+      "id": "item_1792773045173_299",
       "categoryId": "cat_starters",
       "name": "Ghee Podi Idli",
       "shortCode": "GHE",
@@ -706,7 +706,11 @@
       "phone": "+91 80 4123 4567",
       "gstin": "29AABCU9603R1ZM",
       "currency": "INR"
+    },
+    "printer_counter_bill": {
+      "target": "EPSON TM-T82X Receipt6",
+      "paperWidth": "80mm"
     }
   },
-  "updatedAt": "2026-10-23T16:21:55.341Z"
+  "updatedAt": "2026-10-23T16:30:45.173Z"
 }

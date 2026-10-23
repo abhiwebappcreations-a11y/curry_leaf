@@ -239,6 +239,11 @@ export class PrintService {
       gstin: '',
     };
 
+    const printerConf = job.targetPrinter === 'kitchen_kot'
+      ? config.printers.kitchenKot
+      : config.printers.counterBill;
+    const isEthernet = (printerConf.target || '').includes(':');
+
     if (job.jobType === 'test_print') {
       // Center
       chunks.push(Buffer.from([0x1B, 0x61, 0x01]));
@@ -248,11 +253,13 @@ export class PrintService {
       // Normal size
       chunks.push(Buffer.from([0x1D, 0x21, 0x00]));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
-      chunks.push(Buffer.from('*** ETHERNET TEST SLIP ***\n', 'utf-8'));
-      chunks.push(Buffer.from(`Printer: ${job.targetPrinter.toUpperCase()}\n`, 'utf-8'));
-      chunks.push(Buffer.from(`Time: ${new Date().toLocaleTimeString()}\n`, 'utf-8'));
-      chunks.push(Buffer.from('Connection: Ethernet LAN (Port 9100)\n', 'utf-8'));
-      chunks.push(Buffer.from('Status: HARDWARE OPERATIONAL\n', 'utf-8'));
+      chunks.push(Buffer.from(`*** ${isEthernet ? 'ETHERNET LAN' : 'USB DRIVER'} TEST SLIP ***\n`, 'utf-8'));
+      chunks.push(Buffer.from([0x1B, 0x61, 0x00])); // Left
+      chunks.push(Buffer.from(`Printer   : ${job.targetPrinter.toUpperCase()}\n`, 'utf-8'));
+      chunks.push(Buffer.from(`Connection: ${isEthernet ? 'Ethernet LAN (Port 9100)' : 'USB Windows Print Spooler'}\n`, 'utf-8'));
+      chunks.push(Buffer.from(`Target    : ${printerConf.target}\n`, 'utf-8'));
+      chunks.push(Buffer.from(`Time      : ${new Date().toLocaleTimeString()}\n`, 'utf-8'));
+      chunks.push(Buffer.from('Status    : HARDWARE OPERATIONAL\n', 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n\n\n', 'utf-8'));
     } else if (job.jobType === 'kot' || job.jobType === 'reprint_kot') {
       chunks.push(Buffer.from([0x1B, 0x61, 0x01]));
@@ -265,7 +272,7 @@ export class PrintService {
       chunks.push(Buffer.from('================================\n', 'utf-8'));
       chunks.push(Buffer.from([0x1B, 0x61, 0x00]));
       chunks.push(Buffer.from(`KOT No: ${job.payload.kotNumber || job.referenceId || 'KOT'}\n`, 'utf-8'));
-      chunks.push(Buffer.from(`Table : ${job.payload.tableName || 'Table'}\n`, 'utf-8'));
+      chunks.push(Buffer.from(`Table : ${job.payload.tableName || job.payload.tableNumber || 'Table'}\n`, 'utf-8'));
       chunks.push(Buffer.from(`Time  : ${new Date().toLocaleTimeString()}\n`, 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
       chunks.push(Buffer.from('QTY  ITEM NAME\n', 'utf-8'));
@@ -283,33 +290,82 @@ export class PrintService {
       chunks.push(Buffer.from('--------------------------------\n\n\n', 'utf-8'));
     } else {
       // Bill receipt
-      chunks.push(Buffer.from([0x1B, 0x61, 0x01]));
-      chunks.push(Buffer.from([0x1D, 0x21, 0x11]));
+      chunks.push(Buffer.from([0x1B, 0x61, 0x01])); // Center
+      chunks.push(Buffer.from([0x1D, 0x21, 0x11])); // Double size
       chunks.push(Buffer.from(`${profile.name || 'HINOPT POS'}\n`, 'utf-8'));
-      chunks.push(Buffer.from([0x1D, 0x21, 0x00]));
+      chunks.push(Buffer.from([0x1D, 0x21, 0x00])); // Normal size
       if (profile.address) chunks.push(Buffer.from(`${profile.address}\n`, 'utf-8'));
       if (profile.phone) chunks.push(Buffer.from(`Ph: ${profile.phone}\n`, 'utf-8'));
       if (profile.gstin) chunks.push(Buffer.from(`GSTIN: ${profile.gstin}\n`, 'utf-8'));
       if (job.isReprint) chunks.push(Buffer.from('*** DUPLICATE TAX INVOICE ***\n', 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
-      chunks.push(Buffer.from([0x1B, 0x61, 0x00]));
+      chunks.push(Buffer.from([0x1B, 0x61, 0x00])); // Left
       chunks.push(Buffer.from(`Bill No: ${job.payload.billNumber || job.referenceId || 'BILL'}\n`, 'utf-8'));
+      if (job.payload.tableNumber) chunks.push(Buffer.from(`Table  : ${job.payload.tableNumber}\n`, 'utf-8'));
       chunks.push(Buffer.from(`Date   : ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n`, 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
-      chunks.push(Buffer.from('ITEMS                     AMOUNT\n', 'utf-8'));
+      chunks.push(Buffer.from('ITEM NAME            QTY  AMOUNT\n', 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
 
       const items = (job.payload.items as any[]) || [];
       for (const item of items) {
-        const name = String(item.name || item.nameSnapshot || 'Item').substring(0, 20).padEnd(20, ' ');
-        const amt = ((item.totalPaiseSnapshot || item.pricePaise || 0) / 100).toFixed(2).padStart(10, ' ');
-        chunks.push(Buffer.from(`${name}  ${amt}\n`, 'utf-8'));
+        const rawName = String(item.name || item.nameSnapshot || 'Item');
+        const qty = Number(item.quantity || 1);
+        
+        // Compute correct price in paise
+        let lineTotalPaise = 0;
+        if (item.total !== undefined && item.total !== null && Number(item.total) > 0) {
+          lineTotalPaise = Number(item.total);
+        } else if (item.totalPaise !== undefined && item.totalPaise !== null && Number(item.totalPaise) > 0) {
+          lineTotalPaise = Number(item.totalPaise);
+        } else if (item.totalPaiseSnapshot !== undefined && Number(item.totalPaiseSnapshot) > 0) {
+          lineTotalPaise = Number(item.totalPaiseSnapshot);
+        } else {
+          const unitP = Number(item.unitPrice || item.unitPricePaise || item.pricePaise || 0);
+          lineTotalPaise = unitP * qty;
+        }
+
+        const amtStr = (lineTotalPaise / 100).toFixed(2).padStart(8, ' ');
+        const qtyStr = String(qty).padStart(3, ' ');
+        
+        if (rawName.length <= 19) {
+          const namePadded = rawName.padEnd(19, ' ');
+          chunks.push(Buffer.from(`${namePadded} ${qtyStr} ${amtStr}\n`, 'utf-8'));
+        } else {
+          chunks.push(Buffer.from(`${rawName}\n`, 'utf-8'));
+          const emptyPad = ''.padEnd(19, ' ');
+          chunks.push(Buffer.from(`${emptyPad} ${qtyStr} ${amtStr}\n`, 'utf-8'));
+        }
       }
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
-      const total = ((Number(job.payload.totalPaise) || 0) / 100).toFixed(2);
-      chunks.push(Buffer.from(`TOTAL: INR ${total}\n`, 'utf-8'));
+      
+      const subtotalPaise = Number(job.payload.subtotalPaise);
+      if (!isNaN(subtotalPaise) && subtotalPaise > 0) {
+        const subStr = (subtotalPaise / 100).toFixed(2).padStart(10, ' ');
+        chunks.push(Buffer.from(`Subtotal:             ${subStr}\n`, 'utf-8'));
+      }
+
+      const taxPaise = Number(job.payload.taxPaise);
+      if (!isNaN(taxPaise) && taxPaise > 0) {
+        const taxStr = (taxPaise / 100).toFixed(2).padStart(10, ' ');
+        chunks.push(Buffer.from(`GST Tax (5%):         ${taxStr}\n`, 'utf-8'));
+      }
+
+      const discountPaise = Number(job.payload.discountPaise);
+      if (!isNaN(discountPaise) && discountPaise > 0) {
+        const discStr = (discountPaise / 100).toFixed(2).padStart(10, ' ');
+        chunks.push(Buffer.from(`Discount:            -${discStr}\n`, 'utf-8'));
+      }
+
+      const totalPaise = Number(job.payload.totalPaise) || 0;
+      const totalStr = (totalPaise / 100).toFixed(2);
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
-      chunks.push(Buffer.from([0x1B, 0x61, 0x01]));
+      // Emphasize Total
+      chunks.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold ON
+      chunks.push(Buffer.from(`GRAND TOTAL:      INR ${totalStr}\n`, 'utf-8'));
+      chunks.push(Buffer.from([0x1B, 0x45, 0x00])); // Bold OFF
+      chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
+      chunks.push(Buffer.from([0x1B, 0x61, 0x01])); // Center
       chunks.push(Buffer.from(`Thank you for visiting ${profile.name || 'us'}!\n\n\n`, 'utf-8'));
     }
 
