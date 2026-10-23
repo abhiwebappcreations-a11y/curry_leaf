@@ -51,7 +51,7 @@ class TablesFloorView extends StatelessWidget {
                   TextField(
                     controller: tableNumberController,
                     decoration: InputDecoration(
-                      hintText: 'e.g. T12, AC-01, G-4',
+                      hintText: 'e.g. T1, AC-1, Table 10',
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -63,7 +63,7 @@ class TablesFloorView extends StatelessWidget {
                   TextField(
                     controller: displayNameController,
                     decoration: InputDecoration(
-                      hintText: 'e.g. Corner Window, Family Booth',
+                      hintText: 'e.g. Corner Window, Booth 1',
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -177,10 +177,6 @@ class TablesFloorView extends StatelessWidget {
                         backgroundColor: AppColors.success,
                       ),
                     );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to create table. Please check connection.')),
-                    );
                   }
                 }
               },
@@ -292,21 +288,25 @@ class TablesFloorView extends StatelessWidget {
   }
 
   void _confirmDeleteTable(BuildContext context, CounterProvider provider, RestaurantTable table) {
-    if (table.status == TableStatus.occupied || table.status == TableStatus.billed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot delete table while an active order or bill is open on it.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
+    final hasActive = table.status == TableStatus.occupied || table.status == TableStatus.billed;
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete Table ${table.name}?'),
-        content: Text('Are you sure you want to remove table "${table.name}" from ${table.section}?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline, color: AppColors.error, size: 22),
+            const SizedBox(width: 8),
+            Text('Delete Table ${table.name}?'),
+          ],
+        ),
+        content: Text(
+          hasActive
+              ? 'Table "${table.name}" currently has an active order. Deleting this table will cancel the active order and remove the table permanently.\n\nAre you sure you want to proceed?'
+              : 'Are you sure you want to remove table "${table.name}" from ${table.section}?',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
@@ -317,52 +317,164 @@ class TablesFloorView extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(ok ? 'Table ${table.name} deleted.' : 'Failed to delete table.'),
+                    content: Text(ok ? 'Table ${table.name} deleted successfully.' : 'Failed to delete table.'),
                     backgroundColor: ok ? AppColors.success : AppColors.error,
                   ),
                 );
               }
             },
-            child: const Text('Delete'),
+            child: const Text('Delete Table'),
           ),
         ],
       ),
     );
   }
 
-  void _confirmClearDemoTables(BuildContext context, CounterProvider provider) {
+  void _showPetpoojaCancelDialog(BuildContext context, CounterProvider provider, RestaurantTable table) {
+    final activeOrder = provider.activeOrders.where((o) => o.tableId == table.id).firstOrNull;
+    if (activeOrder == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active order found for this table.')),
+      );
+      return;
+    }
+
+    final cancellationReasons = [
+      'Customer Left / Emergency',
+      'Punched Wrong Order by Mistake',
+      'Item Not Available / Kitchen Issue',
+      'Customer Changed Mind',
+    ];
+
+    String selectedReason = cancellationReasons.first;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
+            children: [
+              const Icon(Icons.cancel_outlined, color: AppColors.error, size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Cancel Order: ${table.name}',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Why is this order being cancelled? (Petpooja Kitchen Alert)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'A cancellation ticket will be dispatched to the kitchen printer to stop food preparation immediately.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Column(
+                  children: cancellationReasons.map((r) {
+                    final isSelected = selectedReason == r;
+                    return RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: r,
+                      groupValue: selectedReason,
+                      title: Text(r, style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500)),
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedReason = val);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Keep Order'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final ok = await provider.cancelOrder(activeOrder.id, selectedReason);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(ok ? Icons.check_circle : Icons.error, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              ok
+                                  ? 'Order cancelled! ${table.name} is now free and kitchen was alerted.'
+                                  : 'Failed to cancel order.',
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: ok ? AppColors.success : AppColors.error,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Confirm & Cancel Order'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmWipeAllData(BuildContext context, CounterProvider provider) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Row(
           children: [
-            Icon(Icons.cleaning_services, color: AppColors.warning, size: 22),
+            Icon(Icons.restart_alt, color: AppColors.error, size: 24),
             SizedBox(width: 8),
-            Text('Clear Sample Demo Tables?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            Text('Reset to Fresh Client Setup?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
           ],
         ),
         content: const Text(
-          'This will remove the default demo tables (T1-T5, Patio, VIP AC) so you can add your own custom restaurant floor plan from scratch.\n\nCustom tables you created will NOT be deleted.',
+          'This will wipe all sample demo tables, sample orders, test KOTs, and bills.\n\nYour restaurant floor plan will be a 100% clean canvas, ready to set up your client\'s real rooms and tables.\n\nAre you sure you want to proceed?',
           style: TextStyle(fontSize: 13, height: 1.4),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.pop(ctx);
-              final ok = await provider.clearDemoTables();
+              final ok = await provider.wipeAllDemoData();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(ok ? 'Sample demo tables removed!' : 'Could not clear tables.'),
+                    content: Text(ok ? 'Fresh client setup complete! Floor plan is now clean.' : 'Could not wipe demo data.'),
                     backgroundColor: ok ? AppColors.success : AppColors.error,
                   ),
                 );
               }
             },
-            child: const Text('Clear Demo Tables'),
+            child: const Text('Wipe All Demo Data (Fresh Setup)'),
           ),
         ],
       ),
@@ -430,14 +542,17 @@ class TablesFloorView extends StatelessWidget {
                   ),
                   Row(
                     children: [
-                      // Clear Demo Tables Button
+                      // Fresh Client Setup Wipe Button
                       OutlinedButton.icon(
-                        onPressed: () => _confirmClearDemoTables(context, provider),
-                        icon: const Icon(Icons.cleaning_services, size: 14),
-                        label: Text(isMobile ? 'Clear' : 'Clear Demo'),
+                        onPressed: () => _confirmWipeAllData(context, provider),
+                        icon: const Icon(Icons.restart_alt, size: 14, color: AppColors.error),
+                        label: Text(
+                          isMobile ? 'Reset' : 'Fresh Client Reset',
+                          style: const TextStyle(color: AppColors.error),
+                        ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          foregroundColor: AppColors.textSecondary,
+                          side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -502,11 +617,13 @@ class TablesFloorView extends StatelessWidget {
                                   const Icon(Icons.table_restaurant_outlined, size: 48, color: AppColors.textMuted),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'No tables found in "${provider.selectedSection}".',
-                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                    provider.tables.isEmpty
+                                        ? 'Floor plan is completely clean.\nClick [+ Add Table] to create your restaurant\'s first table!'
+                                        : 'No tables found in "${provider.selectedSection}".',
+                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4),
                                     textAlign: TextAlign.center,
                                   ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 16),
                                   ElevatedButton.icon(
                                     onPressed: () => _showAddTableDialog(context, provider),
                                     icon: const Icon(Icons.add, size: 16),
@@ -630,13 +747,26 @@ class TablesFloorView extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
                     onSelected: (val) {
-                      if (val == 'edit') {
+                      if (val == 'cancel_order') {
+                        _showPetpoojaCancelDialog(context, provider, table);
+                      } else if (val == 'edit') {
                         _showEditTableDialog(context, provider, table);
                       } else if (val == 'delete') {
                         _confirmDeleteTable(context, provider, table);
                       }
                     },
                     itemBuilder: (ctx) => [
+                      if (isOccupied)
+                        const PopupMenuItem(
+                          value: 'cancel_order',
+                          child: Row(
+                            children: [
+                              Icon(Icons.cancel, size: 16, color: AppColors.error),
+                              SizedBox(width: 8),
+                              Text('Cancel Order (Void)', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
                       const PopupMenuItem(
                         value: 'edit',
                         child: Row(

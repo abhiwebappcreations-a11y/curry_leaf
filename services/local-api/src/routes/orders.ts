@@ -209,6 +209,79 @@ const cancelItemSchema = z.object({
   reason: z.string().min(3),
 });
 
+const cancelOrderSchema = z.object({
+  reason: z.string().min(2),
+});
+
+// POST /api/orders/:id/cancel - Instant Order Void / Cancellation Workflow (Petpooja style)
+ordersRouter.post(
+  '/:id/cancel',
+  requireActiveLicense,
+  requireRole('counter', 'admin', 'captain'),
+  validateBody(cancelOrderSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      const order = inMemoryStore.orders.get(id);
+      if (!order) {
+        throw new NotFoundError('Order', id);
+      }
+
+      order.status = 'cancelled';
+      order.customerNotes = (order.customerNotes ? order.customerNotes + ' | ' : '') + `Cancelled: ${reason}`;
+      order.updatedAt = new Date().toISOString();
+
+      // Free the table immediately
+      const table = inMemoryStore.tables.get(order.tableId);
+      if (table) {
+        table.status = 'available';
+        table.activeOrderId = null;
+      }
+
+      // Void any active bill for this order
+      for (const bill of inMemoryStore.bills.values()) {
+        if (bill.orderId === id && bill.status !== 'settled') {
+          bill.status = 'voided';
+          bill.voidReason = reason;
+        }
+      }
+
+      // Enqueue Kitchen Cancellation Alert KOT to thermal printer so chef stops cooking!
+      await PrintService.enqueueJob(
+        'kitchen_kot',
+        'kot',
+        order.id,
+        {
+          kotNumber: 'CANCEL',
+          title: '*** ORDER CANCELLED ***',
+          tableName: table ? table.displayName || table.tableNumber : 'Table',
+          orderNumber: order.orderNumber,
+          reason,
+          items: order.items.map((i) => ({
+            name: `[CANCELLED] ${i.nameSnapshot}`,
+            quantity: i.quantity,
+            itemNotes: `REASON: ${reason}`,
+          })),
+        }
+      );
+
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Order cancelled, table released, and kitchen alert dispatched.',
+          order,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // POST /api/orders/:id/items/:itemId/cancel - Auditable cancellation workflow
 ordersRouter.post(
   '/:id/items/:itemId/cancel',

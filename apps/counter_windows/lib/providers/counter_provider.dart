@@ -155,6 +155,31 @@ class CounterProvider extends ChangeNotifier {
 
   Future<List<String>> fetchSystemPrinters() => _counterApiService.getSystemPrinters();
 
+  Future<bool> cancelOrder(String orderId, String reason) async {
+    final ok = await _counterApiService.cancelOrder(orderId, reason);
+    if (ok) {
+      _selectedOrder = null;
+      _currentDraftBill = null;
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> wipeAllDemoData() async {
+    final ok = await _counterApiService.wipeAllData();
+    if (ok) {
+      _selectedOrder = null;
+      _currentDraftBill = null;
+      _tables.clear();
+      _activeOrders.clear();
+      _settledBills.clear();
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
   Future<bool> clearDemoTables() async {
     final ok = await _counterApiService.clearDemoTables();
     if (ok) {
@@ -306,20 +331,13 @@ class CounterProvider extends ChangeNotifier {
   Future<void> selectOrder(RestaurantOrder order) async {
     _selectedOrder = order;
 
-    // Call POST /api/orders/:id/bill to finalize on backend if live, or fallback to local model
-    final liveBill = await _apiClient.generateBill(order.id);
-    if (liveBill != null) {
-      _currentDraftBill = liveBill.copyWith(
-        cashierName: 'Deepa',
-        tableName: order.tableName,
-      );
-    } else {
-      _currentDraftBill = RestaurantBill.fromOrder(
-        order: order,
-        billNumber: 'INV-2026-00${_settledBills.length + 44}',
-        cashierName: 'Deepa',
-      );
-    }
+    // Pure on-screen draft bill preview - NEVER fires the physical printer when viewing!
+    final billSuffix = order.id.length > 6 ? order.id.substring(order.id.length - 6).toUpperCase() : order.id.toUpperCase();
+    _currentDraftBill = RestaurantBill.fromOrder(
+      order: order,
+      billNumber: 'INV-$billSuffix',
+      cashierName: 'Cashier',
+    );
 
     _activeTab = CounterTab.billing;
     notifyListeners();

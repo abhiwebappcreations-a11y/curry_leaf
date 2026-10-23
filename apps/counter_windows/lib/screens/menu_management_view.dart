@@ -11,7 +11,6 @@ class MenuManagementView extends StatelessWidget {
   void _showAddDishDialog(BuildContext context, CounterProvider provider) {
     final nameController = TextEditingController();
     final priceController = TextEditingController();
-    final imageController = TextEditingController();
     final descController = TextEditingController();
     String selectedCategory = 'Starters';
     bool isVeg = true;
@@ -166,24 +165,7 @@ class MenuManagementView extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // Picture / Image URL
-                  const Text(
-                    'Picture / Image URL (Optional)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: imageController,
-                    decoration: InputDecoration(
-                      hintText: 'https://images.unsplash.com/...',
-                      prefixIcon: const Icon(Icons.image_outlined, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      helperText: 'Direct web image link or Unsplash food URL',
-                      helperStyle: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+
 
                   // Description
                   const Text(
@@ -226,9 +208,7 @@ class MenuManagementView extends StatelessWidget {
                   pricePaise: priceRupees * 100,
                   isVeg: isVeg,
                   description: descController.text.trim(),
-                  imageUrl: imageController.text.trim().isNotEmpty
-                      ? imageController.text.trim()
-                      : null,
+                  imageUrl: null,
                 );
 
                 if (ctx.mounted) {
@@ -326,7 +306,7 @@ class MenuManagementView extends StatelessWidget {
       child: Icon(
         fallbackIcon,
         size: size * 0.52,
-        color: item.isVeg ? AppColors.veg.withOpacity(0.5) : AppColors.nonVeg.withOpacity(0.5),
+        color: item.isVeg ? AppColors.veg.withValues(alpha: 0.5) : AppColors.nonVeg.withValues(alpha: 0.5),
       ),
     );
 

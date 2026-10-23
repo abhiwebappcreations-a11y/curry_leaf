@@ -187,6 +187,34 @@ tablesRouter.put(
   }
 );
 
+// DELETE /api/tables/all/wipe - Complete Fresh Client Onboarding Wipe
+tablesRouter.delete(
+  '/all/wipe',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      inMemoryStore.orders.clear();
+      inMemoryStore.bills.clear();
+      inMemoryStore.kots.clear();
+      inMemoryStore.payments.clear();
+      inMemoryStore.printJobs.clear();
+      inMemoryStore.tables.clear();
+
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'All demo tables, orders, and bills wiped cleanly. Ready for new client floor plan setup.',
+          tableCount: 0,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // DELETE /api/tables/demo/clear - Clear all demo tables
 tablesRouter.delete(
   '/demo/clear',
@@ -197,7 +225,12 @@ tablesRouter.delete(
       let clearedCount = 0;
       for (const id of demoIds) {
         const table = inMemoryStore.tables.get(id);
-        if (table && (!table.activeOrderId || table.status === 'available')) {
+        if (table) {
+          // If demo table has active order, cancel the demo order
+          if (table.activeOrderId) {
+            const order = inMemoryStore.orders.get(table.activeOrderId);
+            if (order) order.status = 'cancelled';
+          }
           inMemoryStore.tables.delete(id);
           clearedCount++;
         }
@@ -230,15 +263,12 @@ tablesRouter.delete(
         throw new NotFoundError('Table', id);
       }
 
-      if (table.activeOrderId && table.status !== 'available') {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'TABLE_HAS_ACTIVE_ORDER',
-            message: 'Cannot delete table while an active order or bill is present.',
-          },
-        });
-        return;
+      // Detach or cancel any active order on this table so it can be deleted cleanly
+      if (table.activeOrderId) {
+        const order = inMemoryStore.orders.get(table.activeOrderId);
+        if (order) {
+          order.status = 'cancelled';
+        }
       }
 
       inMemoryStore.tables.delete(id);

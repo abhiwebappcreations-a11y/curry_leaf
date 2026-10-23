@@ -219,6 +219,120 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
     );
   }
 
+  void _showPetpoojaCancelDialog(
+    BuildContext context,
+    CounterProvider provider,
+    RestaurantBill bill,
+  ) {
+    final cancellationReasons = [
+      'Customer Left / Emergency',
+      'Punched Wrong Order by Mistake',
+      'Item Not Available / Kitchen Issue',
+      'Customer Changed Mind',
+    ];
+
+    String selectedReason = cancellationReasons.first;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
+            children: [
+              const Icon(Icons.cancel_outlined, color: AppColors.error, size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Void / Cancel Order #${bill.orderId}',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Voiding active order for ${bill.tableName}.',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'A cancellation ticket will be sent to the kitchen printer to halt food preparation immediately, and this table will be marked available.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Column(
+                  children: cancellationReasons.map((r) {
+                    final isSelected = selectedReason == r;
+                    return RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: r,
+                      groupValue: selectedReason,
+                      title: Text(
+                        r,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedReason = val);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Keep Order'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final ok = await provider.cancelOrder(bill.orderId, selectedReason);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              ok
+                                  ? 'Order #${bill.orderId} cancelled & table freed.'
+                                  : 'Failed to cancel order.',
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: ok ? AppColors.success : AppColors.error,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Confirm Cancellation', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
@@ -397,6 +511,16 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     elevation: 0,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                OutlinedButton.icon(
+                  onPressed: () => _showPetpoojaCancelDialog(context, provider, bill),
+                  icon: const Icon(Icons.cancel_outlined, size: 14, color: AppColors.error),
+                  label: const Text('Void Order', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.error)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 ),
               ],
@@ -715,6 +839,20 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(vertical: 14),
               minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _showPetpoojaCancelDialog(context, provider, bill),
+            icon: const Icon(Icons.cancel_outlined, size: 16, color: AppColors.error),
+            label: const Text(
+              'Cancel / Void Order (Petpooja Kitchen Alert)',
+              style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              minimumSize: const Size.fromHeight(40),
             ),
           ),
         ],

@@ -63,15 +63,15 @@ class _TopHealthBarState extends State<TopHealthBar> {
             ),
             const SizedBox(width: 12),
           ],
-          // Brand Logo & Restaurant
+          // Commercial Brand & Restaurant Name (Petpooja style)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.restaurant, color: AppColors.accent, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'Hinopt POS',
-                style: TextStyle(
+              Text(
+                provider.restaurantName,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
@@ -79,12 +79,19 @@ class _TopHealthBarState extends State<TopHealthBar> {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '|  ',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Counter POS',
+                  style: TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -92,7 +99,7 @@ class _TopHealthBarState extends State<TopHealthBar> {
 
           const SizedBox(width: 16),
 
-          // Scrollable System Health Pills & Clock
+          // Commercial System Status Pills & Live Clock
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -100,42 +107,37 @@ class _TopHealthBarState extends State<TopHealthBar> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // System Online Status (Clickable for network support)
                   InkWell(
                     onTap: () => _showServerDialog(context, provider),
                     borderRadius: BorderRadius.circular(6),
                     child: _buildHealthIndicator(
-                      label: 'Server: ${provider.serverHost}',
+                      label: provider.localServerHealthy ? 'System: Online' : 'System: Offline',
                       isOk: provider.localServerHealthy,
-                      icon: Icons.dns_outlined,
+                      icon: Icons.cloud_done_outlined,
                     ),
                   ),
                   const SizedBox(width: 8),
+
+                  // Thermal Printers Status
                   _buildHealthIndicator(
-                    label: 'PostgreSQL: OK',
-                    isOk: provider.databaseHealthy,
-                    icon: Icons.storage_outlined,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildHealthIndicator(
-                    label: 'Bill: ${provider.billPrinter?.name.split(" ").first ?? "OK"}',
-                    isOk: provider.billPrinter?.isConnected ?? false,
+                    label: 'Printers: Ready',
+                    isOk: (provider.billPrinter?.isConnected ?? true),
                     icon: Icons.print_outlined,
                   ),
                   const SizedBox(width: 8),
+
+                  // Subscription Status
                   _buildHealthIndicator(
-                    label: 'KOT: ${provider.kotPrinter?.name.split(" ").first ?? "OK"}',
-                    isOk: provider.kotPrinter?.isConnected ?? false,
-                    icon: Icons.kitchen_outlined,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildHealthIndicator(
-                    label: 'License: ${provider.licenseDaysRemaining}d',
-                    isOk: true,
+                    label: 'Active (${provider.licenseDaysRemaining}d)',
+                    isOk: !provider.isLicenseLocked,
                     icon: Icons.verified_user_outlined,
                   ),
                   const SizedBox(width: 8),
+
+                  // Refresh Button
                   Tooltip(
-                    message: 'Refresh Live Orders & Tables',
+                    message: 'Refresh Live Tables & Orders',
                     child: InkWell(
                       onTap: provider.isRefreshing
                           ? null
@@ -180,6 +182,8 @@ class _TopHealthBarState extends State<TopHealthBar> {
                     ),
                   ),
                   const SizedBox(width: 16),
+
+                  // Live Clock
                   Text(
                     _currentTime,
                     style: const TextStyle(
@@ -201,8 +205,9 @@ class _TopHealthBarState extends State<TopHealthBar> {
   void _showServerDialog(BuildContext context, CounterProvider provider) {
     showDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (dialogCtx) => ServerConnectionDialog(provider: provider),
+      builder: (_) => ServerConnectionDialog(
+        provider: provider,
+      ),
     );
   }
 
@@ -214,12 +219,10 @@ class _TopHealthBarState extends State<TopHealthBar> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: isOk ? Colors.white.withValues(alpha: 0.08) : AppColors.errorBg,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: isOk
-              ? AppColors.success.withValues(alpha: 0.4)
-              : AppColors.error.withValues(alpha: 0.4),
+          color: isOk ? Colors.white.withValues(alpha: 0.18) : AppColors.error.withValues(alpha: 0.5),
           width: 0.8,
         ),
       ),
@@ -235,12 +238,12 @@ class _TopHealthBarState extends State<TopHealthBar> {
             ),
           ),
           const SizedBox(width: 6),
-          Icon(icon, size: 12, color: Colors.white70),
-          const SizedBox(width: 4),
+          Icon(icon, size: 13, color: isOk ? Colors.white70 : AppColors.error),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isOk ? Colors.white : AppColors.error,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),

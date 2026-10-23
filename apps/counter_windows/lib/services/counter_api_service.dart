@@ -232,6 +232,32 @@ class CounterApiService {
     return [];
   }
 
+  Future<bool> cancelOrder(String orderId, String reason) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/orders/$orderId/cancel'),
+            headers: headers,
+            body: jsonEncode({'reason': reason}),
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> wipeAllData() async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/tables/all/wipe'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> clearDemoTables() async {
     try {
       final response = await http
