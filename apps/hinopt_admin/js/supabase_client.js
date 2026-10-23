@@ -44,10 +44,55 @@ window.SupabaseClient = {
     return null;
   },
 
-  updateLicenseStatus: async function(licenseKey, status, validUntil) {
+  fetchAuditLogs: async function() {
     try {
-      const body = { status };
-      if (validUntil) body.valid_until = validUntil;
+      const res = await fetch(`${this.url}/rest/v1/audit_logs?select=*&order=created_at.desc&limit=50`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchAuditLogs error:', e);
+    }
+    return null;
+  },
+
+  updateRestaurant: async function(id, data) {
+    try {
+      const body = {
+        name: data.name,
+        city: data.city,
+        contact_name: data.contactName,
+        phone: data.phone,
+        hwid: data.hwid,
+        counter_ip: data.counterIp || '192.168.1.100',
+        notes: data.notes || '',
+        updated_at: new Date().toISOString()
+      };
+      const res = await fetch(`${this.url}/rest/v1/restaurants?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body)
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[Supabase] updateRestaurant failed:', e);
+      return false;
+    }
+  },
+
+  updateLicense: async function(licenseKey, data) {
+    try {
+      const body = {
+        updated_at: new Date().toISOString()
+      };
+      if (data.status) body.status = data.status;
+      if (data.validUntil) body.valid_until = data.validUntil;
+      if (data.maxDevices) body.max_devices = parseInt(data.maxDevices, 10);
+      if (data.signedPayload) body.signed_payload = data.signedPayload;
+      if (data.signature) body.signature = data.signature;
+
       const res = await fetch(`${this.url}/rest/v1/licenses?license_key=eq.${licenseKey}`, {
         method: 'PATCH',
         headers: this.getHeaders(),
@@ -55,9 +100,13 @@ window.SupabaseClient = {
       });
       return res.ok;
     } catch (e) {
-      console.error('[Supabase] updateLicenseStatus failed:', e);
+      console.error('[Supabase] updateLicense failed:', e);
       return false;
     }
+  },
+
+  updateLicenseStatus: async function(licenseKey, status, validUntil) {
+    return this.updateLicense(licenseKey, { status, validUntil });
   },
 
   insertRestaurant: async function(restaurant) {
@@ -84,6 +133,25 @@ window.SupabaseClient = {
       return res.ok;
     } catch (e) {
       console.error('[Supabase] insertLicense failed:', e);
+      return false;
+    }
+  },
+
+  deleteRestaurant: async function(restaurantId) {
+    try {
+      // 1. Delete licenses first (foreign key reference)
+      await fetch(`${this.url}/rest/v1/licenses?restaurant_id=eq.${restaurantId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      // 2. Delete restaurant
+      const res = await fetch(`${this.url}/rest/v1/restaurants?id=eq.${restaurantId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[Supabase] deleteRestaurant failed:', e);
       return false;
     }
   },

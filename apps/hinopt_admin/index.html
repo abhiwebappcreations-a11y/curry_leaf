@@ -80,7 +80,7 @@
           </div>
           <button class="btn btn-primary" onclick="openModal('modal-register')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            <span>Register Restaurant</span>
+            <span>+ Register Restaurant</span>
           </button>
         </div>
       </header>
@@ -152,7 +152,7 @@
                   <th>Counter PC HWID</th>
                   <th>License Status</th>
                   <th>Expiry Date</th>
-                  <th>Action</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="table-restaurants-full-body"></tbody>
@@ -251,7 +251,20 @@
           <div class="form-group">
             <label class="form-label">Counter PC Hardware ID (HWID)</label>
             <input type="text" id="reg-hwid" class="form-input" placeholder="e.g. WIN-HWID-3918B22">
-            <small style="color: var(--text-muted); font-size: 11px;">Obtained from Counter PC diagnostic screen.</small>
+            <small style="color: var(--text-muted); font-size: 11px;">Obtained from Counter PC diagnostic screen (leave blank to auto-generate).</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Counter LAN IP</label>
+            <input type="text" id="reg-ip" class="form-input" placeholder="192.168.1.100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Initial License Expiration Date</label>
+            <input type="date" id="reg-expiry" class="form-input">
+            <small style="color: var(--text-muted); font-size: 11px;">Default is 1 year from today if left empty.</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Allowed Max Captain Devices</label>
+            <input type="number" id="reg-devices" class="form-input" value="10" min="1" max="50">
           </div>
           <div class="form-group">
             <label class="form-label">Installation Notes</label>
@@ -260,7 +273,101 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="closeModal('modal-register')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save & Issue 1-Yr License</button>
+          <button type="submit" class="btn btn-primary">Save to Supabase & Issue License</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Restaurant & Manage License -->
+  <div class="modal-overlay" id="modal-edit-restaurant">
+    <div class="modal-card" style="width: 580px;">
+      <div class="modal-header">
+        <h3>Edit Restaurant: <span id="edit-header-name" style="color: var(--primary);"></span></h3>
+        <button class="modal-close" onclick="closeModal('modal-edit-restaurant')">&times;</button>
+      </div>
+      <form id="form-edit-restaurant">
+        <input type="hidden" id="edit-id">
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Business Name</label>
+              <input type="text" id="edit-name" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">City, State</label>
+              <input type="text" id="edit-city" class="form-input" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Owner / Contact Name</label>
+              <input type="text" id="edit-contact" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contact Phone</label>
+              <input type="text" id="edit-phone" class="form-input" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Counter PC HWID</label>
+              <input type="text" id="edit-hwid" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Counter LAN IP</label>
+              <input type="text" id="edit-ip" class="form-input" placeholder="192.168.1.100">
+            </div>
+          </div>
+
+          <div style="background: var(--surface-muted); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 16px;">
+            <div style="font-size: 13px; font-weight: 800; color: var(--primary-dark); margin-bottom: 10px;">License Control & Expiry Settings</div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+              <div>
+                <label class="form-label">License Status</label>
+                <select id="edit-status" class="form-select">
+                  <option value="ACTIVE">ACTIVE (Operational)</option>
+                  <option value="EXPIRING_SOON">EXPIRING_SOON (Warning)</option>
+                  <option value="SUSPENDED">SUSPENDED (Locked)</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Max Devices</label>
+                <input type="number" id="edit-devices" class="form-input" min="1" max="50" value="10">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label class="form-label">License Expiration Date</label>
+              <input type="date" id="edit-expiry" class="form-input" required>
+            </div>
+
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="setQuickExpiry(30)">+30 Days</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setQuickExpiry(90)">+90 Days</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setQuickExpiry(365)">+1 Year</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="setQuickExpiry(730)">+2 Years</button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="setQuickExpiry(0)">Expire Today (Test Lockout)</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Installation Notes</label>
+            <textarea id="edit-notes" class="form-textarea" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between;">
+          <button type="button" class="btn btn-danger" onclick="deleteCurrentRestaurant()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <span>Delete Restaurant</span>
+          </button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit-restaurant')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes to Supabase</button>
+          </div>
         </div>
       </form>
     </div>
