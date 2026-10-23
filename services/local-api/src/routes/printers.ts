@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PrintService } from '../services/printService.js';
 import { config } from '../config/index.js';
+import { inMemoryStore } from '../db/inMemoryStore.js';
 import { authenticateDevice, requireRole, requireActiveLicense } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 
@@ -35,6 +36,47 @@ printersRouter.get('/', (req: Request, res: Response) => {
     },
   });
 });
+
+const updatePrinterSchema = z.object({
+  target: z.string().min(3),
+  paperWidth: z.string().optional(),
+});
+
+// PATCH /api/printers/:id - Update printer target IP / port (Counter / Admin only)
+printersRouter.patch(
+  '/:id',
+  requireActiveLicense,
+  requireRole('counter', 'admin'),
+  validateBody(updatePrinterSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { target, paperWidth } = req.body;
+
+      if (id === 'counter_bill' || id.includes('bill') || id.includes('counter')) {
+        config.printers.counterBill.target = target;
+        if (paperWidth) config.printers.counterBill.paperWidth = paperWidth;
+        inMemoryStore.settings.set('printer_counter_bill', { target, paperWidth });
+      } else if (id === 'kitchen_kot' || id.includes('kot') || id.includes('kitchen')) {
+        config.printers.kitchenKot.target = target;
+        if (paperWidth) config.printers.kitchenKot.paperWidth = paperWidth;
+        inMemoryStore.settings.set('printer_kitchen_kot', { target, paperWidth });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          id,
+          target,
+          paperWidth: paperWidth || '80mm',
+          message: 'Printer target IP and configuration updated successfully',
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 const testPrintSchema = z.object({
   targetPrinter: z.enum(['counter_bill', 'kitchen_kot']),

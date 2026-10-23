@@ -417,6 +417,25 @@ class CounterApiService {
       return false;
     }
   }
+
+  Future<bool> updatePrinterConfig(String printerId, {required String target, String paperWidth = '80mm'}) async {
+    final roleId = (printerId.contains('kot') || printerId.contains('kitchen'))
+        ? 'kitchen_kot'
+        : 'counter_bill';
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/printers/$roleId'),
+        headers: headers,
+        body: jsonEncode({
+          'target': target,
+          'paperWidth': paperWidth,
+        }),
+      ).timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 /// Backward compatibility alias

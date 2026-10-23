@@ -40,7 +40,7 @@ class PrinterSettingsView extends StatelessWidget {
                   Text(
                     isMobile
                         ? 'Durable print queues for Counter & Kitchen thermal printers'
-                        : 'Independent durable queues and settings for Counter Bill Printer and Kitchen KOT Printer',
+                        : 'Independent durable queues and settings for Counter Bill Printer and Kitchen KOT Printer (ESC/POS over Ethernet Port 9100)',
                     style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ],
@@ -175,11 +175,11 @@ class PrinterSettingsView extends StatelessWidget {
           const Divider(color: AppColors.borderLight, height: 20),
 
           // Configuration Details
-          _buildConfigItem('Hardware Connection', printer.connectionType.label, Icons.cable),
+          _buildConfigItem('Hardware Protocol', '${printer.connectionType.label} (ESC/POS)', Icons.cable),
           const SizedBox(height: 8),
-          _buildConfigItem('Port / IP Address', printer.address, Icons.lan),
+          _buildConfigItem('Ethernet Target IP & Port', printer.address, Icons.lan),
           const SizedBox(height: 8),
-          _buildConfigItem('Paper Width', '${printer.paperWidthMm}mm Thermal Paper (Standard 80mm)', Icons.straighten),
+          _buildConfigItem('Paper Width', '${printer.paperWidthMm}mm Thermal Paper (Standard)', Icons.straighten),
           const SizedBox(height: 8),
           _buildConfigItem('Last Test Print', lastTestStr, Icons.history),
 
@@ -190,7 +190,7 @@ class PrinterSettingsView extends StatelessWidget {
 
           const Divider(color: AppColors.borderLight, height: 20),
 
-          // Test Print Button & Reconnect Button
+          // Action Buttons: Send Test Print & Configure IP
           Row(
             children: [
               Expanded(
@@ -208,7 +208,7 @@ class PrinterSettingsView extends StatelessWidget {
                               const Icon(Icons.check_circle, color: Colors.white),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text('Test ticket printed successfully on ${printer.name}!'),
+                                child: Text('Test ticket dispatched to ${printer.name} (${printer.address})!'),
                               ),
                             ],
                           ),
@@ -225,21 +225,124 @@ class PrinterSettingsView extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              OutlinedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Printer connection refreshed.')),
-                  );
-                },
+              OutlinedButton.icon(
+                onPressed: () => _showEditPrinterDialog(context, provider, printer),
+                icon: const Icon(Icons.settings_ethernet, size: 16),
+                label: const Text('Configure IP'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-                child: const Text('Reconnect'),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  void _showEditPrinterDialog(
+    BuildContext context,
+    CounterProvider provider,
+    ThermalPrinterConfig printer,
+  ) {
+    final ipController = TextEditingController(text: printer.address);
+    int selectedWidth = printer.paperWidthMm;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: Row(
+                children: [
+                  const Icon(Icons.print, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Configure ${printer.role.label}',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Ethernet Printer IP & Port (Port 9100 standard ESC/POS):',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: ipController,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 192.168.1.200:9100',
+                      prefixIcon: const Icon(Icons.lan, size: 18),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Paper Roll Width:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<int>(
+                    value: selectedWidth,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 80, child: Text('80mm Standard Thermal Paper')),
+                      DropdownMenuItem(value: 58, child: Text('58mm Narrow Thermal Paper')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() => selectedWidth = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Ensure your printer is connected to the same Wi-Fi router / switch via RJ45 LAN cable.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final newTarget = ipController.text.trim();
+                    if (newTarget.isNotEmpty) {
+                      await provider.updatePrinterAddress(printer.role, newTarget, selectedWidth);
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AppColors.success,
+                            content: Text('${printer.name} target updated to $newTarget!'),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                  child: const Text('Save & Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

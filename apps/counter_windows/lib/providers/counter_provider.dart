@@ -531,6 +531,26 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updatePrinterAddress(PrinterRole role, String newTarget, [int paperWidthMm = 80]) async {
+    final printer = _printers.where((p) => p.role == role).firstOrNull;
+    if (printer == null) return false;
+
+    final success = await _apiClient.updatePrinterConfig(
+      printer.id,
+      target: newTarget.trim(),
+      paperWidth: '${paperWidthMm}mm',
+    );
+
+    final index = _printers.indexOf(printer);
+    _printers[index] = printer.copyWith(
+      address: newTarget.trim(),
+      paperWidthMm: paperWidthMm,
+      isConnected: true,
+    );
+    notifyListeners();
+    return success;
+  }
+
   @override
   void dispose() {
     _stopAutoPolling();
