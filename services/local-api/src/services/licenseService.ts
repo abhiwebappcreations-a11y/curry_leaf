@@ -1,4 +1,7 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
 import { inMemoryStore, LicenseRecord } from '../db/inMemoryStore.js';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
@@ -18,6 +21,85 @@ export interface LicenseStatusResult {
 }
 
 export class LicenseService {
+  public static async loadLicenseFromDisk(): Promise<void> {
+    const candidatePaths = [
+      process.env.LICENSE_FILE_PATH,
+      path.resolve(process.cwd(), 'license.json'),
+      path.resolve(process.cwd(), 'config/license.json'),
+      path.resolve(process.cwd(), '../config/license.json'),
+      path.resolve(process.cwd(), '../../config/license.json'),
+    ].filter(Boolean) as string[];
+
+    let foundPath: string | null = null;
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        foundPath = p;
+        break;
+      }
+    }
+
+    if (!foundPath) {
+      logger.info('No license.json file found on disk. Using in-memory configuration.');
+      return;
+    }
+
+    try {
+      const content = fs.readFileSync(foundPath, 'utf-8');
+      const data = JSON.parse(content);
+      const payload = data.signedPayload || data;
+
+      const restName = payload.restaurantName || payload.name || config.restaurantName;
+      const restId = payload.restaurantId || payload.id || config.restaurantId;
+      const hwid = payload.hardwareId || payload.hwid || '';
+      const licenseKey = payload.licenseKey || payload.key || 'HINOPT-LIC-ACTIVE';
+      const validFrom = payload.validFrom || payload.issuedAt || new Date().toISOString();
+      const validUntil = payload.validUntil || payload.expiresAt || new Date(Date.now() + 365 * 86400000).toISOString();
+      let status: 'active' | 'grace' | 'expired' | 'suspended' = (payload.status || 'active').toLowerCase();
+
+      // Anti-Piracy Hardware ID check on Windows
+      if (hwid && process.platform === 'win32') {
+        try {
+          const sysHwid = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystemProduct).UUID"').toString().trim();
+          if (sysHwid && hwid.toUpperCase() !== sysHwid.toUpperCase()) {
+            logger.warn(
+              { expectedHwid: hwid, actualHwid: sysHwid },
+              'Hardware ID mismatch! License is bound to a different machine motherboard.'
+            );
+            status = 'suspended';
+          }
+        } catch (_) {}
+      }
+
+      inMemoryStore.license = {
+        id: 'disk_license',
+        restaurantId: restId,
+        restaurantName: restName,
+        licenseKey: licenseKey,
+        status: status,
+        validFrom: validFrom,
+        validUntil: validUntil,
+        lastVerifiedAt: new Date().toISOString(),
+        signature: data.signature || 'disk_sig',
+        signedPayload: payload,
+      };
+
+      // Personalize restaurant profile dynamically so bills, KOTs, receipts use new client name
+      inMemoryStore.settings.set('restaurant_profile', {
+        restaurantId: restId,
+        name: restName,
+        tagline: payload.tagline || 'Fine Dining & Hospitality',
+        address: payload.city || payload.address || 'Main Branch',
+        phone: payload.phone || '+91 98490 00000',
+        gstin: payload.gstin || '36AABCU9603R1ZM',
+        currency: 'INR',
+      });
+
+      logger.info({ path: foundPath, restaurantName: restName, licenseKey, status }, 'Loaded personalized license from disk');
+    } catch (err: any) {
+      logger.error({ err }, 'Failed to parse license.json from disk');
+    }
+  }
+
   public static async getLicenseStatus(): Promise<LicenseStatusResult> {
     const license = inMemoryStore.license;
     if (!license) {
@@ -177,6 +259,17 @@ export class LicenseService {
     };
 
     inMemoryStore.license = updatedLicense;
+
+    // Update restaurant profile name
+    inMemoryStore.settings.set('restaurant_profile', {
+      restaurantId: updatedLicense.restaurantId,
+      name: updatedLicense.restaurantName,
+      tagline: 'Fine Dining & Hospitality',
+      address: payloadJson.city || 'Main Branch',
+      phone: payloadJson.phone || '+91 98490 00000',
+      gstin: '36AABCU9603R1ZM',
+      currency: 'INR',
+    });
 
     inMemoryStore.auditLogs.push({
       id: `audit_${Date.now()}`,

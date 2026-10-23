@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/bill_model.dart';
 import '../theme/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../providers/counter_provider.dart';
 
 class BillReceiptPreview extends StatelessWidget {
   final RestaurantBill bill;
@@ -21,6 +23,8 @@ class BillReceiptPreview extends StatelessWidget {
       decimalDigits: 2,
     );
     final dateStr = DateFormat('dd-MM-yyyy hh:mm a').format(bill.createdAt);
+    final counterProv = context.watch<CounterProvider?>();
+    final restName = counterProv?.restaurantName ?? 'Hinopt POS';
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 360),
@@ -61,8 +65,8 @@ class BillReceiptPreview extends StatelessWidget {
             ),
 
           // Restaurant Header
-          const Text(
-            'CURRY LEAF FINE DINE',
+          Text(
+            restName.toUpperCase(),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
@@ -218,8 +222,8 @@ class BillReceiptPreview extends StatelessWidget {
           _buildMetaRow('Payment Mode:', '${bill.paymentMethod.label} (${bill.paymentStatus.label})'),
 
           const SizedBox(height: 16),
-          const Text(
-            'Thank you for dining at Curry Leaf!\nPlease visit again.',
+          Text(
+            'Thank you for dining at $restName!\nPlease visit again.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
           ),

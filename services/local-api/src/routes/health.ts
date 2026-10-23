@@ -25,8 +25,8 @@ healthRouter.get('/', async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
       uptimeSeconds,
       restaurant: {
-        id: config.restaurantId,
-        name: config.restaurantName,
+        id: license.restaurantId || config.restaurantId,
+        name: license.restaurantName || config.restaurantName,
       },
       components: {
         apiServer: {
@@ -59,6 +59,8 @@ healthRouter.get('/', async (req: Request, res: Response) => {
           status: license.status,
           daysRemaining: license.daysRemaining,
           isOfflineGraceActive: license.isOfflineGraceActive,
+          restaurantName: license.restaurantName,
+          licenseKey: license.licenseKey,
         },
       },
     },

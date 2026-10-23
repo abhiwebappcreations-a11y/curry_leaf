@@ -45,6 +45,9 @@ class CounterProvider extends ChangeNotifier {
   bool _databaseHealthy = false;
   String _licenseStatus = 'Checking...';
   int _licenseDaysRemaining = 365;
+  String _restaurantName = 'Curry Leaf';
+
+  String get restaurantName => _restaurantName;
 
   // Background Auto-Polling & Pull-to-Refresh
   Timer? _autoPollTimer;
@@ -134,6 +137,7 @@ class CounterProvider extends ChangeNotifier {
       _databaseHealthy = health.isDatabaseHealthy;
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
+      _restaurantName = health.restaurantName;
 
       if (_localServerHealthy) {
         final liveTables = await _apiClient.getTables();
@@ -174,6 +178,7 @@ class CounterProvider extends ChangeNotifier {
       _databaseHealthy = health.isDatabaseHealthy;
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
+      _restaurantName = health.restaurantName;
 
       final liveTables = await _apiClient.getTables();
       if (liveTables != null && liveTables.isNotEmpty) {

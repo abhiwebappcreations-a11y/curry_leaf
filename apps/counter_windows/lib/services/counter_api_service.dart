@@ -12,12 +12,14 @@ class SystemHealthInfo {
   final bool isDatabaseHealthy;
   final String licenseStatus;
   final int daysRemaining;
+  final String restaurantName;
 
   SystemHealthInfo({
     required this.isServerHealthy,
     required this.isDatabaseHealthy,
     required this.licenseStatus,
     required this.daysRemaining,
+    this.restaurantName = 'Curry Leaf Fine Dine',
   });
 }
 
@@ -84,8 +86,11 @@ class CounterApiService {
 
         final lic = components?['license'] as Map<String, dynamic>? ??
             (data is Map ? data['license'] as Map<String, dynamic>? : null);
+        final restData = data is Map ? data['restaurant'] as Map<String, dynamic>? : null;
+        final restName = restData?['name']?.toString() ??
+            (lic?['restaurantName']?.toString() ?? 'Hinopt POS');
         final licStatus = lic?['status']?.toString().toUpperCase() == 'ACTIVE'
-            ? 'Active (Licensed to Curry Leaf Fine Dine)'
+            ? 'Active (Licensed to $restName)'
             : (lic?['status']?.toString() ?? 'Active');
         final days = lic?['daysRemaining'] as int? ?? 365;
 
@@ -94,6 +99,7 @@ class CounterApiService {
           isDatabaseHealthy: isDb,
           licenseStatus: licStatus,
           daysRemaining: days,
+          restaurantName: restName,
         );
       }
     } catch (_) {}
@@ -103,6 +109,7 @@ class CounterApiService {
       isDatabaseHealthy: false,
       licenseStatus: 'Connecting to Local API (localhost:4000)...',
       daysRemaining: 365,
+      restaurantName: 'Hinopt POS',
     );
   }
 

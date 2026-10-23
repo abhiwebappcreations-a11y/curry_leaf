@@ -18,7 +18,10 @@ async function bootstrap() {
     logger.warn('PostgreSQL not detected. Running with in-memory resilient operational store');
   }
 
-  // 2. Validate license state on boot
+  // 2. Load personalized client license if present on disk
+  await LicenseService.loadLicenseFromDisk();
+
+  // 3. Validate license state on boot
   const license = await LicenseService.getLicenseStatus();
   if (!license.isValid) {
     logger.warn(
@@ -36,7 +39,7 @@ async function bootstrap() {
     );
   }
 
-  // 3. Start HTTP server
+  // 4. Start HTTP server
   const server = app.listen(config.port, config.host, () => {
     logger.info(
       `Hinopt POS Local Server is listening on http://${config.host}:${config.port}`

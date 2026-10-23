@@ -64,12 +64,12 @@ class _TopHealthBarState extends State<TopHealthBar> {
             const SizedBox(width: 12),
           ],
           // Brand Logo & Restaurant
-          const Row(
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.restaurant, color: AppColors.accent, size: 20),
-              SizedBox(width: 8),
-              Text(
+              const Icon(Icons.restaurant, color: AppColors.accent, size: 20),
+              const SizedBox(width: 8),
+              const Text(
                 'Hinopt POS',
                 style: TextStyle(
                   color: Colors.white,
@@ -78,10 +78,10 @@ class _TopHealthBarState extends State<TopHealthBar> {
                   letterSpacing: -0.2,
                 ),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
-                '|  Curry Leaf',
-                style: TextStyle(
+                '|  ',
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
