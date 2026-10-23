@@ -147,7 +147,7 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               value: _demoMode,
-              activeThumbColor: AppColors.accent,
+              activeColor: AppColors.accent,
               activeTrackColor: AppColors.primary,
               onChanged: (val) {
                 setState(() => _demoMode = val);

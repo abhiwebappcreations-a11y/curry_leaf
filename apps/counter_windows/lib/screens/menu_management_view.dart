@@ -79,7 +79,7 @@ class MenuManagementView extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              initialValue: selectedCategory,
+                              value: selectedCategory,
                               decoration: InputDecoration(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -547,7 +547,7 @@ class MenuManagementView extends StatelessWidget {
                                               scale: 0.85,
                                               child: Switch(
                                                 value: item.isAvailable,
-                                                activeThumbColor: AppColors.accent,
+                                                activeColor: AppColors.accent,
                                                 activeTrackColor: AppColors.primary,
                                                 onChanged: (_) => provider.toggleMenuItemAvailability(item.id),
                                               ),
@@ -712,7 +712,7 @@ class MenuManagementView extends StatelessWidget {
                     scale: 0.85,
                     child: Switch(
                       value: item.isAvailable,
-                      activeThumbColor: AppColors.accent,
+                      activeColor: AppColors.accent,
                       activeTrackColor: AppColors.primary,
                       onChanged: (_) => provider.toggleMenuItemAvailability(item.id),
                     ),
