@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 // In-memory operational store matching PostgreSQL schema for instant local testing and fallback
 
 export interface DeviceRecord {
@@ -197,6 +200,76 @@ export class InMemoryStore {
 
   constructor() {
     this.seed();
+    this.loadFromDisk();
+  }
+
+  public getStoreFilePath(): string {
+    const candidateDirs = [
+      path.resolve(process.cwd(), 'data'),
+      path.resolve(process.cwd(), '../../data'),
+      process.cwd(),
+    ];
+    for (const dir of candidateDirs) {
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        return path.join(dir, 'pos_store.json');
+      } catch (_) {}
+    }
+    return path.resolve(process.cwd(), 'pos_store.json');
+  }
+
+  public saveToDisk(): void {
+    try {
+      const filePath = this.getStoreFilePath();
+      const payload = {
+        tables: Array.from(this.tables.values()),
+        categories: Array.from(this.categories.values()),
+        menuItems: Array.from(this.menuItems.values()),
+        settings: Object.fromEntries(this.settings.entries()),
+        updatedAt: new Date().toISOString(),
+      };
+      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to save inMemoryStore to disk:', err);
+    }
+  }
+
+  public loadFromDisk(): boolean {
+    try {
+      const filePath = this.getStoreFilePath();
+      if (!fs.existsSync(filePath)) return false;
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const data = JSON.parse(content);
+      if (Array.isArray(data.tables) && data.tables.length > 0) {
+        this.tables.clear();
+        for (const t of data.tables) {
+          this.tables.set(t.id, t);
+        }
+      }
+      if (Array.isArray(data.categories) && data.categories.length > 0) {
+        this.categories.clear();
+        for (const c of data.categories) {
+          this.categories.set(c.id, c);
+        }
+      }
+      if (Array.isArray(data.menuItems) && data.menuItems.length > 0) {
+        this.menuItems.clear();
+        for (const m of data.menuItems) {
+          this.menuItems.set(m.id, m);
+        }
+      }
+      if (data.settings && typeof data.settings === 'object') {
+        for (const [k, v] of Object.entries(data.settings)) {
+          this.settings.set(k, v);
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to load inMemoryStore from disk:', err);
+      return false;
+    }
   }
 
   public seed() {

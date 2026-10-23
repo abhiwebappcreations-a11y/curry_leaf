@@ -150,6 +150,83 @@ class CounterApiService {
     return null;
   }
 
+  Future<RestaurantTable?> createTable({
+    required String tableNumber,
+    String? displayName,
+    required String section,
+    required int capacity,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/tables'),
+            headers: headers,
+            body: jsonEncode({
+              'tableNumber': tableNumber,
+              'displayName': displayName ?? 'Table $tableNumber',
+              'section': section,
+              'capacity': capacity,
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        final tableJson = (data is Map && data.containsKey('table')) ? data['table'] : data;
+        return RestaurantTable.fromJson(tableJson as Map<String, dynamic>);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> updateTable(
+    String id, {
+    String? tableNumber,
+    String? displayName,
+    String? section,
+    int? capacity,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (tableNumber != null) body['tableNumber'] = tableNumber;
+      if (displayName != null) body['displayName'] = displayName;
+      if (section != null) body['section'] = section;
+      if (capacity != null) body['capacity'] = capacity;
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/tables/$id'),
+            headers: headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteTable(String id) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/tables/$id'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> clearDemoTables() async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/tables/demo/clear'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<RestaurantOrder>?> getActiveOrders({Map<String, String>? tableIdToName}) async {
     try {
       // 1. Fetch active, preparing, and ready orders from Local API

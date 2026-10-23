@@ -177,6 +177,7 @@ menuRouter.post(
       };
 
       inMemoryStore.menuItems.set(newItem.id, newItem);
+      inMemoryStore.saveToDisk();
 
       res.status(201).json({
         success: true,

@@ -38,6 +38,27 @@ export class LicenseService {
       }
     }
 
+    // Auto-scan for downloaded license tokens like hinopt_license_<id>.json or *.license.json
+    if (!foundPath) {
+      const searchDirs = [
+        process.cwd(),
+        path.resolve(process.cwd(), 'config'),
+        path.resolve(process.cwd(), '..'),
+        path.resolve(process.cwd(), '../config'),
+        path.resolve(process.cwd(), '../../'),
+      ];
+      for (const dir of searchDirs) {
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir);
+          const licenseFile = files.find(f => f.toLowerCase().includes('license') && f.endsWith('.json'));
+          if (licenseFile) {
+            foundPath = path.join(dir, licenseFile);
+            break;
+          }
+        }
+      }
+    }
+
     if (!foundPath) {
       logger.info('No license.json file found on disk. Using in-memory configuration.');
       return;

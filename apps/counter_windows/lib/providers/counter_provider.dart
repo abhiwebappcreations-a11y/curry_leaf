@@ -74,6 +74,16 @@ class CounterProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   String get selectedSection => _selectedSection;
 
+  List<String> get availableSections {
+    final sections = {'All'};
+    for (var t in _tables) {
+      if (t.section.trim().isNotEmpty) {
+        sections.add(t.section.trim());
+      }
+    }
+    return sections.toList();
+  }
+
   bool get localServerHealthy => _localServerHealthy;
   bool get databaseHealthy => _databaseHealthy;
   String get licenseStatus => _licenseStatus;
@@ -90,6 +100,66 @@ class CounterProvider extends ChangeNotifier {
     _counterApiService.updateHost(host, port);
     notifyListeners();
     await refreshFromLiveApi(isManual: true);
+  }
+
+  Future<bool> createTable({
+    required String tableNumber,
+    String? displayName,
+    required String section,
+    required int capacity,
+  }) async {
+    final created = await _counterApiService.createTable(
+      tableNumber: tableNumber,
+      displayName: displayName,
+      section: section,
+      capacity: capacity,
+    );
+    if (created != null) {
+      _tables.add(created);
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> updateTable(
+    String id, {
+    String? tableNumber,
+    String? displayName,
+    String? section,
+    int? capacity,
+  }) async {
+    final ok = await _counterApiService.updateTable(
+      id,
+      tableNumber: tableNumber,
+      displayName: displayName,
+      section: section,
+      capacity: capacity,
+    );
+    if (ok) {
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> deleteTable(String id) async {
+    final ok = await _counterApiService.deleteTable(id);
+    if (ok) {
+      _tables.removeWhere((t) => t.id == id);
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> clearDemoTables() async {
+    final ok = await _counterApiService.clearDemoTables();
+    if (ok) {
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
   }
 
   Future<bool> testServerConnection(String host, int port) async {

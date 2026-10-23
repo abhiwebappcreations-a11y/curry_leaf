@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../models/table_model.dart';
 import '../models/menu_item_model.dart';
@@ -84,6 +85,21 @@ class PosProvider extends ChangeNotifier {
       _tables.where((t) => t.status == TableStatus.available).length;
 
   Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedHost = prefs.getString('counter_pc_host');
+      final savedPort = prefs.getInt('counter_pc_port');
+      final savedDemo = prefs.getBool('counter_demo_mode');
+      if (savedHost != null && savedHost.trim().isNotEmpty) {
+        _apiService.host = savedHost.trim();
+      }
+      if (savedPort != null && savedPort > 0) {
+        _apiService.port = savedPort;
+      }
+      if (savedDemo != null) {
+        _apiService.useDemoMode = savedDemo;
+      }
+    } catch (_) {}
     _isLoading = true;
     notifyListeners();
 
@@ -326,10 +342,16 @@ class PosProvider extends ChangeNotifier {
     }
   }
 
-  void updateServerConfig(String host, int port, bool demoMode) {
+  Future<void> updateServerConfig(String host, int port, bool demoMode) async {
     _apiService.host = host;
     _apiService.port = port;
     _apiService.useDemoMode = demoMode;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('counter_pc_host', host);
+      await prefs.setInt('counter_pc_port', port);
+      await prefs.setBool('counter_demo_mode', demoMode);
+    } catch (_) {}
     init();
   }
 }

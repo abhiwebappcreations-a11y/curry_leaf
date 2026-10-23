@@ -101,3 +101,157 @@ tablesRouter.patch(
     }
   }
 );
+
+
+const createTableSchema = z.object({
+  tableNumber: z.string().min(1),
+  displayName: z.string().optional(),
+  section: z.string().min(1).default('Main Dining'),
+  capacity: z.number().int().min(1).default(4),
+  sortOrder: z.number().int().optional(),
+});
+
+// POST /api/tables - Create a new custom table
+tablesRouter.post(
+  '/',
+  requireRole('counter', 'admin'),
+  validateBody(createTableSchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tableNumber, displayName, section, capacity, sortOrder } = req.body;
+      const id = 'tab_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      const newTable = {
+        id,
+        tableNumber: tableNumber.trim(),
+        displayName: displayName ? displayName.trim() : 'Table ' + tableNumber.trim(),
+        section: section.trim(),
+        capacity: capacity || 4,
+        status: 'available' as const,
+        activeOrderId: null,
+        sortOrder: sortOrder || (inMemoryStore.tables.size + 1),
+      };
+
+      inMemoryStore.tables.set(id, newTable);
+      inMemoryStore.saveToDisk();
+
+      res.status(201).json({
+        success: true,
+        data: {
+          table: newTable,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const updateTableSchema = z.object({
+  tableNumber: z.string().min(1).optional(),
+  displayName: z.string().optional(),
+  section: z.string().min(1).optional(),
+  capacity: z.number().int().min(1).optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+// PUT /api/tables/:id - Update table details
+tablesRouter.put(
+  '/:id',
+  requireRole('counter', 'admin'),
+  validateBody(updateTableSchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const table = inMemoryStore.tables.get(id);
+      if (!table) {
+        throw new NotFoundError('Table', id);
+      }
+
+      if (req.body.tableNumber) table.tableNumber = req.body.tableNumber.trim();
+      if (req.body.displayName) table.displayName = req.body.displayName.trim();
+      if (req.body.section) table.section = req.body.section.trim();
+      if (req.body.capacity) table.capacity = req.body.capacity;
+      if (req.body.sortOrder !== undefined) table.sortOrder = req.body.sortOrder;
+
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          table,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// DELETE /api/tables/demo/clear - Clear all demo tables
+tablesRouter.delete(
+  '/demo/clear',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const demoIds = ['tab_t1', 'tab_t2', 'tab_t3', 'tab_t4', 'tab_t5', 'tab_p1', 'tab_p2', 'tab_ac1'];
+      let clearedCount = 0;
+      for (const id of demoIds) {
+        const table = inMemoryStore.tables.get(id);
+        if (table && (!table.activeOrderId || table.status === 'available')) {
+          inMemoryStore.tables.delete(id);
+          clearedCount++;
+        }
+      }
+
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          clearedCount,
+          remainingCount: inMemoryStore.tables.size,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// DELETE /api/tables/:id - Delete a table
+tablesRouter.delete(
+  '/:id',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const table = inMemoryStore.tables.get(id);
+      if (!table) {
+        throw new NotFoundError('Table', id);
+      }
+
+      if (table.activeOrderId && table.status !== 'available') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'TABLE_HAS_ACTIVE_ORDER',
+            message: 'Cannot delete table while an active order or bill is present.',
+          },
+        });
+        return;
+      }
+
+      inMemoryStore.tables.delete(id);
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Table deleted successfully',
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
