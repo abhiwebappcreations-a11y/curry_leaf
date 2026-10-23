@@ -456,6 +456,20 @@ window.downloadSignedToken = function (restaurantId) {
   }
 };
 
+window.autoDetectHwid = async function (targetInputId) {
+  try {
+    showToast('Detecting machine hardware UUID...');
+    const res = await fetch('/api/system-hwid');
+    const data = await res.json();
+    if (data.hwid) {
+      document.getElementById(targetInputId).value = data.hwid;
+      showToast(`Detected PC Hardware ID: ${data.hwid}`);
+    }
+  } catch (e) {
+    showToast('Could not auto-detect. Please paste HWID from PowerShell.');
+  }
+};
+
 function showToast(message) {
   const toast = document.createElement('div');
   toast.style.position = 'fixed';

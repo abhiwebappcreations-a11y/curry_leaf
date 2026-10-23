@@ -249,9 +249,14 @@
             <input type="text" id="reg-phone" class="form-input" placeholder="+91 98490 00000" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Counter PC Hardware ID (HWID)</label>
-            <input type="text" id="reg-hwid" class="form-input" placeholder="e.g. WIN-HWID-3918B22">
-            <small style="color: var(--text-muted); font-size: 11px;">Obtained from Counter PC diagnostic screen (leave blank to auto-generate).</small>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="margin-bottom: 0;">Counter PC Hardware ID (HWID)</label>
+              <button type="button" class="btn btn-outline btn-sm" onclick="autoDetectHwid('reg-hwid')" style="padding: 2px 8px; font-size: 11px;">
+                Detect This PC's HWID
+              </button>
+            </div>
+            <input type="text" id="reg-hwid" class="form-input" placeholder="e.g. 226798BC-0369-A548-A68D-A24D15CA0075">
+            <small style="color: var(--text-muted); font-size: 11px;">Hardware UUID of the counter PC (run <code>(Get-CimInstance Win32_ComputerSystemProduct).UUID</code> in PowerShell, or click Detect).</small>
           </div>
           <div class="form-group">
             <label class="form-label">Counter LAN IP</label>
@@ -313,7 +318,12 @@
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
-              <label class="form-label">Counter PC HWID</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">Counter PC HWID</label>
+                <button type="button" class="btn btn-outline btn-sm" onclick="autoDetectHwid('edit-hwid')" style="padding: 2px 8px; font-size: 11px;">
+                  Use This PC's HWID
+                </button>
+              </div>
               <input type="text" id="edit-hwid" class="form-input" required>
             </div>
             <div class="form-group">

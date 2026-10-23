@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +53,24 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // API Route: Detect Host PC Hardware ID (HWID)
+  if (pathname === '/api/system-hwid' && req.method === 'GET') {
+    let hwid = '';
+    try {
+      if (process.platform === 'win32') {
+        const out = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystemProduct).UUID"').toString().trim();
+        hwid = out || 'WIN-HWID-UNKNOWN';
+      } else {
+        hwid = 'DEV-HWID-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      }
+    } catch (_) {
+      hwid = 'WIN-HWID-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, hwid }));
     return;
   }
 
