@@ -2,9 +2,11 @@
   "name": "hinopt-admin-dashboard",
   "version": "1.0.0",
   "description": "Hinopt Restaurant POS Cloud Administration & License Management Dashboard",
-  "main": "index.html",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "npx serve ."
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "keywords": ["hinopt", "pos", "licensing", "restaurant-admin"],
   "author": "Hinopt Technologies",

@@ -19,7 +19,9 @@
     "license:verify": "npm.cmd --prefix services/license-service run verify",
     "license:test": "npm.cmd --prefix services/license-service run test",
     "license:build": "npm.cmd --prefix services/license-service run build",
-    "test:all": "npm.cmd --prefix services/local-api run test && npm.cmd --prefix services/license-service run test"
+    "test:all": "npm.cmd --prefix services/local-api run test && npm.cmd --prefix services/license-service run test",
+    "start:admin": "node apps/hinopt_admin/server.js",
+    "admin": "node apps/hinopt_admin/server.js"
   },
   "keywords": [
     "restaurant-pos",
