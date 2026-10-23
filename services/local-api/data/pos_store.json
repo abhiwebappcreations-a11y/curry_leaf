@@ -680,6 +680,21 @@
       "variants": [],
       "addOns": [],
       "sortOrder": 28
+    },
+    {
+      "id": "item_1792772515340_150",
+      "categoryId": "cat_starters",
+      "name": "Ghee Podi Idli",
+      "shortCode": "GHE",
+      "description": "Mini button idlis tossed in gun powder and desi ghee",
+      "pricePaise": 18000,
+      "taxRatePercent": 5,
+      "isAvailable": true,
+      "isVeg": true,
+      "imageUrl": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc",
+      "variants": [],
+      "addOns": [],
+      "sortOrder": 29
     }
   ],
   "settings": {
@@ -693,5 +708,5 @@
       "currency": "INR"
     }
   },
-  "updatedAt": "2026-10-23T15:05:39.686Z"
+  "updatedAt": "2026-10-23T16:21:55.341Z"
 }

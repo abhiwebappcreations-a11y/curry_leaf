@@ -176,9 +176,21 @@ export class PrintService {
    * @param printerName - Exact Windows printer name, e.g. "EPSON TM-T82X Receipt"
    * @param data        - Raw ESC/POS binary buffer
    */
+  private static getRawPrinterExe(): string {
+    const candidates = [
+      path.resolve(process.cwd(), 'bin/RawPrinter.exe'),
+      path.resolve(process.cwd(), 'services/local-api/bin/RawPrinter.exe'),
+      path.resolve(__dirname, '../../bin/RawPrinter.exe'),
+      'D:\\curry_leaf\\services\\local-api\\bin\\RawPrinter.exe',
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return 'D:\\curry_leaf\\services\\local-api\\bin\\RawPrinter.exe';
+  }
+
   private static sendRawUsb(printerName: string, data: Buffer): Promise<boolean> {
     return new Promise((resolve) => {
-      // Write ESC/POS bytes to a unique temp file
       const tmpFile = path.join(os.tmpdir(), `escpos_${Date.now()}.bin`);
 
       try {
@@ -189,95 +201,23 @@ export class PrintService {
         return;
       }
 
-      // PowerShell script: open a RawPrintStream to the printer and write the file bytes
-      // Uses System.Printing which is available on all modern Windows without extra installs.
-      const escapedPrinter = printerName.replace(/'/g, "''");
-      const escapedTmp = tmpFile.replace(/\\/g, '\\\\');
-
-      const psScript = [
-        `Add-Type -AssemblyName System.Printing`,
-        `$server  = New-Object System.Printing.LocalPrintServer`,
-        `$queue   = $server.GetPrintQueue('${escapedPrinter}')`,
-        `$stream  = $queue.CreateXpsDocumentWriter([System.Printing.PrintTicket] $null)`,
-        // Simpler alternative: use a raw stream via PrintDocument
-        // Fall back to copy /b which is universally reliable
-      ].join('; ');
-
-      // Simpler, more reliable fallback: use 'copy /b' to the Windows printer port
-      // Works for USB printers that expose a port name like USB001 / TMUSB001
-      // But since we only know the friendly name, we use PowerShell .NET printing:
-      const psRaw = [
-        `$bytes = [System.IO.File]::ReadAllBytes('${escapedTmp}')`,
-        `$printerName = '${escapedPrinter}'`,
-        `Add-Type -TypeDefinition @"`,
-        `using System;`,
-        `using System.Runtime.InteropServices;`,
-        `public class RawPrinterHelper {`,
-        `    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]`,
-        `    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);`,
-        `    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]`,
-        `    public static extern bool ClosePrinter(IntPtr hPrinter);`,
-        `    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]`,
-        `    public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);`,
-        `    [DllImport("winspool.drv", SetLastError=true)]`,
-        `    public static extern bool EndDocPrinter(IntPtr hPrinter);`,
-        `    [DllImport("winspool.drv", SetLastError=true)]`,
-        `    public static extern bool StartPagePrinter(IntPtr hPrinter);`,
-        `    [DllImport("winspool.drv", SetLastError=true)]`,
-        `    public static extern bool EndPagePrinter(IntPtr hPrinter);`,
-        `    [DllImport("winspool.drv", SetLastError=true)]`,
-        `    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);`,
-        `}`,
-        `[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]`,
-        `public class DOCINFOA {`,
-        `    [MarshalAs(UnmanagedType.LPStr)] public string pDocName;`,
-        `    [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;`,
-        `    [MarshalAs(UnmanagedType.LPStr)] public string pDataType;`,
-        `}`,
-        `"@ -Language CSharpVersion3`,
-        `$hPrinter = [IntPtr]::Zero`,
-        `if (-not [RawPrinterHelper]::OpenPrinter($printerName, [ref]$hPrinter, [IntPtr]::Zero)) { exit 1 }`,
-        `$di = New-Object DOCINFOA`,
-        `$di.pDocName = 'ESC/POS Print Job'`,
-        `$di.pDataType = 'RAW'`,
-        `if (-not [RawPrinterHelper]::StartDocPrinter($hPrinter, 1, $di)) { [RawPrinterHelper]::ClosePrinter($hPrinter); exit 1 }`,
-        `[RawPrinterHelper]::StartPagePrinter($hPrinter) | Out-Null`,
-        `$ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($bytes.Length)`,
-        `[System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $ptr, $bytes.Length)`,
-        `$written = 0`,
-        `[RawPrinterHelper]::WritePrinter($hPrinter, $ptr, $bytes.Length, [ref]$written) | Out-Null`,
-        `[System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)`,
-        `[RawPrinterHelper]::EndPagePrinter($hPrinter) | Out-Null`,
-        `[RawPrinterHelper]::EndDocPrinter($hPrinter) | Out-Null`,
-        `[RawPrinterHelper]::ClosePrinter($hPrinter) | Out-Null`,
-        `exit 0`,
-      ].join('\n');
-
-      // Write PS script to temp file (avoids command-line escaping issues)
-      const psFile = tmpFile.replace('.bin', '.ps1');
-      try {
-        fs.writeFileSync(psFile, psRaw, 'utf-8');
-      } catch (psErr) {
-        logger.error({ psErr }, '[USB] Failed to write PowerShell script file');
-        fs.rmSync(tmpFile, { force: true });
-        resolve(false);
-        return;
-      }
-
-      const cmd = `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${psFile}"`;
+      const rawPrinterExe = this.getRawPrinterExe();
+      const cmd = `"${rawPrinterExe}" "${printerName}" "${tmpFile}"`;
 
       exec(cmd, { timeout: 10000 }, (err, stdout, stderr) => {
-        // Clean up temp files regardless of outcome
-        fs.rmSync(tmpFile, { force: true });
-        fs.rmSync(psFile, { force: true });
+        try { fs.rmSync(tmpFile, { force: true }); } catch (_) {}
 
         if (err) {
           logger.warn(
-            { printerName, exitCode: err.code, stderr: stderr?.trim() },
-            '[USB] PowerShell raw print failed'
+            { printerName, exitCode: err.code, stderr: stderr?.trim(), stdout: stdout?.trim() },
+            '[USB] RawPrinter execution failed'
           );
           resolve(false);
         } else {
+          logger.info(
+            { printerName, stdout: stdout?.trim() },
+            '[USB] RawPrinter successfully sent print job to Windows spooler'
+          );
           resolve(true);
         }
       });
