@@ -153,6 +153,8 @@ class CounterProvider extends ChangeNotifier {
     return false;
   }
 
+  Future<List<String>> fetchSystemPrinters() => _counterApiService.getSystemPrinters();
+
   Future<bool> clearDemoTables() async {
     final ok = await _counterApiService.clearDemoTables();
     if (ok) {
@@ -591,11 +593,11 @@ class CounterProvider extends ChangeNotifier {
   Future<void> testPrint(PrinterRole role) async {
     final printer = _printers.where((p) => p.role == role).firstOrNull;
     if (printer != null) {
-      await _apiClient.testPrint(printer.id);
+      final success = await _apiClient.testPrint(printer.id);
       final index = _printers.indexOf(printer);
       _printers[index] = printer.copyWith(
         lastTestPrintAt: DateTime.now(),
-        isConnected: true,
+        isConnected: success,
       );
       notifyListeners();
     }

@@ -262,7 +262,7 @@ export class InMemoryStore {
       }
       if (data.settings && typeof data.settings === 'object') {
         for (const [k, v] of Object.entries(data.settings)) {
-          this.settings.set(k, v);
+          this.settings.set(k, v as Record<string, unknown>);
         }
       }
       return true;

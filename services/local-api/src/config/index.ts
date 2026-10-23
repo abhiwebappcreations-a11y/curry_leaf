@@ -68,11 +68,15 @@ export const config: AppConfig = {
   printers: {
     servicePort: parseInt(process.env.PRINT_SERVICE_PORT || '4001', 10),
     counterBill: {
-      target: process.env.BILL_PRINTER_TARGET || '192.168.1.200:9100',
+      // USB: use Windows printer name (e.g. 'EPSON TM-T82X Receipt')
+      // Ethernet: use 'host:port' format (e.g. '192.168.1.200:9100')
+      target: process.env.BILL_PRINTER_TARGET || 'EPSON TM-T82X Receipt',
       paperWidth: process.env.BILL_PRINTER_PAPER_WIDTH || '80mm',
     },
     kitchenKot: {
-      target: process.env.KOT_PRINTER_TARGET || '192.168.1.201:9100',
+      // USB: use Windows printer name (e.g. 'EPSON TM-T82X Receipt6')
+      // Ethernet: use 'host:port' format (e.g. '192.168.1.201:9100')
+      target: process.env.KOT_PRINTER_TARGET || 'EPSON TM-T82X Receipt6',
       paperWidth: process.env.KOT_PRINTER_PAPER_WIDTH || '80mm',
     },
   },

@@ -85,12 +85,15 @@ class ThermalPrinterConfig {
         ? PrinterRole.kitchenKot
         : PrinterRole.counterBill;
 
+    final targetStr = (json['target'] ?? json['address'] ?? 'EPSON TM-T82X Receipt').toString();
+    final isUsb = json['connectionType'] == 'usb' || !targetStr.contains(':');
+
     return ThermalPrinterConfig(
       id: id,
       role: role,
       name: json['name'] as String? ?? (role == PrinterRole.kitchenKot ? 'Kitchen KOT Thermal Printer' : 'Counter Bill Thermal Printer'),
-      connectionType: PrinterConnectionType.ethernet,
-      address: (json['target'] ?? json['address'] ?? '192.168.1.200') as String,
+      connectionType: isUsb ? PrinterConnectionType.usb : PrinterConnectionType.ethernet,
+      address: targetStr,
       port: json['port'] as int? ?? 9100,
       paperWidthMm: (json['paperWidth'] ?? json['paperWidthMm'] ?? 80) as int,
       isConnected: json['status'] == 'ready' || json['status'] == 'connected' || (json['isConnected'] ?? true),

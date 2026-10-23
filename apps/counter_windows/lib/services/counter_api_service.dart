@@ -216,6 +216,22 @@ class CounterApiService {
     }
   }
 
+  Future<List<String>> getSystemPrinters() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/printers/system-devices'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map && data.containsKey('devices')) {
+          final list = data['devices'] as List;
+          return list.map((e) => e.toString()).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
   Future<bool> clearDemoTables() async {
     try {
       final response = await http

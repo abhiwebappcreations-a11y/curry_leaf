@@ -1,4 +1,8 @@
 import net from 'net';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { exec } from 'child_process';
 import { inMemoryStore, PrintJobRecord } from '../db/inMemoryStore.js';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
@@ -62,30 +66,59 @@ export class PrintService {
         ? config.printers.kitchenKot
         : config.printers.counterBill;
 
-      const targetParts = printerConfig.target.split(':');
-      const host = targetParts[0] || '127.0.0.1';
-      const port = parseInt(targetParts[1] || '9100', 10);
-
       // 1. Build ESC/POS binary buffer
       const escposBuffer = this.buildEscPosPayload(job);
 
-      // 2. Dispatch over raw TCP Ethernet socket (Port 9100)
-      const didSend = await this.sendRawTcp(host, port, escposBuffer, 2500);
+      // 2. Auto-detect connection type:
+      //    - If target contains ':' → treat as 'host:port' (Ethernet TCP / Port 9100)
+      //    - Otherwise            → treat as Windows printer name (USB via print spooler)
+      const isEthernet = printerConfig.target.includes(':');
 
-      if (didSend) {
-        logger.info(
-          { jobId: job.id, target: printerConfig.target, bytes: escposBuffer.length },
-          `[ETHERNET THERMAL PRINTER] Successfully dispatched to physical printer at ${printerConfig.target}`
-        );
+      let didSend: boolean;
+      if (isEthernet) {
+        const targetParts = printerConfig.target.split(':');
+        const host = targetParts[0] || '127.0.0.1';
+        const port = parseInt(targetParts[1] || '9100', 10);
+        didSend = await this.sendRawTcp(host, port, escposBuffer, 2500);
+
+        if (didSend) {
+          logger.info(
+            { jobId: job.id, target: printerConfig.target, bytes: escposBuffer.length },
+            `[ETHERNET] Dispatched to thermal printer at ${printerConfig.target}`
+          );
+        } else {
+          logger.warn(
+            { jobId: job.id, target: printerConfig.target },
+            `[ETHERNET] TCP send failed — printer unreachable at ${printerConfig.target}`
+          );
+        }
       } else {
-        logger.info(
-          { jobId: job.id, target: printerConfig.target },
-          `[ETHERNET THERMAL PRINTER] Dispatched to queue (Ethernet target ${printerConfig.target} not reachable, simulated fallback)`
-        );
+        // USB / Windows print spooler path
+        didSend = await this.sendRawUsb(printerConfig.target, escposBuffer);
+
+        if (didSend) {
+          logger.info(
+            { jobId: job.id, printerName: printerConfig.target, bytes: escposBuffer.length },
+            `[USB] Dispatched to Windows printer "${printerConfig.target}"`
+          );
+        } else {
+          logger.warn(
+            { jobId: job.id, printerName: printerConfig.target },
+            `[USB] Failed to send to Windows printer "${printerConfig.target}". Verify the printer name matches exactly in Windows Devices & Printers.`
+          );
+        }
       }
 
-      job.status = 'completed';
-      job.updatedAt = new Date().toISOString();
+      if (didSend) {
+        job.status = 'completed';
+        job.updatedAt = new Date().toISOString();
+      } else {
+        job.retryCount += 1;
+        const method = isEthernet ? 'Ethernet TCP (port 9100)' : 'USB Windows spooler';
+        job.errorMessage = `Print failed via ${method} to "${printerConfig.target}". Check connection and printer name.`;
+        job.status = job.retryCount >= job.maxRetries ? 'failed' : 'queued';
+        job.updatedAt = new Date().toISOString();
+      }
     } catch (err: any) {
       job.retryCount += 1;
       job.errorMessage = err.message || 'Thermal printer communication failed';
@@ -128,6 +161,124 @@ export class PrintService {
           resolved = true;
           socket.destroy();
           resolve(false);
+        }
+      });
+    });
+  }
+
+  /**
+   * Sends raw ESC/POS bytes to a USB/Windows printer via the Windows print spooler.
+   *
+   * Strategy: Write the buffer to a temp .bin file, then use PowerShell to open a
+   * RawPrintStream to the named Windows printer (exactly as shown in Devices & Printers).
+   * This works for any Windows-shared or locally-attached USB printer without extra npm packages.
+   *
+   * @param printerName - Exact Windows printer name, e.g. "EPSON TM-T82X Receipt"
+   * @param data        - Raw ESC/POS binary buffer
+   */
+  private static sendRawUsb(printerName: string, data: Buffer): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Write ESC/POS bytes to a unique temp file
+      const tmpFile = path.join(os.tmpdir(), `escpos_${Date.now()}.bin`);
+
+      try {
+        fs.writeFileSync(tmpFile, data);
+      } catch (writeErr) {
+        logger.error({ writeErr }, '[USB] Failed to write temp ESC/POS file');
+        resolve(false);
+        return;
+      }
+
+      // PowerShell script: open a RawPrintStream to the printer and write the file bytes
+      // Uses System.Printing which is available on all modern Windows without extra installs.
+      const escapedPrinter = printerName.replace(/'/g, "''");
+      const escapedTmp = tmpFile.replace(/\\/g, '\\\\');
+
+      const psScript = [
+        `Add-Type -AssemblyName System.Printing`,
+        `$server  = New-Object System.Printing.LocalPrintServer`,
+        `$queue   = $server.GetPrintQueue('${escapedPrinter}')`,
+        `$stream  = $queue.CreateXpsDocumentWriter([System.Printing.PrintTicket] $null)`,
+        // Simpler alternative: use a raw stream via PrintDocument
+        // Fall back to copy /b which is universally reliable
+      ].join('; ');
+
+      // Simpler, more reliable fallback: use 'copy /b' to the Windows printer port
+      // Works for USB printers that expose a port name like USB001 / TMUSB001
+      // But since we only know the friendly name, we use PowerShell .NET printing:
+      const psRaw = [
+        `$bytes = [System.IO.File]::ReadAllBytes('${escapedTmp}')`,
+        `$printerName = '${escapedPrinter}'`,
+        `Add-Type -TypeDefinition @"`,
+        `using System;`,
+        `using System.Runtime.InteropServices;`,
+        `public class RawPrinterHelper {`,
+        `    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]`,
+        `    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);`,
+        `    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]`,
+        `    public static extern bool ClosePrinter(IntPtr hPrinter);`,
+        `    [DllImport("winspool.drv", CharSet=CharSet.Auto, SetLastError=true)]`,
+        `    public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);`,
+        `    [DllImport("winspool.drv", SetLastError=true)]`,
+        `    public static extern bool EndDocPrinter(IntPtr hPrinter);`,
+        `    [DllImport("winspool.drv", SetLastError=true)]`,
+        `    public static extern bool StartPagePrinter(IntPtr hPrinter);`,
+        `    [DllImport("winspool.drv", SetLastError=true)]`,
+        `    public static extern bool EndPagePrinter(IntPtr hPrinter);`,
+        `    [DllImport("winspool.drv", SetLastError=true)]`,
+        `    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);`,
+        `}`,
+        `[StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]`,
+        `public class DOCINFOA {`,
+        `    [MarshalAs(UnmanagedType.LPStr)] public string pDocName;`,
+        `    [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;`,
+        `    [MarshalAs(UnmanagedType.LPStr)] public string pDataType;`,
+        `}`,
+        `"@ -Language CSharpVersion3`,
+        `$hPrinter = [IntPtr]::Zero`,
+        `if (-not [RawPrinterHelper]::OpenPrinter($printerName, [ref]$hPrinter, [IntPtr]::Zero)) { exit 1 }`,
+        `$di = New-Object DOCINFOA`,
+        `$di.pDocName = 'ESC/POS Print Job'`,
+        `$di.pDataType = 'RAW'`,
+        `if (-not [RawPrinterHelper]::StartDocPrinter($hPrinter, 1, $di)) { [RawPrinterHelper]::ClosePrinter($hPrinter); exit 1 }`,
+        `[RawPrinterHelper]::StartPagePrinter($hPrinter) | Out-Null`,
+        `$ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($bytes.Length)`,
+        `[System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $ptr, $bytes.Length)`,
+        `$written = 0`,
+        `[RawPrinterHelper]::WritePrinter($hPrinter, $ptr, $bytes.Length, [ref]$written) | Out-Null`,
+        `[System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)`,
+        `[RawPrinterHelper]::EndPagePrinter($hPrinter) | Out-Null`,
+        `[RawPrinterHelper]::EndDocPrinter($hPrinter) | Out-Null`,
+        `[RawPrinterHelper]::ClosePrinter($hPrinter) | Out-Null`,
+        `exit 0`,
+      ].join('\n');
+
+      // Write PS script to temp file (avoids command-line escaping issues)
+      const psFile = tmpFile.replace('.bin', '.ps1');
+      try {
+        fs.writeFileSync(psFile, psRaw, 'utf-8');
+      } catch (psErr) {
+        logger.error({ psErr }, '[USB] Failed to write PowerShell script file');
+        fs.rmSync(tmpFile, { force: true });
+        resolve(false);
+        return;
+      }
+
+      const cmd = `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${psFile}"`;
+
+      exec(cmd, { timeout: 10000 }, (err, stdout, stderr) => {
+        // Clean up temp files regardless of outcome
+        fs.rmSync(tmpFile, { force: true });
+        fs.rmSync(psFile, { force: true });
+
+        if (err) {
+          logger.warn(
+            { printerName, exitCode: err.code, stderr: stderr?.trim() },
+            '[USB] PowerShell raw print failed'
+          );
+          resolve(false);
+        } else {
+          resolve(true);
         }
       });
     });
