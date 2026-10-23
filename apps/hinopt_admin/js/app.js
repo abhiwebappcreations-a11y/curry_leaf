@@ -141,7 +141,7 @@ function renderRestaurants() {
            r.hwid.toLowerCase().includes(activeFilter);
   });
 
-  tbody.innerHTML = data.map(r => {
+  const html = data.map(r => {
     const badgeClass = r.status === 'ACTIVE' ? 'badge-success' : (r.status === 'EXPIRING_SOON' ? 'badge-warning' : 'badge-danger');
     return `
       <tr>
@@ -168,6 +168,12 @@ function renderRestaurants() {
       </tr>
     `;
   }).join('');
+
+  tbody.innerHTML = html;
+  const fullTbody = document.getElementById('table-restaurants-full-body');
+  if (fullTbody) {
+    fullTbody.innerHTML = html;
+  }
 }
 
 function renderLicenses() {
