@@ -7,6 +7,7 @@ import '../models/order_model.dart';
 import '../models/kot_model.dart';
 import '../services/api_service.dart';
 import '../services/mock_data.dart';
+import '../services/discovery_service.dart';
 
 class PosProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -28,6 +29,13 @@ class PosProvider extends ChangeNotifier {
   String? _lastError;
   bool _isConnected = true;
   Timer? _autoPollTimer;
+  Timer? _pairingPollTimer;
+
+  bool _isPairingApproved = false;
+  bool _isPairingPending = false;
+  String? _pairingMessage;
+  String _deviceId = 'dev_captain_01';
+  String _deviceName = 'Captain Phone';
 
   PosProvider() {
     init();
@@ -45,6 +53,11 @@ class PosProvider extends ChangeNotifier {
   bool get isSubmittingKot => _isSubmittingKot;
   String? get lastError => _lastError;
   bool get isConnected => _isConnected;
+  bool get isPairingApproved => _isPairingApproved;
+  bool get isPairingPending => _isPairingPending;
+  String? get pairingMessage => _pairingMessage;
+  String get deviceName => _deviceName;
+  String get deviceId => _deviceId;
   List<KotTicket> get kotHistory => _kotHistory;
   ApiService get apiService => _apiService;
 
@@ -87,11 +100,32 @@ class PosProvider extends ChangeNotifier {
       _tables.where((t) => t.status == TableStatus.available).length;
 
   Future<void> init() async {
+    _isLoading = true;
+    notifyListeners();
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedHost = prefs.getString('counter_pc_host');
       final savedPort = prefs.getInt('counter_pc_port');
       final savedDemo = prefs.getBool('counter_demo_mode');
+      final savedDeviceId = prefs.getString('captain_device_id');
+      final savedDeviceName = prefs.getString('captain_device_name');
+      final savedApiKey = prefs.getString('captain_api_key');
+
+      if (savedDeviceId != null && savedDeviceId.isNotEmpty) {
+        _deviceId = savedDeviceId;
+      } else {
+        _deviceId = 'cap_${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        await prefs.setString('captain_device_id', _deviceId);
+      }
+
+      if (savedDeviceName != null && savedDeviceName.isNotEmpty) {
+        _deviceName = savedDeviceName;
+      }
+      if (savedApiKey != null && savedApiKey.isNotEmpty) {
+        _apiService.apiKey = savedApiKey;
+      }
+
       if (savedHost != null && savedHost.trim().isNotEmpty) {
         _apiService.host = savedHost.trim();
       }
@@ -101,9 +135,51 @@ class PosProvider extends ChangeNotifier {
       if (savedDemo != null) {
         _apiService.useDemoMode = savedDemo;
       }
-    } catch (_) {}
-    _isLoading = true;
-    notifyListeners();
+
+      _apiService.deviceId = _deviceId;
+
+      // 1. If not demo mode, attempt Zero-Config Wi-Fi Auto-Discovery
+      if (!_apiService.useDemoMode) {
+        final discovered = await CounterDiscoveryService.discoverCounterPos();
+        if (discovered != null && discovered['host'] != null) {
+          _apiService.host = discovered['host'].toString();
+          if (discovered['port'] != null) {
+            _apiService.port = int.tryParse(discovered['port'].toString()) ?? 4000;
+          }
+        }
+
+        // 2. Pair / Permission Handshake with Counter POS
+        final pairRes = await _apiService.requestPairing(
+          deviceId: _deviceId,
+          deviceName: _deviceName,
+        );
+
+        if (pairRes != null) {
+          final status = pairRes['status']?.toString();
+          if (status == 'approved') {
+            _isPairingApproved = true;
+            _isPairingPending = false;
+            if (pairRes['apiKey'] != null) {
+              await prefs.setString('captain_api_key', pairRes['apiKey'].toString());
+            }
+          } else {
+            // Pending Counter Manager Approval
+            _isPairingApproved = false;
+            _isPairingPending = true;
+            _pairingMessage = pairRes['message']?.toString() ??
+                'New device detected. Please tap "Approve" on Counter POS screen.';
+            _startPairingPolling();
+          }
+        } else {
+          // If pair request fails (offline or demo), allow graceful local use
+          _isPairingApproved = true;
+        }
+      } else {
+        _isPairingApproved = true;
+      }
+    } catch (_) {
+      _isPairingApproved = true;
+    }
 
     _tables = await _apiService.fetchTables();
     _menuItems = await _apiService.fetchMenu();
@@ -119,6 +195,27 @@ class PosProvider extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     startAutoPolling();
+  }
+
+  void _startPairingPolling() {
+    _pairingPollTimer?.cancel();
+    _pairingPollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      final res = await _apiService.checkPairStatus(_deviceId);
+      if (res != null && res['status'] == 'approved') {
+        _pairingPollTimer?.cancel();
+        _pairingPollTimer = null;
+        _isPairingApproved = true;
+        _isPairingPending = false;
+
+        if (res['apiKey'] != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('captain_api_key', res['apiKey'].toString());
+        }
+
+        await pollLatestState();
+        notifyListeners();
+      }
+    });
   }
 
   void startAutoPolling() {
@@ -179,6 +276,7 @@ class PosProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _pairingPollTimer?.cancel();
     stopAutoPolling();
     super.dispose();
   }

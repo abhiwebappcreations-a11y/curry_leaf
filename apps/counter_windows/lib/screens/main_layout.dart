@@ -53,6 +53,8 @@ class MainLayout extends StatelessWidget {
           child: Column(
             children: [
               const TopHealthBar(showMenuButton: true),
+              for (var device in provider.pendingDevices)
+                _buildPendingDeviceBanner(context, provider, device),
               if (provider.isLicenseLocked)
                 Container(
                   width: double.infinity,
@@ -104,7 +106,9 @@ class MainLayout extends StatelessWidget {
         child: Column(
           children: [
             const TopHealthBar(showMenuButton: false),
-              if (provider.isLicenseLocked)
+            for (var device in provider.pendingDevices)
+              _buildPendingDeviceBanner(context, provider, device),
+            if (provider.isLicenseLocked)
                 Container(
                   width: double.infinity,
                   color: AppColors.error,
@@ -153,6 +157,69 @@ class MainLayout extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPendingDeviceBanner(BuildContext context, CounterProvider provider, Map<String, dynamic> device) {
+    final name = device['deviceName']?.toString() ?? 'Captain Phone';
+    final id = device['id']?.toString() ?? '';
+    final ip = device['deviceIp']?.toString() ?? 'Wi-Fi Device';
+
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFF1E3A8A), // Deep indigo alert banner
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_tethering, color: Colors.white, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'NEW CAPTAIN DEVICE DETECTED: "$name"',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                ),
+                Text(
+                  'Device ID: $id • IP: $ip • Requesting permission to connect and take orders on table floor.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            onPressed: () async {
+              final ok = await provider.approveDevice(id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok ? 'Captain device "$name" approved successfully.' : 'Failed to approve device.'),
+                    backgroundColor: ok ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.check_circle_outline, size: 16),
+            label: const Text('Approve & Activate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            onPressed: () => provider.rejectDevice(id),
+            child: const Text('Decline', style: TextStyle(fontSize: 12)),
+          ),
+        ],
       ),
     );
   }

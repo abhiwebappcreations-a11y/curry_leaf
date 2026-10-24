@@ -51,9 +51,11 @@ class TablesScreen extends StatelessWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: Column(
-        children: [
-          // Quick Operational Metrics Bar
+      body: provider.isPairingPending
+          ? _buildPairingPendingScreen(context, provider)
+          : Column(
+              children: [
+                // Quick Operational Metrics Bar
           Container(
             color: AppColors.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -233,6 +235,104 @@ class TablesScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPairingPendingScreen(BuildContext context, PosProvider provider) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.wifi_tethering, size: 36, color: AppColors.primary),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'New Device Detected',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Connected to Counter on Wi-Fi (${provider.apiService.host})',
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.warningBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.hourglass_top_rounded, color: AppColors.warning, size: 20),
+                        SizedBox(width: 6),
+                        Text(
+                          'Waiting for Approval',
+                          style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.warning, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please look at the Counter POS screen.\nA notification appeared asking the manager to activate this phone.',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textPrimary, height: 1.3),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Device: ${provider.deviceName} (${provider.deviceId})',
+                      style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ConnectionSettingsScreen()),
+                ),
+                icon: const Icon(Icons.settings, size: 16),
+                label: const Text('Change Connection Settings', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
         ),
       ),
     );

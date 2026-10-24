@@ -3,6 +3,7 @@ import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { db } from './db/index.js';
 import { LicenseService } from './services/licenseService.js';
+import { DiscoveryService } from './services/discoveryService.js';
 
 async function bootstrap() {
   logger.info(
@@ -45,11 +46,15 @@ async function bootstrap() {
       `Hinopt POS Local Server is listening on http://${config.host}:${config.port}`
     );
     logger.info(`Health check endpoint: http://localhost:${config.port}/api/health`);
+
+    // Start UDP Wi-Fi Auto-Discovery Beacon
+    DiscoveryService.start();
   });
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down Hinopt Local API server gracefully...');
+    DiscoveryService.stop();
     server.close(async () => {
       await db.close();
       logger.info('Server closed. Operational state preserved.');

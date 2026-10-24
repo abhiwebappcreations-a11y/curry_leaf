@@ -16,6 +16,7 @@ import { printersRouter } from './routes/printers.js';
 import { licenseRouter } from './routes/license.js';
 import { reportsRouter } from './routes/reports.js';
 import { backupRouter } from './routes/backup.js';
+import { devicesRouter } from './routes/devices.js';
 
 export const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/printers', printersRouter);
 app.use('/api/license', licenseRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/backup', backupRouter);
+app.use('/api/devices', devicesRouter);
 
 // 404 handler
 app.use((req, res, next) => {

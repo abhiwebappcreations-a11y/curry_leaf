@@ -88,6 +88,15 @@ class CounterProvider extends ChangeNotifier {
   bool get databaseHealthy => _databaseHealthy;
   String get licenseStatus => _licenseStatus;
   int get licenseDaysRemaining => _licenseDaysRemaining;
+
+  // Wi-Fi Auto-Discovery & Captain Pairing
+  List<Map<String, dynamic>> _pendingDevices = [];
+  Map<String, dynamic>? _lanInfo;
+
+  List<Map<String, dynamic>> get pendingDevices => _pendingDevices;
+  bool get hasPendingDevices => _pendingDevices.isNotEmpty;
+  Map<String, dynamic>? get lanInfo => _lanInfo;
+  String get lanHost => _lanInfo?['host']?.toString() ?? '127.0.0.1';
   bool get isLicenseLocked =>
       _licenseStatus.toLowerCase() == 'expired' ||
       _licenseStatus.toLowerCase() == 'suspended' ||
@@ -313,6 +322,10 @@ class CounterProvider extends ChangeNotifier {
             _syncDraftBillFromOrder(activeOrder);
           }
         }
+        // Check for pending Captain devices on LAN
+        final pending = await _apiClient.getPendingDevices();
+        _pendingDevices = pending;
+
         notifyListeners();
       }
     } catch (_) {}
@@ -332,6 +345,9 @@ class CounterProvider extends ChangeNotifier {
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
       _restaurantName = health.restaurantName;
+
+      _lanInfo = await _apiClient.getLanInfo();
+      _pendingDevices = await _apiClient.getPendingDevices();
 
       final liveTables = await _apiClient.getTables();
       if (liveTables != null) {
@@ -683,6 +699,24 @@ class CounterProvider extends ChangeNotifier {
     final ok = await _counterApiService.seedDemoMenu();
     if (ok) {
       await refreshFromLiveApi(isManual: true);
+    }
+    return ok;
+  }
+
+  Future<bool> approveDevice(String deviceId) async {
+    final ok = await _apiClient.approveDevice(deviceId);
+    if (ok) {
+      _pendingDevices.removeWhere((d) => d['id'] == deviceId);
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  Future<bool> rejectDevice(String deviceId) async {
+    final ok = await _apiClient.rejectDevice(deviceId);
+    if (ok) {
+      _pendingDevices.removeWhere((d) => d['id'] == deviceId);
+      notifyListeners();
     }
     return ok;
   }

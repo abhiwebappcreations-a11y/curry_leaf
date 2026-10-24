@@ -120,6 +120,53 @@ class _TopHealthBarState extends State<TopHealthBar> {
                   ),
                   const SizedBox(width: 8),
 
+                  // Wi-Fi LAN & Captain Auto-Discovery Status
+                  InkWell(
+                    onTap: () => _showCaptainPairingDialog(context, provider),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.5),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.wifi_tethering, size: 13, color: AppColors.accent),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Wi-Fi: ${provider.lanHost}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (provider.hasPendingDevices) ...[
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.warning,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${provider.pendingDevices.length}',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
                   // Thermal Printers Status
                   _buildHealthIndicator(
                     label: 'Printers: Ready',
@@ -253,6 +300,148 @@ class _TopHealthBarState extends State<TopHealthBar> {
       context: context,
       builder: (_) => BackupRestoreDialog(
         provider: provider,
+      ),
+    );
+  }
+
+  void _showCaptainPairingDialog(BuildContext context, CounterProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_tethering, color: AppColors.accent, size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Wi-Fi Auto-Discovery & Captain Pairing',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.router_outlined, size: 20, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Counter Wi-Fi IP: ${provider.lanHost}:4000',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'UDP Auto-Discovery Beacon is active on Port 41234.\nCaptain phones on the same Wi-Fi router will automatically discover this Counter without typing any IP address.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pending Device Requests',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              if (!provider.hasPendingDevices)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'No new Captain devices waiting. Open the Captain app on any phone to connect.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              else
+                ...provider.pendingDevices.map((dev) {
+                  final devName = dev['deviceName']?.toString() ?? 'Captain Phone';
+                  final devId = dev['id']?.toString() ?? '';
+                  final devIp = dev['deviceIp']?.toString() ?? 'Wi-Fi';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.phone_android, color: Color(0xFF1D4ED8), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(devName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                              Text('$devId • IP: $devIp', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
+                          onPressed: () {
+                            provider.approveDevice(devId);
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('Approve', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 6),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
+                          onPressed: () {
+                            provider.rejectDevice(devId);
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('Decline', style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

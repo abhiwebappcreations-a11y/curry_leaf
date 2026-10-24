@@ -10,6 +10,8 @@ export interface DeviceRecord {
   deviceFingerprint: string;
   apiKeyHash: string;
   isActive: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  deviceIp?: string;
   lastSeenAt?: string;
   registeredAt: string;
 }
@@ -234,6 +236,7 @@ export class InMemoryStore {
         bills: Array.from(this.bills.values()),
         payments: Array.from(this.payments.values()),
         kots: Array.from(this.kots.values()),
+        devices: Array.from(this.devices.values()),
         settings: Object.fromEntries(this.settings.entries()),
         updatedAt: new Date().toISOString(),
       };
@@ -272,6 +275,11 @@ export class InMemoryStore {
     try {
       const content = fs.readFileSync(targetPath, 'utf-8');
       const data = JSON.parse(content);
+      if (Array.isArray(data.devices)) {
+        for (const d of data.devices) {
+          this.devices.set(d.id, d);
+        }
+      }
       if (Array.isArray(data.tables)) {
         this.tables.clear();
         for (const t of data.tables) {
@@ -327,7 +335,12 @@ export class InMemoryStore {
           const bakContent = fs.readFileSync(bakPath, 'utf-8');
           const data = JSON.parse(bakContent);
           // Auto recover
-          if (Array.isArray(data.tables)) {
+          if (Array.isArray(data.devices)) {
+        for (const d of data.devices) {
+          this.devices.set(d.id, d);
+        }
+      }
+      if (Array.isArray(data.tables)) {
             this.tables.clear();
             for (const t of data.tables) this.tables.set(t.id, t);
           }

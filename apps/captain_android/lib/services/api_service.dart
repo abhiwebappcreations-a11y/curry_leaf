@@ -12,6 +12,8 @@ class ApiService {
   String host;
   int port;
   bool useDemoMode;
+  String deviceId = 'dev_captain_01';
+  String apiKey = 'captain_dev_token_01';
 
   ApiService({
     this.host = '192.168.29.116', // Default to Counter PC IP (fallback: 192.168.1.100)
@@ -29,9 +31,9 @@ class ApiService {
 
   Map<String, String> get _defaultHeaders => {
     'Content-Type': 'application/json',
-    'X-Device-Id': 'dev_captain_01',
+    'X-Device-Id': deviceId,
     'X-Device-Role': 'captain',
-    'X-Api-Key': 'captain_dev_token_01',
+    'X-Api-Key': apiKey,
   };
 
   /// Generates a compliant RFC4122 UUIDv4 for Idempotency-Key
@@ -72,6 +74,55 @@ class ApiService {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<Map<String, dynamic>?> requestPairing({
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    try {
+      this.deviceId = deviceId;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/devices/pair-request'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'deviceId': deviceId,
+              'deviceName': deviceName,
+              'deviceRole': 'captain',
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
+
+      final data = _unwrapResponse(response);
+      if (data is Map<String, dynamic>) {
+        if (data['apiKey'] != null) {
+          apiKey = data['apiKey'].toString();
+        }
+        return data;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> checkPairStatus(String deviceId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/devices/pair-status/$deviceId'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 3));
+
+      final data = _unwrapResponse(response);
+      if (data is Map<String, dynamic>) {
+        if (data['apiKey'] != null) {
+          apiKey = data['apiKey'].toString();
+        }
+        return data;
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<List<RestaurantTable>> fetchTables() async {

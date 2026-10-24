@@ -496,6 +496,58 @@ class CounterApiService {
     }
   }
 
+  Future<Map<String, dynamic>?> getLanInfo() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/devices/lan-info'))
+          .timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map<String, dynamic>) return data;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingDevices() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/devices/pending'), headers: headers)
+          .timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map<String, dynamic> && data['devices'] is List) {
+          return List<Map<String, dynamic>>.from(
+            (data['devices'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+          );
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<bool> approveDevice(String deviceId) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/devices/$deviceId/approve'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> rejectDevice(String deviceId) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/devices/$deviceId/reject'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<RestaurantBill?> generateBill(String orderId, {int discountPaise = 0}) async {
     final idempotencyKey = generateUuidV4();
     try {
