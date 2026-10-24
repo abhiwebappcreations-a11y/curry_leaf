@@ -19,9 +19,15 @@ async function initApp() {
         window.SupabaseClient.fetchAuditLogs()
       ]);
 
-      if (liveRests && liveRests.length > 0) {
+      if (liveRests !== null && Array.isArray(liveRests)) {
         const merged = liveRests.map(r => {
           const lic = (liveLics || []).find(l => l.restaurant_id === r.id);
+          const payload = (lic && lic.signed_payload) ? lic.signed_payload : {};
+          const limits = payload.limits || {};
+          const menuLimit = limits.menuItems !== undefined ? parseInt(limits.menuItems, 10) : 100;
+          const captainLimit = limits.captainDevices !== undefined ? parseInt(limits.captainDevices, 10) : (lic && lic.max_devices ? parseInt(lic.max_devices, 10) : 5);
+          const counterLimit = limits.counterPcs !== undefined ? parseInt(limits.counterPcs, 10) : 1;
+
           return {
             id: r.id,
             name: r.name,
@@ -34,7 +40,15 @@ async function initApp() {
             issuedAt: lic && lic.valid_from ? lic.valid_from.split('T')[0] : '2026-10-17',
             expiresAt: lic && lic.valid_until ? lic.valid_until.split('T')[0] : '2027-10-17',
             counterIp: r.counter_ip || '192.168.1.100',
-            maxDevices: lic && lic.max_devices ? lic.max_devices : 10,
+            maxDevices: captainLimit,
+            menuItemsLimit: menuLimit,
+            captainDevicesLimit: captainLimit,
+            counterPcsLimit: counterLimit,
+            limits: {
+              menuItems: menuLimit,
+              captainDevices: captainLimit,
+              counterPcs: counterLimit,
+            },
             notes: r.notes || ''
           };
         });

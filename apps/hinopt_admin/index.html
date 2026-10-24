@@ -481,15 +481,19 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/supabase_client.js"></script>
-  <script src="js/mock_data.js"></script>
-  <script src="js/license_service.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/supabase_client.js?v=20261024_04"></script>
+  <script src="js/mock_data.js?v=20261024_04"></script>
+  <script src="js/license_service.js?v=20261024_04"></script>
+  <script src="js/app.js?v=20261024_04"></script>
   <script>
+    // Clean up any stale service workers and caches
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration note:', err));
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let r of registrations) r.unregister();
       });
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
     }
   </script>
 </body>
