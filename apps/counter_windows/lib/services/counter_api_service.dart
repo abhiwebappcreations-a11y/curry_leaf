@@ -142,9 +142,7 @@ class CounterApiService {
         } else {
           list = [];
         }
-        if (list.isNotEmpty) {
-          return list.map((json) => RestaurantTable.fromJson(json as Map<String, dynamic>)).toList();
-        }
+        return list.map((json) => RestaurantTable.fromJson(json as Map<String, dynamic>)).toList();
       }
     } catch (_) {}
     return null;
@@ -390,7 +388,7 @@ class CounterApiService {
             items.add(MenuItem.fromJson(item as Map<String, dynamic>));
           }
         }
-        if (items.isNotEmpty) return items;
+        return items;
       }
     } catch (_) {}
     return null;
@@ -439,6 +437,55 @@ class CounterApiService {
         }),
       ).timeout(const Duration(seconds: 4));
 
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateMenuItemPrice(String id, int newPricePaise) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/menu/items/$id/price'),
+        headers: headers,
+        body: jsonEncode({
+          'pricePaise': newPricePaise,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteMenuItem(String id) async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/menu/items/$id'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> wipeAllMenuItems() async {
+    try {
+      final response = await http
+          .delete(Uri.parse('$baseUrl/menu/items/all/wipe'), headers: headers)
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> seedDemoMenu() async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/menu/demo/seed'), headers: headers)
+          .timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (_) {
       return false;

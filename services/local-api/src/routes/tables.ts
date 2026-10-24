@@ -200,13 +200,21 @@ tablesRouter.delete(
       inMemoryStore.printJobs.clear();
       inMemoryStore.tables.clear();
 
+      const includeMenu = req.query.includeMenu === 'true';
+      if (includeMenu) {
+        inMemoryStore.menuItems.clear();
+      }
+
       inMemoryStore.saveToDisk();
 
       res.json({
         success: true,
         data: {
-          message: 'All demo tables, orders, and bills wiped cleanly. Ready for new client floor plan setup.',
+          message: includeMenu
+            ? 'All demo tables, orders, bills, and menu items wiped cleanly. Ready for new client floor plan and menu setup.'
+            : 'All demo tables, orders, and bills wiped cleanly. Ready for new client floor plan setup.',
           tableCount: 0,
+          menuCount: inMemoryStore.menuItems.size,
         },
       });
     } catch (err) {

@@ -332,6 +332,100 @@ class MenuManagementView extends StatelessWidget {
     );
   }
 
+  void _confirmDeleteDish(BuildContext context, CounterProvider provider, MenuItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppColors.error, size: 22),
+            SizedBox(width: 8),
+            Text('Delete Dish', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to permanently delete "${item.name}" from the menu?',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await provider.deleteMenuItem(item.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'Dish "${item.name}" deleted successfully.'
+                        : 'Failed to delete dish from server.'),
+                    backgroundColor: ok ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete Dish'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmWipeAllMenu(BuildContext context, CounterProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24),
+            SizedBox(width: 8),
+            Text('Wipe All Menu Items?', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: const Text(
+          'This will permanently delete ALL demo menu items for this restaurant so you can start clean for a fresh client onboarding.\n\nThis action cannot be undone. Are you sure?',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await provider.wipeAllMenuItems();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'All menu items wiped cleanly. Menu is now blank for fresh setup.'
+                        : 'Failed to wipe menu from server.'),
+                    backgroundColor: ok ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
+            },
+            child: const Text('Wipe All Dishes'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
@@ -375,26 +469,115 @@ class MenuManagementView extends StatelessWidget {
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showAddDishDialog(context, provider),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: Text(isMobile ? 'Add' : 'Add New Dish'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (provider.menuItems.isNotEmpty) ...[
+                        OutlinedButton.icon(
+                          onPressed: () => _confirmWipeAllMenu(context, provider),
+                          icon: const Icon(Icons.delete_sweep_outlined, size: 16, color: AppColors.error),
+                          label: Text(
+                            isMobile ? 'Wipe All' : 'Wipe All Dishes (Fresh Setup)',
+                            style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.error),
+                            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddDishDialog(context, provider),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: Text(isMobile ? 'Add' : 'Add New Dish'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
 
               const SizedBox(height: 16),
 
-              // Menu Content: Mobile Cards or Desktop Table
+              // Menu Content: Mobile Cards or Desktop Table or Empty State
               Expanded(
-                child: isMobile
+                child: provider.menuItems.isEmpty
+                    ? Center(
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 480),
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.restaurant_menu_outlined, size: 56, color: AppColors.textMuted.withValues(alpha: 0.6)),
+                              const SizedBox(height: 14),
+                              const Text(
+                                'No Dishes in Menu',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'All demo dishes wiped cleanly. Click "Add New Dish" above to create live items for this client restaurant.',
+                                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () => _showAddDishDialog(context, provider),
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Add First Dish'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final ok = await provider.seedDemoMenu();
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(ok ? 'Sample demo menu loaded.' : 'Failed to load demo menu.'),
+                                            backgroundColor: ok ? AppColors.success : AppColors.error,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
+                                    label: const Text('Load Sample Demo Menu', style: TextStyle(color: AppColors.primary)),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: AppColors.primary),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : isMobile
                     ? ListView.separated(
                         itemCount: provider.menuItems.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 10),
@@ -424,11 +607,11 @@ class MenuManagementView extends StatelessWidget {
                                     children: [
                                       SizedBox(width: 48, child: Text('PHOTO', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       SizedBox(width: 32, child: Text('TYPE', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
-                                      Expanded(flex: 5, child: Text('DISH NAME', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
+                                      Expanded(flex: 4, child: Text('DISH NAME', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       Expanded(flex: 3, child: Text('CATEGORY', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       Expanded(flex: 2, child: Text('PRICE', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       Expanded(flex: 3, child: Text('CAPTAIN STOCK', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
-                                      Expanded(flex: 2, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
+                                      Expanded(flex: 3, child: Text('ACTIONS', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                     ],
                                   ),
                                 );
@@ -458,7 +641,7 @@ class MenuManagementView extends StatelessWidget {
                                     ),
                                     // Name & Description
                                     Expanded(
-                                      flex: 5,
+                                      flex: 4,
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -536,16 +719,32 @@ class MenuManagementView extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    // Edit Button
+                                    // Action Buttons: Edit Price & Delete
                                     Expanded(
-                                      flex: 2,
-                                      child: Align(
-                                        alignment: Alignment.centerRight,
-                                        child: TextButton.icon(
-                                          onPressed: () => _showEditPriceDialog(context, provider, item),
-                                          icon: const Icon(Icons.edit, size: 14),
-                                          label: const Text('Edit Price', style: TextStyle(fontSize: 11)),
-                                        ),
+                                      flex: 3,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          TextButton.icon(
+                                            onPressed: () => _showEditPriceDialog(context, provider, item),
+                                            icon: const Icon(Icons.edit, size: 13),
+                                            label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                                            style: TextButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            tooltip: 'Delete dish',
+                                            icon: const Icon(Icons.delete_outline, size: 17, color: AppColors.error),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                            splashRadius: 16,
+                                            onPressed: () => _confirmDeleteDish(context, provider, item),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -699,14 +898,28 @@ class MenuManagementView extends StatelessWidget {
                   ),
                 ],
               ),
-              TextButton.icon(
-                onPressed: () => _showEditPriceDialog(context, provider, item),
-                icon: const Icon(Icons.edit, size: 14),
-                label: const Text('Edit Price', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: const Size(60, 30),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _showEditPriceDialog(context, provider, item),
+                    icon: const Icon(Icons.edit, size: 14),
+                    label: const Text('Edit Price', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: const Size(60, 30),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Delete dish',
+                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                    splashRadius: 16,
+                    onPressed: () => _confirmDeleteDish(context, provider, item),
+                  ),
+                ],
               ),
             ],
           ),

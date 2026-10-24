@@ -166,7 +166,7 @@ class CounterProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> wipeAllDemoData() async {
+  Future<bool> wipeAllDemoData({bool includeMenu = true}) async {
     final ok = await _counterApiService.wipeAllData();
     if (ok) {
       _selectedOrder = null;
@@ -174,6 +174,10 @@ class CounterProvider extends ChangeNotifier {
       _tables.clear();
       _activeOrders.clear();
       _settledBills.clear();
+      if (includeMenu) {
+        await _counterApiService.wipeAllMenuItems();
+        _menuItems.clear();
+      }
       await refreshFromLiveApi(isManual: true);
       return true;
     }
@@ -330,7 +334,7 @@ class CounterProvider extends ChangeNotifier {
       _restaurantName = health.restaurantName;
 
       final liveTables = await _apiClient.getTables();
-      if (liveTables != null && liveTables.isNotEmpty) {
+      if (liveTables != null) {
         _tables = liveTables;
       }
 
@@ -354,7 +358,7 @@ class CounterProvider extends ChangeNotifier {
       }
 
       final liveMenu = await _apiClient.getMenu();
-      if (liveMenu != null && liveMenu.isNotEmpty) {
+      if (liveMenu != null) {
         _menuItems = liveMenu;
       }
     } catch (_) {} finally {
@@ -652,12 +656,35 @@ class CounterProvider extends ChangeNotifier {
     return true;
   }
 
-  void updateMenuItemPrice(String id, int newPricePaise) {
+  Future<void> updateMenuItemPrice(String id, int newPricePaise) async {
     final index = _menuItems.indexWhere((m) => m.id == id);
     if (index >= 0) {
       _menuItems[index] = _menuItems[index].copyWith(pricePaise: newPricePaise);
       notifyListeners();
+      await _counterApiService.updateMenuItemPrice(id, newPricePaise);
     }
+  }
+
+  Future<bool> deleteMenuItem(String id) async {
+    final ok = await _counterApiService.deleteMenuItem(id);
+    _menuItems.removeWhere((item) => item.id == id);
+    notifyListeners();
+    return ok;
+  }
+
+  Future<bool> wipeAllMenuItems() async {
+    final ok = await _counterApiService.wipeAllMenuItems();
+    _menuItems.clear();
+    notifyListeners();
+    return ok;
+  }
+
+  Future<bool> seedDemoMenu() async {
+    final ok = await _counterApiService.seedDemoMenu();
+    if (ok) {
+      await refreshFromLiveApi(isManual: true);
+    }
+    return ok;
   }
 
   Future<void> testPrint(PrinterRole role) async {

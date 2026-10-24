@@ -272,19 +272,19 @@ export class InMemoryStore {
     try {
       const content = fs.readFileSync(targetPath, 'utf-8');
       const data = JSON.parse(content);
-      if (Array.isArray(data.tables) && data.tables.length > 0) {
+      if (Array.isArray(data.tables)) {
         this.tables.clear();
         for (const t of data.tables) {
           this.tables.set(t.id, t);
         }
       }
-      if (Array.isArray(data.categories) && data.categories.length > 0) {
+      if (Array.isArray(data.categories)) {
         this.categories.clear();
         for (const c of data.categories) {
           this.categories.set(c.id, c);
         }
       }
-      if (Array.isArray(data.menuItems) && data.menuItems.length > 0) {
+      if (Array.isArray(data.menuItems)) {
         this.menuItems.clear();
         for (const m of data.menuItems) {
           this.menuItems.set(m.id, m);

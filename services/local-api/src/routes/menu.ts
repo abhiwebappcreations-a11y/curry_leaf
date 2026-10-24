@@ -191,3 +191,109 @@ menuRouter.post(
   }
 );
 
+const updatePriceSchema = z.object({
+  pricePaise: z.number().int().positive(),
+});
+
+// PATCH /api/menu/items/:id/price - Update dish price (Counter / Admin)
+menuRouter.patch(
+  '/items/:id/price',
+  requireRole('counter', 'admin'),
+  validateBody(updatePriceSchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const item = inMemoryStore.menuItems.get(id);
+      if (!item) {
+        throw new NotFoundError('Menu Item', id);
+      }
+
+      item.pricePaise = req.body.pricePaise;
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          item,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// DELETE /api/menu/items/all/wipe - Wipe all menu dishes for fresh restaurant onboarding
+menuRouter.delete(
+  '/items/all/wipe',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const previousCount = inMemoryStore.menuItems.size;
+      inMemoryStore.menuItems.clear();
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'All menu items wiped cleanly for client onboarding.',
+          deletedCount: previousCount,
+          count: 0,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// DELETE /api/menu/items/:id - Delete a specific dish from menu (Counter / Admin)
+menuRouter.delete(
+  '/items/:id',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const item = inMemoryStore.menuItems.get(id);
+      if (!item) {
+        throw new NotFoundError('Menu Item', id);
+      }
+
+      inMemoryStore.menuItems.delete(id);
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: `Dish "${item.name}" deleted successfully.`,
+          deletedId: id,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/menu/demo/seed - Re-seed sample restaurant menu & tables
+menuRouter.post(
+  '/demo/seed',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      inMemoryStore.seed();
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Sample demo menu loaded successfully.',
+          menuCount: inMemoryStore.menuItems.size,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
