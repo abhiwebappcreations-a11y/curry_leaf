@@ -127,7 +127,31 @@ class TablesScreen extends StatelessWidget {
           Expanded(
             child: provider.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
+                : provider.filteredTables.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.table_restaurant_outlined,
+                              size: 52,
+                              color: AppColors.textSecondary.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'No tables available',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Set up tables on the Counter POS or pull to refresh.',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
                     onRefresh: () => provider.init(),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -183,7 +207,7 @@ class TablesScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -93,9 +93,7 @@ class ApiService {
         } else {
           list = [];
         }
-        if (list.isNotEmpty) {
-          return list.map((json) => RestaurantTable.fromJson(json as Map<String, dynamic>)).toList();
-        }
+        return list.map((json) => RestaurantTable.fromJson(json as Map<String, dynamic>)).toList();
       }
     } catch (_) {}
     return MockData.getInitialTables();
@@ -136,12 +134,25 @@ class ApiService {
             parsedItems.add(MenuItem.fromJson(item as Map<String, dynamic>));
           }
         }
-        if (parsedItems.isNotEmpty) {
-          return parsedItems;
-        }
+        return parsedItems;
       }
     } catch (_) {}
     return MockData.getInitialMenu();
+  }
+
+  Future<List<RestaurantOrder>> fetchActiveOrders() async {
+    if (useDemoMode) return [];
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/orders?status=active,preparing,ready'), headers: _defaultHeaders)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = _unwrapResponse(response);
+        final List<dynamic> list = (data is Map<String, dynamic> ? data['orders'] : data) as List<dynamic>? ?? [];
+        return list.map((json) => RestaurantOrder.fromJson(json as Map<String, dynamic>)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   List<Map<String, dynamic>> _formatOrderItems(List<OrderItem> items) {

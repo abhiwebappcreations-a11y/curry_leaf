@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../models/table_model.dart';
@@ -26,6 +27,7 @@ class PosProvider extends ChangeNotifier {
   bool _isSubmittingKot = false;
   String? _lastError;
   bool _isConnected = true;
+  Timer? _autoPollTimer;
 
   PosProvider() {
     init();
@@ -105,10 +107,80 @@ class PosProvider extends ChangeNotifier {
 
     _tables = await _apiService.fetchTables();
     _menuItems = await _apiService.fetchMenu();
-    _ordersByTableId.addAll(MockData.getSeedOrders());
+    if (_apiService.useDemoMode) {
+      _ordersByTableId.addAll(MockData.getSeedOrders());
+    } else {
+      final liveOrders = await _apiService.fetchActiveOrders();
+      for (var o in liveOrders) {
+        _ordersByTableId[o.tableId] = o;
+      }
+    }
 
     _isLoading = false;
     notifyListeners();
+    startAutoPolling();
+  }
+
+  void startAutoPolling() {
+    _autoPollTimer?.cancel();
+    _autoPollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_isLoading && !_isSubmittingKot) {
+        pollLatestState();
+      }
+    });
+  }
+
+  void stopAutoPolling() {
+    _autoPollTimer?.cancel();
+    _autoPollTimer = null;
+  }
+
+  /// Periodic background sync: listens to Counter POS changes
+  /// (stock toggles, price updates, table occupancy/settlement, menu wipe)
+  Future<void> pollLatestState() async {
+    try {
+      final healthy = await _apiService.checkHealth();
+      _isConnected = healthy;
+      if (healthy && !_apiService.useDemoMode) {
+        final liveTables = await _apiService.fetchTables();
+        _tables = liveTables;
+
+        final liveMenu = await _apiService.fetchMenu();
+        _menuItems = liveMenu;
+
+        final liveOrders = await _apiService.fetchActiveOrders();
+        final serverTableIds = <String>{};
+        for (var o in liveOrders) {
+          serverTableIds.add(o.tableId);
+          _ordersByTableId[o.tableId] = o;
+        }
+
+        // Clean up settled tables that no longer have server orders
+        _ordersByTableId.removeWhere((tblId, ord) =>
+            !serverTableIds.contains(tblId) && ord.draftItems.isEmpty);
+
+        if (_currentTable != null) {
+          final updatedTable = _tables.where((t) => t.id == _currentTable!.id).firstOrNull;
+          if (updatedTable != null) {
+            _currentTable = updatedTable;
+            if (updatedTable.status == TableStatus.available &&
+                _currentOrder != null &&
+                _currentOrder!.draftItems.isEmpty) {
+              _ordersByTableId.remove(_currentTable!.id);
+              _currentOrder = null;
+            }
+          }
+        }
+
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    stopAutoPolling();
+    super.dispose();
   }
 
   void setSection(String section) {
