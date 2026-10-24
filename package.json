@@ -2,6 +2,7 @@
   "name": "hinopt-restaurant-pos",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Hinopt Restaurant POS - Offline-first restaurant POS with central licensing",
   "workspaces": [
     "services/*"
