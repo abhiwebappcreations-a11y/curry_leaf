@@ -372,4 +372,25 @@ class ApiService {
       status: KotStatus.printed,
     );
   }
+
+  Future<bool> requestCancellation({
+    required String orderId,
+    String? itemId,
+    required String reason,
+  }) async {
+    if (useDemoMode) return true;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders/$orderId/cancel-request'),
+        headers: _defaultHeaders,
+        body: jsonEncode({
+          if (itemId != null) 'itemId': itemId,
+          'reason': reason,
+        }),
+      ).timeout(const Duration(seconds: 4));
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
 }

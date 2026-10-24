@@ -312,3 +312,198 @@ ordersRouter.post(
     }
   }
 );
+
+const cancelRequestSchema = z.object({
+  itemId: z.string().optional(),
+  reason: z.string().min(2),
+});
+
+// POST /api/orders/:id/cancel-request - Captain or Counter submits cancellation request
+ordersRouter.post(
+  '/:id/cancel-request',
+  requireActiveLicense,
+  requireRole('captain', 'counter', 'admin'),
+  validateBody(cancelRequestSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orderId = req.params.id as string;
+      const order = inMemoryStore.orders.get(orderId);
+      if (!order) {
+        throw new NotFoundError('Order', orderId);
+      }
+
+      const table = inMemoryStore.tables.get(order.tableId);
+      let itemName: string | undefined;
+      let itemQuantity: number | undefined;
+
+      if (req.body.itemId) {
+        const item = order.items.find((i) => i.id === req.body.itemId);
+        if (item) {
+          itemName = item.nameSnapshot;
+          itemQuantity = item.quantity;
+        }
+      }
+
+      const cancelReq = {
+        id: `creq_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        tableId: order.tableId,
+        tableName: table ? (table.displayName || table.tableNumber) : 'Table',
+        itemId: req.body.itemId,
+        itemName,
+        itemQuantity,
+        reason: req.body.reason,
+        requestedByDeviceId: req.device?.id,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+      };
+
+      inMemoryStore.cancelRequests.set(cancelReq.id, cancelReq);
+      inMemoryStore.saveToDisk();
+
+      res.status(201).json({
+        success: true,
+        data: {
+          message: 'Cancellation request sent to Counter Manager for approval.',
+          request: cancelReq,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/orders/cancel-requests/pending - Fetch active cancellation requests awaiting Counter approval
+ordersRouter.get(
+  ['/cancel-requests/pending', '/cancel-requests'],
+  requireActiveLicense,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pending = Array.from(inMemoryStore.cancelRequests.values()).filter(
+        (r) => r.status === 'pending'
+      );
+      res.json({
+        success: true,
+        data: {
+          requests: pending,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/orders/cancel-requests/:requestId/approve - Counter Manager approves cancellation
+ordersRouter.post(
+  '/cancel-requests/:requestId/approve',
+  requireActiveLicense,
+  requireRole('counter', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const requestId = req.params.requestId as string;
+      const cancelReq = inMemoryStore.cancelRequests.get(requestId);
+      if (!cancelReq) {
+        throw new NotFoundError('Cancellation Request', requestId);
+      }
+
+      const order = inMemoryStore.orders.get(cancelReq.orderId);
+      if (!order) {
+        throw new NotFoundError('Order', cancelReq.orderId);
+      }
+
+      const table = inMemoryStore.tables.get(cancelReq.tableId);
+
+      if (cancelReq.itemId) {
+        // Cancel single line item and print Kitchen Cancellation Slip
+        await KotService.cancelSubmittedItem(
+          cancelReq.orderId,
+          cancelReq.itemId,
+          cancelReq.reason,
+          req.device?.id
+        );
+      } else {
+        // Cancel entire order, free table, and print Kitchen Cancellation Ticket
+        order.status = 'cancelled';
+        order.customerNotes = (order.customerNotes ? order.customerNotes + ' | ' : '') + `Cancelled: ${cancelReq.reason}`;
+        order.updatedAt = new Date().toISOString();
+
+        if (table) {
+          table.status = 'available';
+          table.activeOrderId = null;
+        }
+
+        for (const bill of inMemoryStore.bills.values()) {
+          if (bill.orderId === order.id && bill.status !== 'settled') {
+            bill.status = 'voided';
+            bill.voidReason = cancelReq.reason;
+          }
+        }
+
+        await PrintService.enqueueJob(
+          'kitchen_kot',
+          'kot',
+          order.id,
+          {
+            kotNumber: 'CANCEL',
+            title: '*** ORDER CANCELLED ***',
+            tableName: table ? table.displayName || table.tableNumber : 'Table',
+            orderNumber: order.orderNumber,
+            reason: cancelReq.reason,
+            items: order.items.map((i) => ({
+              name: `[CANCELLED] ${i.nameSnapshot}`,
+              quantity: i.quantity,
+              itemNotes: `REASON: ${cancelReq.reason}`,
+            })),
+          }
+        );
+      }
+
+      cancelReq.status = 'approved';
+      cancelReq.resolvedAt = new Date().toISOString();
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Cancellation approved. Order updated and Kitchen Cancellation KOT dispatched.',
+          request: cancelReq,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/orders/cancel-requests/:requestId/reject - Counter Manager rejects cancellation
+ordersRouter.post(
+  '/cancel-requests/:requestId/reject',
+  requireActiveLicense,
+  requireRole('counter', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const requestId = req.params.requestId as string;
+      const cancelReq = inMemoryStore.cancelRequests.get(requestId);
+      if (!cancelReq) {
+        throw new NotFoundError('Cancellation Request', requestId);
+      }
+
+      cancelReq.status = 'rejected';
+      cancelReq.resolvedAt = new Date().toISOString();
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Cancellation request rejected.',
+          request: cancelReq,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);

@@ -94,9 +94,12 @@ class CounterProvider extends ChangeNotifier {
 
   // Wi-Fi Auto-Discovery & Captain Pairing
   List<Map<String, dynamic>> _pendingDevices = [];
+  List<Map<String, dynamic>> _pendingCancelRequests = [];
   Map<String, dynamic>? _lanInfo;
 
   List<Map<String, dynamic>> get pendingDevices => _pendingDevices;
+  List<Map<String, dynamic>> get pendingCancelRequests => _pendingCancelRequests;
+  bool get hasPendingCancelRequests => _pendingCancelRequests.isNotEmpty;
   bool get hasPendingDevices => _pendingDevices.isNotEmpty;
   Map<String, dynamic>? get lanInfo => _lanInfo;
   String get lanHost => _lanInfo?['host']?.toString() ?? '127.0.0.1';
@@ -277,6 +280,29 @@ class CounterProvider extends ChangeNotifier {
     return _counterApiService.checkHealthFor(host, port);
   }
 
+  Future<bool> approveCancelRequest(String requestId) async {
+    final ok = await _counterApiService.approveCancelRequest(requestId);
+    if (ok) {
+      _pendingCancelRequests.removeWhere((r) => r['id'] == requestId);
+      notifyListeners();
+      await refreshFromLiveApi(isManual: true);
+    }
+    return ok;
+  }
+
+  Future<bool> rejectCancelRequest(String requestId) async {
+    final ok = await _counterApiService.rejectCancelRequest(requestId);
+    if (ok) {
+      _pendingCancelRequests.removeWhere((r) => r['id'] == requestId);
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  Future<bool> printCustomerBill(String id) async {
+    return await _counterApiService.printCustomerBill(id);
+  }
+
   Future<bool> setPrinterMode(String mode) async {
     _printerMode = mode;
     notifyListeners();
@@ -368,6 +394,10 @@ class CounterProvider extends ChangeNotifier {
         // Check for pending Captain devices on LAN
         final pending = await _apiClient.getPendingDevices();
         _pendingDevices = pending;
+
+        // Check for pending cancellation requests from Captains
+        final cancelReqs = await _counterApiService.getPendingCancelRequests();
+        _pendingCancelRequests = cancelReqs;
 
         notifyListeners();
       }
@@ -608,13 +638,34 @@ class CounterProvider extends ChangeNotifier {
     try {
       final billToSettle = _currentDraftBill!;
 
-      // Connect to Live API: POST /api/bills/:id/payments
-      await _apiClient.settlePayment(
-        billId: billToSettle.id,
+      // 1. Ensure bill is registered on backend before settlement
+      RestaurantBill? liveBill;
+      try {
+        liveBill = await _counterApiService.generateBill(
+          billToSettle.orderId,
+          discountPaise: billToSettle.discountPaise,
+        );
+      } catch (_) {}
+
+      final effectiveBillId = liveBill?.id ?? billToSettle.id;
+
+      // 2. Connect to Live API: POST /api/bills/:id/payments
+      final ok = await _counterApiService.settlePayment(
+        billId: effectiveBillId,
+        orderId: billToSettle.orderId,
         method: method.name.toUpperCase(),
         amountPaise: billToSettle.totalPaise,
         reference: reference,
       );
+
+      if (!ok) {
+        throw Exception('Failed to settle payment on local POS server.');
+      }
+
+      // 3. Guarantee physical customer bill print on thermal printer
+      try {
+        await _counterApiService.printCustomerBill(effectiveBillId);
+      } catch (_) {}
 
       final settledBill = billToSettle.copyWith(
         cashierName: 'Deepa',

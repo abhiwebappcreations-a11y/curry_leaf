@@ -162,6 +162,22 @@ export interface PrintJobRecord {
   updatedAt: string;
 }
 
+export interface CancelRequestRecord {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  tableId: string;
+  tableName: string;
+  itemId?: string;
+  itemName?: string;
+  itemQuantity?: number;
+  reason: string;
+  requestedByDeviceId?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 export interface AuditLogRecord {
   id: string;
   eventType: string;
@@ -196,6 +212,7 @@ export class InMemoryStore {
   public bills: Map<string, BillRecord> = new Map();
   public payments: Map<string, PaymentRecord> = new Map();
   public printJobs: Map<string, PrintJobRecord> = new Map();
+  public cancelRequests: Map<string, CancelRequestRecord> = new Map();
   public auditLogs: AuditLogRecord[] = [];
   public settings: Map<string, Record<string, unknown>> = new Map();
   public license?: LicenseRecord;
@@ -237,6 +254,7 @@ export class InMemoryStore {
         payments: Array.from(this.payments.values()),
         kots: Array.from(this.kots.values()),
         devices: Array.from(this.devices.values()),
+        cancelRequests: Array.from(this.cancelRequests.values()),
         settings: Object.fromEntries(this.settings.entries()),
         updatedAt: new Date().toISOString(),
       };
@@ -320,6 +338,12 @@ export class InMemoryStore {
         this.kots.clear();
         for (const k of data.kots) {
           this.kots.set(k.id, k);
+        }
+      }
+      if (Array.isArray(data.cancelRequests)) {
+        this.cancelRequests.clear();
+        for (const cr of data.cancelRequests) {
+          this.cancelRequests.set(cr.id, cr);
         }
       }
       if (data.settings && typeof data.settings === 'object') {

@@ -575,6 +575,7 @@ class CounterApiService {
 
   Future<bool> settlePayment({
     required String billId,
+    String? orderId,
     required String method,
     required int amountPaise,
     String? reference,
@@ -588,6 +589,7 @@ class CounterApiService {
           'Idempotency-Key': idempotencyKey,
         },
         body: jsonEncode({
+          if (orderId != null) 'orderId': orderId,
           'method': method.toUpperCase(),
           'paymentMethod': method.toLowerCase(),
           'amountPaise': amountPaise,
@@ -595,13 +597,64 @@ class CounterApiService {
           'referenceNumber': reference ?? '',
           'notes': 'Settled by Counter Cashier',
         }),
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
       }
     } catch (_) {}
     return false;
+  }
+
+  Future<bool> printCustomerBill(String id) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/bills/$id/print'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 6));
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingCancelRequests() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/orders/cancel-requests/pending'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map<String, dynamic> && data['requests'] is List) {
+          return List<Map<String, dynamic>>.from(data['requests']);
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<bool> approveCancelRequest(String requestId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders/cancel-requests/$requestId/approve'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 6));
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> rejectCancelRequest(String requestId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders/cancel-requests/$requestId/reject'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 4));
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> testPrint(String printerId) async {

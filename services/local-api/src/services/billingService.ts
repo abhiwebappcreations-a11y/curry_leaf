@@ -20,6 +20,7 @@ export interface SettlePaymentInput {
   amountPaise: number;
   paymentMethod: 'cash' | 'upi' | 'card' | 'split' | 'other';
   idempotencyKey: string;
+  orderId?: string;
   referenceNumber?: string;
   notes?: string;
 }
@@ -196,13 +197,32 @@ export class BillingService {
   }
 
   public static async settlePayment(
-    billId: string,
+    billIdOrOrderId: string,
     input: SettlePaymentInput,
     deviceId?: string
   ): Promise<{ payment: PaymentRecord; bill: BillRecord }> {
-    const bill = inMemoryStore.bills.get(billId);
+    let bill = inMemoryStore.bills.get(billIdOrOrderId);
     if (!bill) {
-      throw new NotFoundError('Bill', billId);
+      bill = Array.from(inMemoryStore.bills.values()).find(
+        (b) => b.orderId === billIdOrOrderId || b.billNumber === billIdOrOrderId
+      );
+    }
+    if (!bill) {
+      let order = inMemoryStore.orders.get(billIdOrOrderId);
+      if (!order && input.orderId) {
+        order = inMemoryStore.orders.get(input.orderId);
+      }
+      if (!order) {
+        order = Array.from(inMemoryStore.orders.values()).find(
+          (o) => o.status === 'active' || o.status === 'billed'
+        );
+      }
+      if (order) {
+        bill = await this.finalizeBill(order.id, { discountPaise: 0 }, deviceId);
+      }
+    }
+    if (!bill) {
+      throw new NotFoundError('Bill', billIdOrOrderId);
     }
 
     if (bill.status === 'voided') {
@@ -264,8 +284,14 @@ export class BillingService {
         bill.id,
         {
           billNumber: bill.billNumber,
-          tableNumber: table ? table.tableNumber : 'Counter',
-          items: bill.items,
+          orderNumber: order ? order.orderNumber : undefined,
+          tableNumber: table ? (table.displayName || table.tableNumber) : 'Counter',
+          items: bill.items.map((bi) => ({
+            name: bi.nameSnapshot,
+            quantity: bi.quantity,
+            total: bi.totalPaise,
+            unitPrice: bi.unitPricePaise,
+          })),
           subtotalPaise: bill.subtotalPaise,
           taxPaise: bill.taxPaise,
           discountPaise: bill.discountPaise,
@@ -274,7 +300,9 @@ export class BillingService {
           restaurantName: (inMemoryStore.settings.get('restaurant_profile') as any)?.name || 'Curry Leaf Fine Dining',
         }
       );
-    } catch (_) {}
+    } catch (printErr) {
+      console.error('[BillingService] Failed to enqueue customer bill receipt:', printErr);
+    }
 
     // Audit log
     inMemoryStore.auditLogs.push({
@@ -395,4 +423,58 @@ export class BillingService {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
+  public static async printBill(
+    billIdOrOrderId: string,
+    isReprint = false
+  ): Promise<BillRecord> {
+    let bill = inMemoryStore.bills.get(billIdOrOrderId);
+    if (!bill) {
+      bill = Array.from(inMemoryStore.bills.values()).find(
+        (b) => b.orderId === billIdOrOrderId || b.billNumber === billIdOrOrderId
+      );
+    }
+    if (!bill) {
+      let order = inMemoryStore.orders.get(billIdOrOrderId);
+      if (!order) {
+        order = Array.from(inMemoryStore.orders.values()).find(
+          (o) => o.status === 'active' || o.status === 'billed'
+        );
+      }
+      if (order) {
+        bill = await this.finalizeBill(order.id, { discountPaise: 0 });
+      }
+    }
+    if (!bill) {
+      throw new NotFoundError('Bill', billIdOrOrderId);
+    }
+
+    const table = inMemoryStore.tables.get(bill.tableId);
+    const order = inMemoryStore.orders.get(bill.orderId);
+    await PrintService.enqueueJob(
+      'counter_bill',
+      isReprint ? 'reprint_bill' : 'bill',
+      bill.id,
+      {
+        billNumber: bill.billNumber,
+        orderNumber: order ? order.orderNumber : undefined,
+        tableNumber: table ? (table.displayName || table.tableNumber) : 'Counter',
+        items: bill.items.map((bi) => ({
+          name: bi.nameSnapshot,
+          quantity: bi.quantity,
+          total: bi.totalPaise,
+          unitPrice: bi.unitPricePaise,
+        })),
+        subtotalPaise: bill.subtotalPaise,
+        taxPaise: bill.taxPaise,
+        discountPaise: bill.discountPaise,
+        totalPaise: bill.totalPaise,
+        paymentMethod: 'Cash / Card / UPI',
+        restaurantName: (inMemoryStore.settings.get('restaurant_profile') as any)?.name || 'Curry Leaf Fine Dining',
+      },
+      isReprint
+    );
+
+    return bill;
+  }
+
 }

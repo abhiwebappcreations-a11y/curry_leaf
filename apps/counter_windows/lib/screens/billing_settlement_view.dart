@@ -792,6 +792,41 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
 
           const SizedBox(height: 16),
 
+          // Direct Print Customer Bill / Invoice Button
+          OutlinedButton.icon(
+            onPressed: () async {
+              final ok = await provider.printCustomerBill(bill.orderId);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: ok ? AppColors.success : AppColors.error,
+                    content: Row(
+                      children: [
+                        Icon(ok ? Icons.check_circle : Icons.error_outline, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(ok
+                              ? 'Customer Bill sent to printer (${provider.billPrinter?.name ?? "Counter Printer"})'
+                              : 'Failed to print bill. Check printer status.'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.print, size: 18),
+            label: const Text(
+              'PRINT CUSTOMER BILL (TAX INVOICE)',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              minimumSize: const Size.fromHeight(44),
+            ),
+          ),
+          const SizedBox(height: 10),
+
           // Big Settlement Button
           ElevatedButton.icon(
             onPressed: (provider.isSettlingPayment || provider.isLicenseLocked)

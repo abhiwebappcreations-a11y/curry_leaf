@@ -499,6 +499,7 @@ class PosProvider extends ChangeNotifier {
 
   void requestItemCancellation(OrderItem item, String reason) {
     if (_currentOrder == null) return;
+    final orderId = _currentOrder!.id;
     final index = _currentOrder!.items.indexWhere((i) => i.id == item.id);
     if (index >= 0) {
       List<OrderItem> updated = List.from(_currentOrder!.items);
@@ -509,6 +510,13 @@ class PosProvider extends ChangeNotifier {
       _currentOrder = _currentOrder!.copyWith(items: updated);
       _ordersByTableId[_currentTable!.id] = _currentOrder!;
       notifyListeners();
+
+      // Dispatch request to Counter POS backend for manager approval & kitchen ticket
+      _apiService.requestCancellation(
+        orderId: orderId,
+        itemId: item.id,
+        reason: reason,
+      );
     }
   }
 

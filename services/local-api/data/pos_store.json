@@ -6,8 +6,8 @@
       "displayName": "Table T1",
       "section": "Main Dining",
       "capacity": 4,
-      "status": "available",
-      "activeOrderId": null,
+      "status": "occupied",
+      "activeOrderId": "ord_1792841321486_rm5v4",
       "sortOrder": 1
     }
   ],
@@ -71,10 +71,74 @@
       "sortOrder": 1
     }
   ],
-  "orders": [],
+  "orders": [
+    {
+      "id": "ord_1792841321486_rm5v4",
+      "orderNumber": "ORD-261024-1001",
+      "tableId": "tab_1792832437786_10",
+      "tableName": "Table T1",
+      "captainDeviceId": "dev_counter_01",
+      "status": "preparing",
+      "guestCount": 1,
+      "subtotalPaise": 0,
+      "taxPaise": 0,
+      "discountPaise": 0,
+      "totalPaise": 0,
+      "items": [
+        {
+          "id": "oi_1792841321487_vomt",
+          "orderId": "ord_1792841321486_rm5v4",
+          "menuItemId": "item_1792832487598_734",
+          "nameSnapshot": "CHICKEN DUM BIRYANI",
+          "pricePaiseSnapshot": 22900,
+          "taxRateSnapshot": 5,
+          "quantity": 2,
+          "itemNotes": "Less spicy",
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "cancelled",
+          "createdAt": "2026-10-24T11:28:41.487Z",
+          "updatedAt": "2026-10-24T11:28:41.544Z",
+          "kotId": "kot_1792841321490_s56ul",
+          "cancellationReason": "Guest wants different dish",
+          "cancelledByDeviceId": "dev_counter_01"
+        }
+      ],
+      "createdAt": "2026-10-24T11:28:41.486Z",
+      "updatedAt": "2026-10-24T11:28:41.544Z"
+    }
+  ],
   "bills": [],
   "payments": [],
-  "kots": [],
+  "kots": [
+    {
+      "id": "kot_1792841321490_s56ul",
+      "kotNumber": "KOT-261024-2001",
+      "orderId": "ord_1792841321486_rm5v4",
+      "tableId": "tab_1792832437786_10",
+      "status": "queued",
+      "printCount": 1,
+      "items": [
+        {
+          "id": "oi_1792841321487_vomt",
+          "orderId": "ord_1792841321486_rm5v4",
+          "menuItemId": "item_1792832487598_734",
+          "nameSnapshot": "CHICKEN DUM BIRYANI",
+          "pricePaiseSnapshot": 22900,
+          "taxRateSnapshot": 5,
+          "quantity": 2,
+          "itemNotes": "Less spicy",
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "sent_to_kitchen",
+          "createdAt": "2026-10-24T11:28:41.487Z",
+          "updatedAt": "2026-10-24T11:28:41.490Z",
+          "kotId": "kot_1792841321490_s56ul"
+        }
+      ],
+      "createdAt": "2026-10-24T11:28:41.490Z"
+    }
+  ],
   "devices": [
     {
       "id": "dev_counter_01",
@@ -111,9 +175,26 @@
       "apiKeyHash": "cap_1792832246524_w3s29n",
       "isActive": true,
       "status": "approved",
-      "deviceIp": "192.168.10.3",
+      "deviceIp": "192.168.10.4",
       "registeredAt": "2026-10-24T08:57:26.524Z",
-      "lastSeenAt": "2026-10-24T09:49:16.261Z"
+      "lastSeenAt": "2026-10-24T11:17:05.861Z"
+    }
+  ],
+  "cancelRequests": [
+    {
+      "id": "creq_1792841321536_zqfc",
+      "orderId": "ord_1792841321486_rm5v4",
+      "orderNumber": "ORD-261024-1001",
+      "tableId": "tab_1792832437786_10",
+      "tableName": "Table T1",
+      "itemId": "oi_1792841321487_vomt",
+      "itemName": "CHICKEN DUM BIRYANI",
+      "itemQuantity": 2,
+      "reason": "Guest wants different dish",
+      "requestedByDeviceId": "dev_captain_01",
+      "status": "approved",
+      "createdAt": "2026-10-24T11:28:41.536Z",
+      "resolvedAt": "2026-10-24T11:28:41.544Z"
     }
   ],
   "settings": {
@@ -140,7 +221,18 @@
     "license_heartbeat": {
       "lastOnlineAt": "2026-10-24T06:56:20.427Z",
       "status": "verified"
+    },
+    "printer_settings": {
+      "mode": "single",
+      "counterBill": {
+        "target": "EPSON TM-T82X Receipt",
+        "paperWidth": "80mm"
+      },
+      "kitchenKot": {
+        "target": "EPSON TM-T82X Receipt",
+        "paperWidth": "80mm"
+      }
     }
   },
-  "updatedAt": "2026-10-24T09:49:16.261Z"
+  "updatedAt": "2026-10-24T11:28:41.544Z"
 }

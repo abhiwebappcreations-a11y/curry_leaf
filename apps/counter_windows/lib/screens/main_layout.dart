@@ -56,6 +56,8 @@ class MainLayout extends StatelessWidget {
               const TopHealthBar(showMenuButton: true),
               for (var device in provider.pendingDevices)
                 _buildPendingDeviceBanner(context, provider, device),
+              for (var req in provider.pendingCancelRequests)
+                _buildPendingCancelRequestBanner(context, provider, req),
               if (provider.isLicenseLocked)
                 Container(
                   width: double.infinity,
@@ -107,6 +109,8 @@ class MainLayout extends StatelessWidget {
             const TopHealthBar(showMenuButton: false),
             for (var device in provider.pendingDevices)
               _buildPendingDeviceBanner(context, provider, device),
+            for (var req in provider.pendingCancelRequests)
+              _buildPendingCancelRequestBanner(context, provider, req),
             if (provider.isLicenseLocked)
                 Container(
                   width: double.infinity,
@@ -215,6 +219,99 @@ class MainLayout extends StatelessWidget {
             ),
             onPressed: () => provider.rejectDevice(id),
             child: const Text('Decline', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingCancelRequestBanner(BuildContext context, CounterProvider provider, Map<String, dynamic> req) {
+    final reqId = req['id']?.toString() ?? '';
+    final tableName = req['tableName']?.toString() ?? req['tableId']?.toString() ?? 'Table';
+    final itemName = req['itemName']?.toString();
+    final itemQty = req['itemQuantity']?.toString() ?? '1';
+    final reason = req['reason']?.toString() ?? 'Customer requested cancellation';
+    final isItem = itemName != null && itemName.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFB91C1C), // Vivid red-amber alert
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'TABLE $tableName',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isItem ? 'CANCELLATION REQUEST: "$itemName (x$itemQty)"' : 'WHOLE ORDER CANCELLATION REQUEST',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Reason: "$reason" • Awaiting Counter Manager approval to halt kitchen preparation.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFFB91C1C),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            onPressed: () async {
+              final ok = await provider.approveCancelRequest(reqId);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok ? 'Cancellation approved! Kitchen cancellation ticket printed.' : 'Failed to approve cancellation.'),
+                    backgroundColor: ok ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.check, size: 16),
+            label: const Text('ACCEPT & CANCEL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            onPressed: () async {
+              await provider.rejectCancelRequest(reqId);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Cancellation request rejected.'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+            },
+            child: const Text('Reject', style: TextStyle(fontSize: 12)),
           ),
         ],
       ),

@@ -74,6 +74,7 @@ const settlePaymentSchema = z.object({
   amountPaise: z.number().int().positive(),
   paymentMethod: z.enum(['cash', 'upi', 'card', 'split', 'other']),
   idempotencyKey: z.string().min(5),
+  orderId: z.string().optional(),
   referenceNumber: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -94,6 +95,28 @@ billingRouter.post(
       res.status(201).json({
         success: true,
         data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+
+// POST /:id/print or /bills/:id/print or /orders/:id/print-bill - Direct Customer Bill Print
+billingRouter.post(
+  ['/:id/print', '/bills/:id/print', '/orders/:id/print-bill'],
+  requireActiveLicense,
+  requireRole('counter', 'admin'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const bill = await BillingService.printBill(req.params.id as string, false);
+      res.json({
+        success: true,
+        data: {
+          message: 'Customer bill sent to counter printer',
+          bill,
+        },
       });
     } catch (err) {
       next(err);
