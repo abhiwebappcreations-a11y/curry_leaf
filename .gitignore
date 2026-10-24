@@ -21,6 +21,8 @@ out/
 *.pem
 *.key
 *.cert
+*credentials*.json
+google_drive_credentials.json
 
 # Database & logs
 *.sqlite

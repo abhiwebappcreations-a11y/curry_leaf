@@ -75,6 +75,22 @@ export class GoogleDriveUploader {
     return data.access_token;
   }
 
+  static async findSharedFolderId(token, folderName = 'Hinopt_POS_Backups') {
+    try {
+      const q = encodeURIComponent(`name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && data.files.length > 0) {
+          return data.files[0].id;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /**
    * Upload an encrypted backup file to Hinopt Google Drive
    */
@@ -86,13 +102,18 @@ export class GoogleDriveUploader {
     const creds = this.getCredentials();
     const token = await this.getAccessToken(creds);
 
+    let targetFolderId = folderId;
+    if (!targetFolderId) {
+      targetFolderId = await this.findSharedFolderId(token);
+    }
+
     const metadata = {
       name: fileName,
       mimeType: 'application/octet-stream',
     };
 
-    if (folderId) {
-      metadata.parents = [folderId];
+    if (targetFolderId) {
+      metadata.parents = [targetFolderId];
     }
 
     const boundary = '-------314159265358979323846';

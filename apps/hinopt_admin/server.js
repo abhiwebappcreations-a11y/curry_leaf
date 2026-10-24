@@ -174,6 +174,20 @@ const server = http.createServer(async (req, res) => {
           })
         }).catch(() => {});
 
+        // Dispatch upload to Google Drive if credentials exist
+        if (GoogleDriveUploader.isConfigured()) {
+          GoogleDriveUploader.uploadEncryptedBackup({
+            fileName,
+            fileContent: JSON.stringify(payload, null, 2)
+          }).then(driveRes => {
+            if (driveRes.success) {
+              console.log('[Google Drive] Successfully saved to Google Drive folder:', driveRes.fileName, driveRes.link);
+            }
+          }).catch(err => {
+            console.warn('[Google Drive] Background upload notice:', err.message);
+          });
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
