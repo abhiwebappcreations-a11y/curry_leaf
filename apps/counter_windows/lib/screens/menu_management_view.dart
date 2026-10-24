@@ -277,61 +277,6 @@ class MenuManagementView extends StatelessWidget {
     );
   }
 
-  Widget _buildDishThumbnail(MenuItem item, {double size = 42}) {
-    IconData fallbackIcon = Icons.restaurant;
-    final cat = item.category.toLowerCase();
-    if (cat.contains('starter')) {
-      fallbackIcon = Icons.tapas;
-    } else if (cat.contains('tandoor')) {
-      fallbackIcon = Icons.outdoor_grill;
-    } else if (cat.contains('biryani') || cat.contains('rice')) {
-      fallbackIcon = Icons.rice_bowl;
-    } else if (cat.contains('bread')) {
-      fallbackIcon = Icons.bakery_dining;
-    } else if (cat.contains('beverage') || cat.contains('drink')) {
-      fallbackIcon = Icons.local_cafe;
-    } else if (cat.contains('dessert')) {
-      fallbackIcon = Icons.icecream;
-    } else if (cat.contains('curry')) {
-      fallbackIcon = Icons.dinner_dining;
-    }
-
-    final placeholder = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: item.isVeg ? const Color(0xFFF1F8E9) : const Color(0xFFFBE9E7),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Icon(
-        fallbackIcon,
-        size: size * 0.52,
-        color: item.isVeg ? AppColors.veg.withValues(alpha: 0.5) : AppColors.nonVeg.withValues(alpha: 0.5),
-      ),
-    );
-
-    if (item.imageUrl == null || item.imageUrl!.isEmpty) {
-      return placeholder;
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Image.network(
-          item.imageUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => placeholder,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return placeholder;
-          },
-        ),
-      ),
-    );
-  }
-
   void _confirmDeleteDish(BuildContext context, CounterProvider provider, MenuItem item) {
     showDialog(
       context: context,
@@ -462,8 +407,8 @@ class MenuManagementView extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           isMobile
-                              ? 'Manage prices, pictures, and live stock'
-                              : 'Manage dish pictures, prices, and toggle real-time stock availability for Captain devices',
+                              ? 'Manage prices, categories, and live stock'
+                              : 'Manage dish prices, categories, and toggle real-time stock availability for Captain devices',
                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                         ),
                       ],
@@ -605,9 +550,8 @@ class MenuManagementView extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                   child: const Row(
                                     children: [
-                                      SizedBox(width: 48, child: Text('PHOTO', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       SizedBox(width: 32, child: Text('TYPE', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
-                                      Expanded(flex: 4, child: Text('DISH NAME', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
+                                      Expanded(flex: 5, child: Text('DISH NAME', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       Expanded(flex: 3, child: Text('CATEGORY', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       Expanded(flex: 2, child: Text('PRICE', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
                                       Expanded(flex: 3, child: Text('CAPTAIN STOCK', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11))),
@@ -619,14 +563,9 @@ class MenuManagementView extends StatelessWidget {
 
                               final item = provider.menuItems[index - 1];
                               return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                                 child: Row(
                                   children: [
-                                    // Picture Thumbnail
-                                    SizedBox(
-                                      width: 48,
-                                      child: _buildDishThumbnail(item, size: 38),
-                                    ),
                                     // Type Veg/Non-Veg
                                     SizedBox(
                                       width: 32,
@@ -641,7 +580,7 @@ class MenuManagementView extends StatelessWidget {
                                     ),
                                     // Name & Description
                                     Expanded(
-                                      flex: 4,
+                                      flex: 5,
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -790,10 +729,6 @@ class MenuManagementView extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Dish Picture Thumbnail
-              _buildDishThumbnail(item, size: 54),
-              const SizedBox(width: 10),
-
               // Item Name and Category
               Expanded(
                 child: Column(
