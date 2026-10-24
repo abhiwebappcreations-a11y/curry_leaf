@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
+import { GoogleDriveUploader } from './google_drive_uploader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,6 +104,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API Route: Google Drive Connection Status
+  if (pathname === '/api/google-drive/status' && req.method === 'GET') {
+    const isConfigured = GoogleDriveUploader.isConfigured();
+    const creds = GoogleDriveUploader.getCredentials();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      googleDriveConnected: isConfigured,
+      clientEmail: creds?.client_email || null,
+      projectId: creds?.project_id || null,
+      credentialsPath: 'apps/hinopt_admin/google_drive_credentials.json',
+      instructions: isConfigured
+        ? 'Google Drive is connected and active!'
+        : 'Place your Google Cloud Service Account JSON key into apps/hinopt_admin/google_drive_credentials.json to link your Google Drive.'
+    }));
+    return;
+  }
+
   // API Route: Server Status and Configuration
   if (pathname === '/api/config' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -134,6 +153,26 @@ const server = http.createServer(async (req, res) => {
 
         // Also update latest pointer
         fs.writeFileSync(path.join(targetDir, 'latest.json'), JSON.stringify(payload, null, 2), 'utf-8');
+
+        // Sync metadata to Supabase cloud_backups table
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+        fetch(`${supabaseUrl}/rest/v1/cloud_backups`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            restaurant_id: restId,
+            restaurant_name: payload.restaurantName || restId,
+            file_name: fileName,
+            size_bytes: fs.statSync(filePath).size,
+            encryption_cipher: 'AES-256-GCM'
+          })
+        }).catch(() => {});
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -230,6 +269,25 @@ const server = http.createServer(async (req, res) => {
         });
 
         fs.writeFileSync(revokedDbPath, JSON.stringify(revokedList, null, 2), 'utf-8');
+
+        // Sync to Supabase revoked_hwids table
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+        fetch(`${supabaseUrl}/rest/v1/revoked_hwids`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            hwid: oldHwid,
+            license_key: licenseKey,
+            reason: reason || 'Hardware replacement',
+            transferred_to_hwid: newHwid
+          })
+        }).catch(() => {});
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
