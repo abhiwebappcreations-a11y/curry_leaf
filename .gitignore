@@ -30,6 +30,7 @@ logs/
 pos_store.json
 services/local-api/data/
 data/
+apps/hinopt_admin/cloud_backups/
 
 # IDE & OS
 .vscode/

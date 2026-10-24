@@ -215,6 +215,32 @@ class CounterProvider extends ChangeNotifier {
     return false;
   }
 
+  Future<Map<String, dynamic>?> syncCloudBackup() async {
+    return await _counterApiService.syncCloudBackup();
+  }
+
+  Future<bool> restoreCloudBackup() async {
+    final result = await _counterApiService.restoreCloudBackup();
+    if (result != null) {
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<Map<String, dynamic>?> getCloudBackupStatus() async {
+    return await _counterApiService.getCloudBackupStatus();
+  }
+
+  Future<Map<String, dynamic>?> checkLicenseHeartbeat() async {
+    final result = await _counterApiService.checkLicenseHeartbeat();
+    if (result != null && result['status'] == 'revoked') {
+      _licenseStatus = 'suspended';
+      notifyListeners();
+    }
+    return result;
+  }
+
   Future<bool> testServerConnection(String host, int port) async {
     return _counterApiService.checkHealthFor(host, port);
   }

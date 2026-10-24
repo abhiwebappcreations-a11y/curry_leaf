@@ -631,6 +631,82 @@ class CounterApiService {
       return false;
     }
   }
+
+  Future<Map<String, dynamic>?> syncCloudBackup() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/backup/cloud-sync'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> restoreCloudBackup() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/backup/cloud-restore'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCloudBackupStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/backup/cloud-status'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> checkLicenseHeartbeat() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/license/heartbeat'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// Backward compatibility alias

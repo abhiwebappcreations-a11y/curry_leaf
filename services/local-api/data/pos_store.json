@@ -697,6 +697,113 @@
       "sortOrder": 29
     }
   ],
+  "orders": [
+    {
+      "id": "ord_live_101",
+      "orderNumber": "ORD-101",
+      "tableId": "tab_t2",
+      "tableName": "Table 2",
+      "guestCount": 2,
+      "status": "preparing",
+      "subtotalPaise": 41000,
+      "taxPaise": 2050,
+      "discountPaise": 0,
+      "totalPaise": 43050,
+      "createdAt": "2026-10-24T06:33:36.907Z",
+      "updatedAt": "2026-10-24T06:45:36.907Z",
+      "items": [
+        {
+          "id": "item_rec_1",
+          "orderId": "ord_live_101",
+          "menuItemId": "item_chicken_ghee_roast",
+          "nameSnapshot": "Kundapura Chicken Ghee Roast",
+          "pricePaiseSnapshot": 34000,
+          "taxRateSnapshot": 5,
+          "quantity": 1,
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "preparing",
+          "createdAt": "2026-10-24T06:33:36.907Z",
+          "updatedAt": "2026-10-24T06:45:36.907Z"
+        },
+        {
+          "id": "item_rec_2",
+          "orderId": "ord_live_101",
+          "menuItemId": "item_masala_chaas",
+          "nameSnapshot": "Spiced Buttermilk (Neer Moru)",
+          "pricePaiseSnapshot": 6000,
+          "taxRateSnapshot": 5,
+          "quantity": 2,
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "preparing",
+          "createdAt": "2026-10-24T06:33:36.907Z",
+          "updatedAt": "2026-10-24T06:45:36.907Z"
+        }
+      ]
+    },
+    {
+      "id": "ord_live_102",
+      "orderNumber": "ORD-102",
+      "tableId": "tab_t4",
+      "tableName": "Table 4",
+      "guestCount": 4,
+      "status": "active",
+      "subtotalPaise": 120000,
+      "taxPaise": 6000,
+      "discountPaise": 0,
+      "totalPaise": 126000,
+      "createdAt": "2026-10-24T06:40:36.907Z",
+      "updatedAt": "2026-10-24T06:45:36.907Z",
+      "items": [
+        {
+          "id": "item_rec_3",
+          "orderId": "ord_live_102",
+          "menuItemId": "item_chicken_biryani",
+          "nameSnapshot": "Ambur Chicken Dum Biryani",
+          "pricePaiseSnapshot": 32000,
+          "taxRateSnapshot": 5,
+          "quantity": 2,
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "preparing",
+          "createdAt": "2026-10-24T06:40:36.907Z",
+          "updatedAt": "2026-10-24T06:45:36.907Z"
+        },
+        {
+          "id": "item_rec_4",
+          "orderId": "ord_live_102",
+          "menuItemId": "item_butter_naan",
+          "nameSnapshot": "Butter Garlic Naan",
+          "pricePaiseSnapshot": 7000,
+          "taxRateSnapshot": 5,
+          "quantity": 4,
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "preparing",
+          "createdAt": "2026-10-24T06:40:36.907Z",
+          "updatedAt": "2026-10-24T06:45:36.907Z"
+        },
+        {
+          "id": "item_rec_5",
+          "orderId": "ord_live_102",
+          "menuItemId": "item_paneer_butter_masala",
+          "nameSnapshot": "Paneer Butter Masala",
+          "pricePaiseSnapshot": 28000,
+          "taxRateSnapshot": 5,
+          "quantity": 1,
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "preparing",
+          "createdAt": "2026-10-24T06:40:36.907Z",
+          "updatedAt": "2026-10-24T06:45:36.907Z"
+        }
+      ]
+    }
+  ],
+  "bills": [],
+  "payments": [],
+  "kots": [],
   "settings": {
     "restaurant_profile": {
       "restaurantId": "rest_curry_leaf_01",
@@ -710,7 +817,18 @@
     "printer_counter_bill": {
       "target": "EPSON TM-T82X Receipt6",
       "paperWidth": "80mm"
+    },
+    "cloud_backup_meta": {
+      "lastSyncedAt": "2026-10-24T06:50:19.225Z",
+      "fileName": "pos_cloud_2026-10-24T06-50-19.enc",
+      "cloudSynced": true,
+      "sizeBytes": 36346,
+      "provider": "Hinopt Google Drive (AES-256-GCM Encrypted)"
+    },
+    "license_heartbeat": {
+      "lastOnlineAt": "2026-10-24T06:51:01.052Z",
+      "status": "verified"
     }
   },
-  "updatedAt": "2026-10-23T16:30:45.173Z"
+  "updatedAt": "2026-10-24T06:51:01.053Z"
 }

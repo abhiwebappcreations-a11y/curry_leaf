@@ -223,6 +223,9 @@ export class InMemoryStore {
   public saveToDisk(): void {
     try {
       const filePath = this.getStoreFilePath();
+      const tmpPath = filePath + '.tmp';
+      const bakPath = filePath + '.bak';
+
       const payload = {
         tables: Array.from(this.tables.values()),
         categories: Array.from(this.categories.values()),
@@ -234,17 +237,40 @@ export class InMemoryStore {
         settings: Object.fromEntries(this.settings.entries()),
         updatedAt: new Date().toISOString(),
       };
-      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+
+      // 1. Atomic write to temporary file
+      fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), 'utf-8');
+
+      // 2. Rotate existing file to .bak for power-outage protection
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.copyFileSync(filePath, bakPath);
+        } catch (_) {}
+      }
+
+      // 3. Rename tmp to real file (atomic in Windows filesystem)
+      fs.renameSync(tmpPath, filePath);
     } catch (err) {
       console.error('Failed to save inMemoryStore to disk:', err);
     }
   }
 
   public loadFromDisk(): boolean {
+    const filePath = this.getStoreFilePath();
+    const bakPath = filePath + '.bak';
+
+    let targetPath: string | null = null;
+    if (fs.existsSync(filePath)) {
+      targetPath = filePath;
+    } else if (fs.existsSync(bakPath)) {
+      console.warn('Primary store file missing; recovering from power-failure backup (.bak)');
+      targetPath = bakPath;
+    }
+
+    if (!targetPath) return false;
+
     try {
-      const filePath = this.getStoreFilePath();
-      if (!fs.existsSync(filePath)) return false;
-      const content = fs.readFileSync(filePath, 'utf-8');
+      const content = fs.readFileSync(targetPath, 'utf-8');
       const data = JSON.parse(content);
       if (Array.isArray(data.tables) && data.tables.length > 0) {
         this.tables.clear();
@@ -295,7 +321,25 @@ export class InMemoryStore {
       }
       return true;
     } catch (err) {
-      console.error('Failed to load inMemoryStore from disk:', err);
+      console.error('Failed to parse primary store file. Attempting recovery from .bak:', err);
+      if (targetPath !== bakPath && fs.existsSync(bakPath)) {
+        try {
+          const bakContent = fs.readFileSync(bakPath, 'utf-8');
+          const data = JSON.parse(bakContent);
+          // Auto recover
+          if (Array.isArray(data.tables)) {
+            this.tables.clear();
+            for (const t of data.tables) this.tables.set(t.id, t);
+          }
+          if (Array.isArray(data.menuItems)) {
+            this.menuItems.clear();
+            for (const m of data.menuItems) this.menuItems.set(m.id, m);
+          }
+          this.saveToDisk();
+          console.info('Database successfully recovered from .bak backup snapshot!');
+          return true;
+        } catch (_) {}
+      }
       return false;
     }
   }

@@ -307,4 +307,53 @@ export class LicenseService {
 
     return this.getLicenseStatus();
   }
+
+  public static getSystemHardwareId(): string {
+    if (process.platform === 'win32') {
+      try {
+        const out = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_ComputerSystemProduct).UUID"').toString().trim();
+        if (out) return out;
+      } catch (_) {}
+    }
+    return 'HWID-LOCAL-DEV-NODE';
+  }
+
+  public static async performHeartbeat(): Promise<{ online: boolean; status: string; message?: string }> {
+    const license = inMemoryStore.license;
+    if (!license) return { online: false, status: 'no_license' };
+
+    const adminUrl = process.env.HINOPT_ADMIN_URL || 'http://127.0.0.1:5000';
+    const hwid = this.getSystemHardwareId();
+
+    try {
+      const resp = await fetch(`${adminUrl}/api/license/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          licenseKey: license.licenseKey,
+          hwid,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      if (resp.ok) {
+        const data = (await resp.json()) as any;
+        if (data.status === 'revoked') {
+          license.status = 'suspended';
+          inMemoryStore.saveToDisk();
+          logger.error('CRITICAL: License revoked by Hinopt Cloud — Terminal deactivated');
+          return { online: true, status: 'revoked', message: data.message };
+        }
+
+        inMemoryStore.settings.set('license_heartbeat', {
+          lastOnlineAt: new Date().toISOString(),
+          status: 'verified',
+        });
+        inMemoryStore.saveToDisk();
+        return { online: true, status: 'active' };
+      }
+    } catch (_) {}
+
+    return { online: false, status: license.status };
+  }
 }

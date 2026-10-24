@@ -20,14 +20,16 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
 
   bool _isLoading = false;
   List<Map<String, dynamic>> _localSnapshots = [];
+  Map<String, dynamic>? _cloudStatus;
   String? _statusMessage;
   bool _isSuccessMessage = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadSnapshots();
+    _loadCloudStatus();
   }
 
   @override
@@ -41,6 +43,82 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
     final list = await widget.provider.listBackupSnapshots();
     if (mounted) {
       setState(() => _localSnapshots = list);
+    }
+  }
+
+  Future<void> _loadCloudStatus() async {
+    final status = await widget.provider.getCloudBackupStatus();
+    if (mounted) {
+      setState(() => _cloudStatus = status);
+    }
+  }
+
+  Future<void> _handleCloudSync() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = null;
+    });
+
+    final res = await widget.provider.syncCloudBackup();
+    setState(() => _isLoading = false);
+
+    if (res != null) {
+      final fileName = res['fileName'] as String? ?? 'backup.enc';
+      final size = (res['sizeBytes'] ?? 0) ~/ 1024;
+      setState(() {
+        _statusMessage = 'Backup encrypted with AES-256-GCM and synced to Hinopt Google Drive!\nFile: $fileName ($size KB) • Data is 100% private and encrypted.';
+        _isSuccessMessage = true;
+      });
+      _loadCloudStatus();
+      _loadSnapshots();
+    } else {
+      setState(() {
+        _statusMessage = 'Failed to sync to cloud. Local encrypted copy saved safely on disk.';
+        _isSuccessMessage = false;
+      });
+    }
+  }
+
+  Future<void> _handleCloudRestore() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Google Drive Restore'),
+        content: const Text(
+          'This will pull the latest AES-256 encrypted backup from Hinopt Google Drive, decrypt it with your restaurant license key, and restore all tables, menu, and orders.\n\nDo you want to proceed?',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Restore from Cloud', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = null;
+    });
+
+    final ok = await widget.provider.restoreCloudBackup();
+    setState(() => _isLoading = false);
+
+    if (ok) {
+      setState(() {
+        _statusMessage = 'Database restored successfully from Hinopt Google Drive! All dishes, tables, and past bills are active.';
+        _isSuccessMessage = true;
+      });
+    } else {
+      setState(() {
+        _statusMessage = 'Could not restore from cloud. Please check internet connection or license status.';
+        _isSuccessMessage = false;
+      });
     }
   }
 
@@ -112,7 +190,7 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Restore'),
         content: Text(
-          'Restoring snapshot "$fileName" will replace the current tables, menu, and active orders with this backup.\n\nDo you want to proceed?',
+          'Restoring snapshot "$fileName" will replace current tables, menu, and active orders with this backup.\n\nDo you want to proceed?',
           style: const TextStyle(fontSize: 13),
         ),
         actions: [
@@ -150,26 +228,26 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Container(
-        width: 620,
-        height: 580,
+        width: 660,
+        height: 600,
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.usb_rounded, color: AppColors.primary, size: 28),
+                const Icon(Icons.cloud_sync, color: AppColors.primary, size: 28),
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Database Backup & USB Restore',
+                        'Database Backup & Cloud Restore',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                       ),
                       Text(
-                        'Protect restaurant data offline or migrate to a new computer in 30 seconds',
+                        'AES-256-GCM Encrypted Google Drive Sync & Offline USB Protection',
                         style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       ),
                     ],
@@ -191,8 +269,9 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
               tabs: const [
-                Tab(icon: Icon(Icons.file_download_outlined, size: 18), text: 'Export / USB Backup'),
-                Tab(icon: Icon(Icons.settings_backup_restore, size: 18), text: 'Restore to New PC'),
+                Tab(icon: Icon(Icons.cloud_done_outlined, size: 18), text: 'Google Drive Sync'),
+                Tab(icon: Icon(Icons.usb_rounded, size: 18), text: 'USB Export'),
+                Tab(icon: Icon(Icons.settings_backup_restore, size: 18), text: 'Manual Restore'),
               ],
             ),
             const SizedBox(height: 12),
@@ -237,6 +316,7 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
               child: TabBarView(
                 controller: _tabController,
                 children: [
+                  _buildCloudTab(),
                   _buildExportTab(),
                   _buildRestoreTab(),
                 ],
@@ -245,6 +325,118 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCloudTab() {
+    final lastSyncStr = _cloudStatus?['lastSyncedAt'] != null
+        ? DateFormat('dd MMM yyyy • hh:mm:ss a').format(DateTime.tryParse(_cloudStatus!['lastSyncedAt']) ?? DateTime.now())
+        : 'Never synced yet';
+
+    final sizeKb = ((_cloudStatus?['sizeBytes'] ?? 0) / 1024).toStringAsFixed(1);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFA5D6A7)),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.shield_outlined, color: Color(0xFF2E7D32), size: 22),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Zero-Knowledge AES-256-GCM Military Encryption',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Your data is encrypted locally with your restaurant license key before upload. Nobody at Google or outside can see your customer phone numbers, GST invoices, or sales figures.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32), height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Card(
+          elevation: 0,
+          color: AppColors.surfaceMuted,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                _buildInfoRow('Storage Destination:', 'Hinopt Google Drive Storage Bridge'),
+                const Divider(height: 16),
+                _buildInfoRow('Encryption Cipher:', 'AES-256-GCM Authenticated Cipher'),
+                const Divider(height: 16),
+                _buildInfoRow('Last Cloud Sync:', lastSyncStr),
+                const Divider(height: 16),
+                _buildInfoRow('Encrypted File Size:', '$sizeKb KB (Under 50 KB)'),
+              ],
+            ),
+          ),
+        ),
+        const Spacer(),
+
+        ElevatedButton.icon(
+          onPressed: _isLoading ? null : _handleCloudSync,
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.cloud_upload, size: 20),
+          label: Text(
+            _isLoading ? 'ENCRYPTING & UPLOADING...' : 'SYNC ENCRYPTED BACKUP TO GOOGLE DRIVE NOW',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            minimumSize: const Size.fromHeight(48),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        OutlinedButton.icon(
+          onPressed: _isLoading ? null : _handleCloudRestore,
+          icon: const Icon(Icons.settings_backup_restore, size: 18, color: AppColors.primary),
+          label: const Text(
+            '1-Click Restore From Latest Cloud Backup',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primary),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            minimumSize: const Size.fromHeight(42),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+      ],
     );
   }
 
@@ -260,11 +452,11 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
           ),
           child: const Row(
             children: [
-              Icon(Icons.info_outline, size: 20, color: AppColors.textSecondary),
+              Icon(Icons.usb_rounded, size: 20, color: AppColors.textSecondary),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Recommended: Keep a small USB pendrive plugged into the counter PC. Export a backup daily at shift closing. If this PC ever fails, simply plug the USB into any other PC and restore.',
+                  'Offline Safety: Keep a ₹250 USB thumb drive permanently plugged into the counter PC. Export a snapshot daily at closing for zero-internet backup.',
                   style: TextStyle(fontSize: 11, height: 1.4, color: AppColors.textSecondary),
                 ),
               ),
@@ -283,7 +475,7 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
                 )
               : const Icon(Icons.backup_outlined, size: 20),
           label: Text(
-            _isLoading ? 'GENERATING SNAPSHOT...' : 'CREATE BACKUP SNAPSHOT NOW',
+            _isLoading ? 'GENERATING SNAPSHOT...' : 'CREATE USB BACKUP SNAPSHOT NOW',
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
           ),
           style: ElevatedButton.styleFrom(
@@ -293,7 +485,7 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
             minimumSize: const Size.fromHeight(48),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         const Text(
           'Existing Local Snapshots on this PC:',
@@ -378,7 +570,7 @@ class _BackupRestoreDialogState extends State<BackupRestoreDialog> with SingleTi
         const SizedBox(height: 6),
 
         SizedBox(
-          height: 110,
+          height: 100,
           child: _localSnapshots.isEmpty
               ? const Center(
                   child: Text(

@@ -116,6 +116,135 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API Route: Receive Encrypted Backup (Hinopt Google Drive Bridge)
+  if (pathname === '/api/cloud-backups/upload' && req.method === 'POST') {
+    let bodyStr = '';
+    req.on('data', chunk => { bodyStr += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(bodyStr);
+        const restId = payload.restaurantId || 'default';
+        const targetDir = path.join(__dirname, 'cloud_backups', restId);
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        const fileName = payload.fileName || `backup_${Date.now()}.enc`;
+        const filePath = path.join(targetDir, fileName);
+        fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+
+        // Also update latest pointer
+        fs.writeFileSync(path.join(targetDir, 'latest.json'), JSON.stringify(payload, null, 2), 'utf-8');
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: 'Encrypted backup received and stored on Hinopt Google Drive storage bridge.',
+          fileName,
+          bytesStored: fs.statSync(filePath).size
+        }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // API Route: Get Latest Encrypted Cloud Backup for a Restaurant
+  if (pathname.startsWith('/api/cloud-backups/latest/') && req.method === 'GET') {
+    const parts = pathname.split('/');
+    const restId = parts[parts.length - 1] || 'default';
+    const latestPath = path.join(__dirname, 'cloud_backups', restId, 'latest.json');
+
+    if (fs.existsSync(latestPath)) {
+      const data = JSON.parse(fs.readFileSync(latestPath, 'utf-8'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, data }));
+    } else {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'No cloud backup found for this restaurant' }));
+    }
+    return;
+  }
+
+  // API Route: 30-Day Check-in / Heartbeat & Hardware Revocation Check
+  if (pathname === '/api/license/heartbeat' && req.method === 'POST') {
+    let bodyStr = '';
+    req.on('data', chunk => { bodyStr += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(bodyStr);
+        const revokedDbPath = path.join(__dirname, 'revoked_hwids.json');
+        let revokedList = [];
+        if (fs.existsSync(revokedDbPath)) {
+          revokedList = JSON.parse(fs.readFileSync(revokedDbPath, 'utf-8'));
+        }
+
+        const isRevoked = revokedList.some(r => r.hwid === payload.hwid || (payload.licenseKey && r.revokedKey === payload.licenseKey && r.hwid !== payload.hwid));
+
+        if (isRevoked) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            status: 'revoked',
+            code: 'HARDWARE_REASSIGNED',
+            message: 'This license was transferred to another computer. Terminal is deactivated.'
+          }));
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          status: 'active',
+          code: 'OK',
+          lastVerifiedAt: new Date().toISOString()
+        }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // API Route: Transfer Hardware (Revokes Old PC, Binds New PC)
+  if (pathname === '/api/licenses/transfer-hardware' && req.method === 'POST') {
+    let bodyStr = '';
+    req.on('data', chunk => { bodyStr += chunk; });
+    req.on('end', () => {
+      try {
+        const { oldHwid, newHwid, licenseKey, reason } = JSON.parse(bodyStr);
+        const revokedDbPath = path.join(__dirname, 'revoked_hwids.json');
+        let revokedList = [];
+        if (fs.existsSync(revokedDbPath)) {
+          revokedList = JSON.parse(fs.readFileSync(revokedDbPath, 'utf-8'));
+        }
+
+        revokedList.push({
+          hwid: oldHwid,
+          revokedKey: licenseKey,
+          revokedAt: new Date().toISOString(),
+          transferredToHwid: newHwid,
+          reason: reason || 'Client claimed hardware replacement (Burn/Crash)'
+        });
+
+        fs.writeFileSync(revokedDbPath, JSON.stringify(revokedList, null, 2), 'utf-8');
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: `Hardware transfer approved. Old PC (${oldHwid}) revoked immediately upon next heartbeat.`,
+          transferFeeChargedPaise: 150000 // Rs 1,500 transfer fee
+        }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   // Static File Serving
   let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
   

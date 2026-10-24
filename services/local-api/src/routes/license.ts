@@ -8,6 +8,18 @@ export const licenseRouter = Router();
 
 licenseRouter.use(authenticateDevice);
 
+// GET /api/license/hwid - Inspect local PC Hardware ID
+licenseRouter.get('/hwid', async (req: Request, res: Response) => {
+  const hwid = LicenseService.getSystemHardwareId();
+  res.json({ success: true, data: { hwid } });
+});
+
+// POST /api/license/heartbeat - 30-Day Check-in & Cloud Revocation Check
+licenseRouter.post('/heartbeat', async (req: Request, res: Response) => {
+  const result = await LicenseService.performHeartbeat();
+  res.json({ success: true, data: result });
+});
+
 // GET /api/license/status - Inspect local license verification status
 licenseRouter.get('/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
