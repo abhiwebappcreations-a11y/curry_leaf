@@ -6,6 +6,7 @@ import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
 import 'server_connection_dialog.dart';
 import 'backup_restore_dialog.dart';
+import 'license_activation_dialog.dart';
 
 class TopHealthBar extends StatefulWidget {
   final bool showMenuButton;
@@ -176,10 +177,17 @@ class _TopHealthBarState extends State<TopHealthBar> {
                   const SizedBox(width: 8),
 
                   // Subscription Status
-                  _buildHealthIndicator(
-                    label: 'Active (${provider.licenseDaysRemaining}d)',
-                    isOk: !provider.isLicenseLocked,
-                    icon: Icons.verified_user_outlined,
+                  Tooltip(
+                    message: 'Click to view license or enter license key',
+                    child: InkWell(
+                      onTap: () => showLicenseActivationDialog(context, provider),
+                      borderRadius: BorderRadius.circular(6),
+                      child: _buildHealthIndicator(
+                        label: 'Active (${provider.licenseDaysRemaining}d)',
+                        isOk: !provider.isLicenseLocked,
+                        icon: Icons.verified_user_outlined,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
 

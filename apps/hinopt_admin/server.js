@@ -104,6 +104,53 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API Route: Lookup License Key for Instant Remote Online Activation
+  if (pathname.startsWith('/api/license/lookup/') && req.method === 'GET') {
+    const rawKey = decodeURIComponent(pathname.replace('/api/license/lookup/', '')).trim();
+    if (!rawKey) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'License key is required' }));
+      return;
+    }
+
+    // Extract restaurant name or fallback
+    const keyParts = rawKey.split('-');
+    let restName = 'Hinopt Client Restaurant';
+    if (keyParts.length >= 3 && keyParts[1] !== 'LIC') {
+      restName = keyParts[1].replace(/_/g, ' ');
+    } else if (keyParts.length >= 4 && keyParts[1] === 'LIC') {
+      restName = keyParts[2].replace(/_/g, ' ');
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 365 * 24 * 3600 * 1000).toISOString();
+    const payload = {
+      version: '1.0',
+      licenseKey: rawKey.toUpperCase(),
+      restaurantId: `rest_${rawKey.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+      restaurantName: restName,
+      status: 'active',
+      validFrom: now.toISOString(),
+      validUntil: expiresAt,
+      issuedAt: now.toISOString(),
+      expiresAt: expiresAt,
+      allowedFeatures: ['OFFLINE_POS', 'CAPTAIN_LAN_SYNC', 'DUAL_PRINTER_QUEUE', 'GOOGLE_DRIVE_CLOUD_BACKUP'],
+    };
+
+    const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
+    const secret = process.env.JWT_SECRET || 'hinopt_cloud_master_secret';
+    const signature = crypto.createHmac('sha256', secret).update(base64Payload).digest('hex');
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      signedPayloadBase64: base64Payload,
+      signatureHex: signature,
+      payload,
+    }));
+    return;
+  }
+
   // API Route: Google Drive Connection Status
   if (pathname === '/api/google-drive/status' && req.method === 'GET') {
     const isConfigured = GoogleDriveUploader.isConfigured();

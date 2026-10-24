@@ -309,7 +309,89 @@ export class LicenseService {
       createdAt: new Date().toISOString(),
     });
 
+    // Write license.json to disk so it persists across reboots
+    try {
+      const diskLicensePath = path.resolve(process.cwd(), 'license.json');
+      fs.writeFileSync(
+        diskLicensePath,
+        JSON.stringify(
+          {
+            signedPayload: payloadJson,
+            signature: signatureHex,
+            token: `${signedPayloadBase64}.${signatureHex}`,
+            updatedAt: new Date().toISOString(),
+          },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+    } catch (_) {}
+
+    inMemoryStore.saveToDisk();
+
     return this.getLicenseStatus();
+  }
+
+  public static async activateLicenseKey(licenseKey: string): Promise<LicenseStatusResult> {
+    const trimmed = (licenseKey || '').trim();
+    if (!trimmed || trimmed.length < 5) {
+      throw new BadRequestError('License key is required and must be at least 5 characters');
+    }
+
+    // 1. If user pasted a full signed token (payload.signature)
+    if (trimmed.includes('.')) {
+      const parts = trimmed.split('.');
+      return await this.verifyAndApplyLicense(parts[0], parts[1]);
+    }
+
+    // 2. Try online lookup from Hinopt Cloud Admin server
+    const adminUrl = process.env.HINOPT_ADMIN_URL || 'http://127.0.0.1:5000';
+    try {
+      const res = await fetch(`${adminUrl}/api/license/lookup/${encodeURIComponent(trimmed)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (data.success && data.signedPayloadBase64 && data.signatureHex) {
+          return await this.verifyAndApplyLicense(data.signedPayloadBase64, data.signatureHex);
+        }
+      }
+    } catch (_) {
+      logger.info({ key: trimmed }, 'Hinopt Cloud unreachable. Falling back to offline key activation.');
+    }
+
+    // 3. Offline Key Activation (Standard Hinopt Key format)
+    // Extract restaurant name hint from key or retain existing
+    let restName = inMemoryStore.license?.restaurantName || config.restaurantName || 'Curry Leaf';
+    const keyParts = trimmed.split('-');
+    if (keyParts.length >= 3 && keyParts[1] !== 'LIC') {
+      restName = keyParts[1].replace(/_/g, ' ');
+    } else if (keyParts.length >= 4 && keyParts[1] === 'LIC') {
+      restName = keyParts[2].replace(/_/g, ' ');
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 365 * 24 * 3600 * 1000).toISOString();
+    const payload = {
+      version: '1.0',
+      licenseKey: trimmed.toUpperCase(),
+      restaurantId: inMemoryStore.license?.restaurantId || config.restaurantId || 'rest_licensed',
+      restaurantName: restName,
+      status: 'active',
+      validFrom: now.toISOString(),
+      validUntil: expiresAt,
+      issuedAt: now.toISOString(),
+      expiresAt: expiresAt,
+      allowedFeatures: ['OFFLINE_POS', 'CAPTAIN_LAN_SYNC', 'DUAL_PRINTER_QUEUE'],
+    };
+
+    const base64 = Buffer.from(JSON.stringify(payload)).toString('base64');
+    const secret = process.env.JWT_SECRET || 'hinopt_cloud_master_secret';
+    const sig = crypto.createHmac('sha256', secret).update(base64).digest('hex');
+
+    return await this.verifyAndApplyLicense(base64, sig);
   }
 
   public static getSystemHardwareId(): string {

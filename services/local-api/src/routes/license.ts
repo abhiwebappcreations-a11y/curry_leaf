@@ -40,6 +40,29 @@ const applyLicenseSchema = z.object({
   signatureHex: z.string().min(10),
 });
 
+const activateKeySchema = z.object({
+  licenseKey: z.string().min(5),
+});
+
+// POST /api/license/activate-key - Activate or Renew directly by typing/pasting License Key
+licenseRouter.post(
+  '/activate-key',
+  validateBody(activateKeySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await LicenseService.activateLicenseKey(req.body.licenseKey);
+      res.json({
+        success: true,
+        data: {
+          license: result,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // POST /api/license/verify - Apply renewed / updated license from Hinopt Cloud (Admin only)
 licenseRouter.post(
   '/verify',

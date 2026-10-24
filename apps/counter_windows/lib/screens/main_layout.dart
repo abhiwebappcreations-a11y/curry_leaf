@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/counter_provider.dart';
 import '../widgets/top_health_bar.dart';
+import '../widgets/license_activation_dialog.dart';
 import '../theme/app_colors.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'active_orders_view.dart';
@@ -79,17 +80,15 @@ class MainLayout extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.all(Radius.circular(4)),
-                          border: Border.all(color: Colors.white54),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.error,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        child: const Text(
-                          "CONTACT HINOPT ADMIN",
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                        ),
+                        onPressed: () => showLicenseActivationDialog(context, provider),
+                        icon: const Icon(Icons.vpn_key, size: 14),
+                        label: const Text("ENTER LICENSE KEY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                       ),
                     ],
                   ),
@@ -132,17 +131,15 @@ class MainLayout extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.all(Radius.circular(4)),
-                          border: Border.all(color: Colors.white54),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.error,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        child: const Text(
-                          "CONTACT HINOPT ADMIN",
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                        ),
+                        onPressed: () => showLicenseActivationDialog(context, provider),
+                        icon: const Icon(Icons.vpn_key, size: 14),
+                        label: const Text("ENTER LICENSE KEY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                       ),
                     ],
                   ),

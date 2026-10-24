@@ -1,5 +1,16 @@
 {
-  "tables": [],
+  "tables": [
+    {
+      "id": "tab_1792832437786_10",
+      "tableNumber": "T1",
+      "displayName": "Table T1",
+      "section": "Main Dining",
+      "capacity": 4,
+      "status": "available",
+      "activeOrderId": null,
+      "sortOrder": 1
+    }
+  ],
   "categories": [
     {
       "id": "cat_starters",
@@ -44,11 +55,67 @@
       "isActive": true
     }
   ],
-  "menuItems": [],
+  "menuItems": [
+    {
+      "id": "item_1792832487598_734",
+      "categoryId": "cat_biryani",
+      "name": "CHICKEN DUM BIRYANI",
+      "shortCode": "CHI",
+      "description": "",
+      "pricePaise": 22900,
+      "taxRatePercent": 5,
+      "isAvailable": true,
+      "isVeg": false,
+      "variants": [],
+      "addOns": [],
+      "sortOrder": 1
+    }
+  ],
   "orders": [],
   "bills": [],
   "payments": [],
   "kots": [],
+  "devices": [
+    {
+      "id": "dev_counter_01",
+      "deviceName": "Counter Main PC",
+      "role": "counter",
+      "deviceFingerprint": "fp_win_counter_01",
+      "apiKeyHash": "counter_dev_token",
+      "isActive": true,
+      "registeredAt": "2026-10-24T08:39:28.525Z"
+    },
+    {
+      "id": "dev_captain_01",
+      "deviceName": "Captain Tablet 1 - Ground Floor",
+      "role": "captain",
+      "deviceFingerprint": "fp_tab_android_01",
+      "apiKeyHash": "captain_dev_token_01",
+      "isActive": true,
+      "registeredAt": "2026-10-24T08:39:28.526Z"
+    },
+    {
+      "id": "dev_admin_01",
+      "deviceName": "Admin Manager Laptop",
+      "role": "admin",
+      "deviceFingerprint": "fp_admin_manager_01",
+      "apiKeyHash": "admin_dev_token",
+      "isActive": true,
+      "registeredAt": "2026-10-24T08:39:28.526Z"
+    },
+    {
+      "id": "cap_32246061",
+      "deviceName": "Captain Phone",
+      "role": "captain",
+      "deviceFingerprint": "fp_1792832246524",
+      "apiKeyHash": "cap_1792832246524_w3s29n",
+      "isActive": true,
+      "status": "approved",
+      "deviceIp": "192.168.10.3",
+      "registeredAt": "2026-10-24T08:57:26.524Z",
+      "lastSeenAt": "2026-10-24T09:02:27.960Z"
+    }
+  ],
   "settings": {
     "restaurant_profile": {
       "restaurantId": "rest_curry_leaf_01",
@@ -75,5 +142,5 @@
       "status": "verified"
     }
   },
-  "updatedAt": "2026-10-24T08:04:28.027Z"
+  "updatedAt": "2026-10-24T09:02:27.960Z"
 }

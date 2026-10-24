@@ -810,6 +810,26 @@ class CounterApiService {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> activateLicenseKey(String licenseKey) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/license/activate-key'),
+        headers: headers,
+        body: jsonEncode({'licenseKey': licenseKey}),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// Backward compatibility alias

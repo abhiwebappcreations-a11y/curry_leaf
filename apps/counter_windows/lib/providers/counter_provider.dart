@@ -254,6 +254,22 @@ class CounterProvider extends ChangeNotifier {
     return result;
   }
 
+  Future<bool> activateLicense(String licenseKey) async {
+    final result = await _counterApiService.activateLicenseKey(licenseKey);
+    if (result != null && result['license'] != null) {
+      final lic = result['license'] as Map<String, dynamic>;
+      _licenseStatus = lic['status']?.toString() ?? 'active';
+      _licenseDaysRemaining = (lic['daysRemaining'] as int?) ?? 365;
+      if (lic['restaurantName'] != null) {
+        _restaurantName = lic['restaurantName'].toString();
+      }
+      notifyListeners();
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
   Future<bool> testServerConnection(String host, int port) async {
     return _counterApiService.checkHealthFor(host, port);
   }
