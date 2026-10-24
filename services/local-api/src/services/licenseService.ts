@@ -115,6 +115,10 @@ export class LicenseService {
         currency: 'INR',
       });
 
+      // Update runtime global configuration
+      config.restaurantName = restName;
+      config.restaurantId = restId;
+
       logger.info({ path: foundPath, restaurantName: restName, licenseKey, status }, 'Loaded personalized license from disk');
     } catch (err: any) {
       logger.error({ err }, 'Failed to parse license.json from disk');
