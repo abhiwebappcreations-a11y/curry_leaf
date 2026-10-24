@@ -97,13 +97,13 @@ menuRouter.patch(
 const createMenuItemSchema = z.object({
   name: z.string().min(1),
   categoryId: z.string().min(1),
-  shortCode: z.string().optional(),
-  description: z.string().optional(),
+  shortCode: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
   pricePaise: z.number().int().positive(),
   taxRatePercent: z.number().min(0).default(5.0),
   isAvailable: z.boolean().default(true),
   isVeg: z.boolean().default(true),
-  imageUrl: z.string().optional(),
+  imageUrl: z.string().nullable().optional(),
   variants: z
     .array(
       z.object({
@@ -112,6 +112,7 @@ const createMenuItemSchema = z.object({
         pricePaise: z.number().int(),
       })
     )
+    .optional()
     .default([]),
   addOns: z
     .array(
@@ -121,6 +122,7 @@ const createMenuItemSchema = z.object({
         pricePaise: z.number().int(),
       })
     )
+    .optional()
     .default([]),
 });
 
@@ -255,17 +257,15 @@ menuRouter.delete(
     try {
       const id = req.params.id as string;
       const item = inMemoryStore.menuItems.get(id);
-      if (!item) {
-        throw new NotFoundError('Menu Item', id);
+      if (item) {
+        inMemoryStore.menuItems.delete(id);
+        inMemoryStore.saveToDisk();
       }
-
-      inMemoryStore.menuItems.delete(id);
-      inMemoryStore.saveToDisk();
 
       res.json({
         success: true,
         data: {
-          message: `Dish "${item.name}" deleted successfully.`,
+          message: item ? `Dish "${item.name}" deleted successfully.` : 'Dish removed from menu.',
           deletedId: id,
         },
       });

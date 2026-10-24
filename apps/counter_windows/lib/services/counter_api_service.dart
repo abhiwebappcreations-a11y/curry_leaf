@@ -403,17 +403,21 @@ class CounterApiService {
     String? imageUrl,
   }) async {
     try {
+      final payload = <String, dynamic>{
+        'name': name,
+        'categoryId': category,
+        'pricePaise': pricePaise,
+        'isVeg': isVeg,
+        'description': description ?? '',
+      };
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        payload['imageUrl'] = imageUrl;
+      }
+
       final response = await http.post(
         Uri.parse('$baseUrl/menu/items'),
         headers: headers,
-        body: jsonEncode({
-          'name': name,
-          'categoryId': category,
-          'pricePaise': pricePaise,
-          'isVeg': isVeg,
-          'description': description ?? '',
-          'imageUrl': imageUrl,
-        }),
+        body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -464,7 +468,7 @@ class CounterApiService {
       final response = await http
           .delete(Uri.parse('$baseUrl/menu/items/$id'), headers: headers)
           .timeout(const Duration(seconds: 4));
-      return response.statusCode == 200;
+      return response.statusCode == 200 || response.statusCode == 404;
     } catch (_) {
       return false;
     }

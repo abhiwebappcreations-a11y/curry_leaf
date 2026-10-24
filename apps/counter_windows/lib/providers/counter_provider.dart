@@ -666,10 +666,10 @@ class CounterProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteMenuItem(String id) async {
-    final ok = await _counterApiService.deleteMenuItem(id);
+    await _counterApiService.deleteMenuItem(id);
     _menuItems.removeWhere((item) => item.id == id);
     notifyListeners();
-    return ok;
+    return true;
   }
 
   Future<bool> wipeAllMenuItems() async {
