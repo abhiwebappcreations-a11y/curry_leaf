@@ -6,8 +6,8 @@
       "displayName": "Table T1",
       "section": "Main Dining",
       "capacity": 4,
-      "status": "occupied",
-      "activeOrderId": "ord_1792841321486_rm5v4",
+      "status": "available",
+      "activeOrderId": null,
       "sortOrder": 1
     }
   ],
@@ -78,12 +78,12 @@
       "tableId": "tab_1792832437786_10",
       "tableName": "Table T1",
       "captainDeviceId": "dev_counter_01",
-      "status": "preparing",
+      "status": "settled",
       "guestCount": 1,
-      "subtotalPaise": 0,
-      "taxPaise": 0,
+      "subtotalPaise": 45800,
+      "taxPaise": 2290,
       "discountPaise": 0,
-      "totalPaise": 0,
+      "totalPaise": 48090,
       "items": [
         {
           "id": "oi_1792841321487_vomt",
@@ -102,14 +102,75 @@
           "kotId": "kot_1792841321490_s56ul",
           "cancellationReason": "Guest wants different dish",
           "cancelledByDeviceId": "dev_counter_01"
+        },
+        {
+          "id": "oi_1792841408041_sxgw",
+          "orderId": "ord_1792841321486_rm5v4",
+          "menuItemId": "item_1792832487598_734",
+          "nameSnapshot": "CHICKEN DUM BIRYANI",
+          "pricePaiseSnapshot": 22900,
+          "taxRateSnapshot": 5,
+          "quantity": 2,
+          "selectedVariants": [],
+          "selectedAddons": [],
+          "status": "draft",
+          "createdAt": "2026-10-24T11:30:08.041Z",
+          "updatedAt": "2026-10-24T11:30:08.041Z"
         }
       ],
       "createdAt": "2026-10-24T11:28:41.486Z",
-      "updatedAt": "2026-10-24T11:28:41.544Z"
+      "updatedAt": "2026-10-24T11:30:08.069Z"
     }
   ],
-  "bills": [],
-  "payments": [],
+  "bills": [
+    {
+      "id": "bill_1792841408053_x8svz",
+      "billNumber": "BILL-261024-3001",
+      "orderId": "ord_1792841321486_rm5v4",
+      "tableId": "tab_1792832437786_10",
+      "subtotalPaise": 45800,
+      "taxPaise": 2290,
+      "discountPaise": 0,
+      "totalPaise": 48090,
+      "status": "settled",
+      "printStatus": "pending",
+      "printCount": 1,
+      "createdByDeviceId": "dev_counter_01",
+      "items": [
+        {
+          "id": "bi_1792841408053_5hfx",
+          "billId": "bill_1792841408053_x8svz",
+          "menuItemId": "item_1792832487598_734",
+          "nameSnapshot": "CHICKEN DUM BIRYANI",
+          "unitPricePaise": 22900,
+          "quantity": 2,
+          "totalPaise": 45800,
+          "taxPaise": 2290,
+          "optionsSnapshot": {
+            "variants": [],
+            "addons": []
+          },
+          "createdAt": "2026-10-24T11:30:08.053Z"
+        }
+      ],
+      "finalizedAt": "2026-10-24T11:30:08.053Z",
+      "createdAt": "2026-10-24T11:30:08.053Z",
+      "settledAt": "2026-10-24T11:30:08.069Z"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay_1792841408069_rqv9v",
+      "billId": "bill_1792841408053_x8svz",
+      "amountPaise": 40000,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "idempotencyKey": "idemp_1792841408049",
+      "settledByDeviceId": "dev_counter_01",
+      "notes": "Test settlement",
+      "createdAt": "2026-10-24T11:30:08.069Z"
+    }
+  ],
   "kots": [
     {
       "id": "kot_1792841321490_s56ul",
@@ -177,7 +238,7 @@
       "status": "approved",
       "deviceIp": "192.168.10.4",
       "registeredAt": "2026-10-24T08:57:26.524Z",
-      "lastSeenAt": "2026-10-24T11:17:05.861Z"
+      "lastSeenAt": "2026-10-24T11:33:15.729Z"
     }
   ],
   "cancelRequests": [
@@ -234,5 +295,5 @@
       }
     }
   },
-  "updatedAt": "2026-10-24T11:28:41.544Z"
+  "updatedAt": "2026-10-24T11:33:15.729Z"
 }

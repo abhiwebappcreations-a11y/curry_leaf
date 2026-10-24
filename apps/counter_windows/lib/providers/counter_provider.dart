@@ -662,11 +662,6 @@ class CounterProvider extends ChangeNotifier {
         throw Exception('Failed to settle payment on local POS server.');
       }
 
-      // 3. Guarantee physical customer bill print on thermal printer
-      try {
-        await _counterApiService.printCustomerBill(effectiveBillId);
-      } catch (_) {}
-
       final settledBill = billToSettle.copyWith(
         cashierName: 'Deepa',
         paymentMethod: method,

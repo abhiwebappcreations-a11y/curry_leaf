@@ -255,9 +255,11 @@ class OrderSummarySheet extends StatelessWidget {
                           try {
                             final ticket = await provider.sendDraftToKitchen();
                             if (context.mounted && ticket != null) {
+                              Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   backgroundColor: AppColors.success,
+                                  duration: const Duration(seconds: 2),
                                   content: Row(
                                     children: [
                                       const Icon(Icons.check_circle, color: Colors.white),

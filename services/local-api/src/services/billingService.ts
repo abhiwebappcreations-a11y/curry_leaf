@@ -170,28 +170,7 @@ export class BillingService {
       table.status = 'billed';
     }
 
-    // Persist records before enqueuing print job to Counter Bill Printer
-    await PrintService.enqueueJob(
-      'counter_bill',
-      'bill',
-      bill.id,
-      {
-        billNumber: bill.billNumber,
-        orderNumber: order.orderNumber,
-        tableNumber: table ? table.tableNumber : 'Unknown',
-        items: immutableBillItems.map((bi) => ({
-          name: bi.nameSnapshot,
-          unitPrice: bi.unitPricePaise,
-          quantity: bi.quantity,
-          total: bi.totalPaise,
-        })),
-        subtotalPaise: bill.subtotalPaise,
-        taxPaise: bill.taxPaise,
-        discountPaise: bill.discountPaise,
-        totalPaise: bill.totalPaise,
-      },
-      false
-    );
+    // Note: finalizeBill prepares the bill record without auto-printing. Printing occurs on settlement or explicit print request.
 
     return bill;
   }

@@ -242,9 +242,6 @@ class PosProvider extends ChangeNotifier {
         final liveTables = await _apiService.fetchTables();
         _tables = liveTables;
 
-        final liveMenu = await _apiService.fetchMenu();
-        _menuItems = liveMenu;
-
         final liveOrders = await _apiService.fetchActiveOrders();
         final serverTableIds = <String>{};
         for (var o in liveOrders) {
@@ -265,6 +262,19 @@ class PosProvider extends ChangeNotifier {
                 _currentOrder!.draftItems.isEmpty) {
               _ordersByTableId.remove(_currentTable!.id);
               _currentOrder = null;
+            }
+          }
+
+          // Keep current active order synchronized with real server item IDs
+          if (_currentOrder != null && _ordersByTableId.containsKey(_currentTable!.id)) {
+            final serverOrder = _ordersByTableId[_currentTable!.id]!;
+            final localDrafts = _currentOrder!.draftItems;
+            if (localDrafts.isNotEmpty) {
+              _currentOrder = serverOrder.copyWith(
+                items: [...serverOrder.items, ...localDrafts],
+              );
+            } else {
+              _currentOrder = serverOrder;
             }
           }
         }
@@ -415,37 +425,12 @@ class PosProvider extends ChangeNotifier {
 
       String activeOrderId = _currentOrder!.id;
       final serverTableOrderId = _currentTable?.activeOrderId;
-      final isLocalDraftOrder = activeOrderId.startsWith('ord-');
-
-      // Automatically create or attach items to server order before dispatching KOT
-      if (!_apiService.useDemoMode) {
-        if (serverTableOrderId != null && serverTableOrderId.isNotEmpty) {
-          activeOrderId = serverTableOrderId;
-          await _apiService.addItemsToOrder(
-            orderId: activeOrderId,
-            items: itemsToSend,
-          );
-        } else if (isLocalDraftOrder) {
-          // No active order yet: call POST /api/orders first with draft items
-          final createdOrderId = await _apiService.createOrder(
-            tableId: _currentTable!.id,
-            guestCount: _currentOrder!.guestCount,
-            initialItems: itemsToSend,
-          );
-
-          if (createdOrderId != null && createdOrderId.isNotEmpty) {
-            activeOrderId = createdOrderId;
-          }
-        } else {
-          // Order ID is already from server, append new items
-          await _apiService.addItemsToOrder(
-            orderId: activeOrderId,
-            items: itemsToSend,
-          );
-        }
+      if (serverTableOrderId != null && serverTableOrderId.isNotEmpty) {
+        activeOrderId = serverTableOrderId;
       }
 
-      final ticket = await _apiService.submitKot(
+      // Fast atomic KOT submission (dispatches order items & prints KOT in a single network round-trip)
+      final result = await _apiService.submitKot(
         orderId: activeOrderId,
         tableId: _currentTable!.id,
         tableName: _currentTable!.name,
@@ -453,25 +438,34 @@ class PosProvider extends ChangeNotifier {
         idempotencyKey: idempotencyKey,
       );
 
-      // Transition draft items to submitted items
-      final now = DateTime.now();
-      final updatedItems = _currentOrder!.items.map((item) {
-        if (item.isDraft) {
-          return item.copyWith(
-            isDraft: false,
-            sentAt: now,
-            status: OrderItemStatus.sentToKitchen,
-          );
-        }
-        return item;
-      }).toList();
+      final ticket = result.ticket;
+      final serverOrder = result.order;
 
-      _currentOrder = _currentOrder!.copyWith(
-        id: activeOrderId,
-        items: updatedItems,
-        status: 'IN_KITCHEN',
-      );
-      _ordersByTableId[_currentTable!.id] = _currentOrder!;
+      if (serverOrder != null) {
+        _currentOrder = serverOrder;
+        _ordersByTableId[_currentTable!.id] = serverOrder;
+        activeOrderId = serverOrder.id;
+      } else {
+        // Fallback local update
+        final now = DateTime.now();
+        final updatedItems = _currentOrder!.items.map((item) {
+          if (item.isDraft) {
+            return item.copyWith(
+              isDraft: false,
+              sentAt: now,
+              status: OrderItemStatus.sentToKitchen,
+            );
+          }
+          return item;
+        }).toList();
+
+        _currentOrder = _currentOrder!.copyWith(
+          id: activeOrderId,
+          items: updatedItems,
+          status: 'ACTIVE',
+        );
+        _ordersByTableId[_currentTable!.id] = _currentOrder!;
+      }
 
       // Update table status
       final tableIndex = _tables.indexWhere((t) => t.id == _currentTable!.id);
@@ -480,7 +474,7 @@ class PosProvider extends ChangeNotifier {
           status: TableStatus.occupied,
           activeOrderId: activeOrderId,
           activeOrderTotalPaise: _currentOrder!.totalPaise,
-          occupiedSince: _tables[tableIndex].occupiedSince ?? now,
+          occupiedSince: _tables[tableIndex].occupiedSince ?? DateTime.now(),
         );
         _currentTable = _tables[tableIndex];
       }
@@ -488,6 +482,10 @@ class PosProvider extends ChangeNotifier {
       _kotHistory.insert(0, ticket);
       _isSubmittingKot = false;
       notifyListeners();
+
+      // Refresh table floor state
+      pollLatestState();
+
       return ticket;
     } catch (e) {
       _lastError = e.toString();

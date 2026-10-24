@@ -8,6 +8,12 @@ import '../models/order_model.dart';
 import '../models/kot_model.dart';
 import 'mock_data.dart';
 
+class KotSubmitResult {
+  final KotTicket ticket;
+  final RestaurantOrder? order;
+  KotSubmitResult({required this.ticket, this.order});
+}
+
 class ApiService {
   String host;
   int port;
@@ -289,7 +295,7 @@ class ApiService {
     }
   }
 
-  Future<KotTicket> submitKot({
+  Future<KotSubmitResult> submitKot({
     required String orderId,
     required String tableId,
     required String tableName,
@@ -297,8 +303,8 @@ class ApiService {
     required String idempotencyKey,
   }) async {
     if (useDemoMode) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      return KotTicket(
+      await Future.delayed(const Duration(milliseconds: 300));
+      final ticket = KotTicket(
         id: 'kot-${DateTime.now().millisecondsSinceEpoch}',
         kotNumber: 'KOT-${DateTime.now().minute}${DateTime.now().second}',
         orderId: orderId,
@@ -315,6 +321,7 @@ class ApiService {
         timestamp: DateTime.now(),
         status: KotStatus.printed,
       );
+      return KotSubmitResult(ticket: ticket);
     }
 
     final headers = {
@@ -340,7 +347,16 @@ class ApiService {
             ? data['kot'] as Map<String, dynamic>
             : (data is Map<String, dynamic> ? data : <String, dynamic>{});
         kotJson['tableName'] = tableName;
-        return KotTicket.fromJson(kotJson);
+        final ticket = KotTicket.fromJson(kotJson);
+
+        RestaurantOrder? updatedOrder;
+        if (data is Map<String, dynamic> && data['order'] != null) {
+          try {
+            updatedOrder = RestaurantOrder.fromJson(data['order'] as Map<String, dynamic>);
+          } catch (_) {}
+        }
+
+        return KotSubmitResult(ticket: ticket, order: updatedOrder);
       } else if (response.statusCode == 402) {
         final decoded = jsonDecode(response.body);
         final msg = decoded['error']?['message'] ?? 'Hinopt POS subscription has expired. Operations are stopped.';
@@ -350,11 +366,10 @@ class ApiService {
       if (e.toString().contains('subscription has expired') || e.toString().contains('license')) {
         rethrow;
       }
-      // In offline resilience mode, return confirmed local KOT ticket
     }
 
     // Graceful offline fallback ticket when live local-api is not yet reachable
-    return KotTicket(
+    final fallbackTicket = KotTicket(
       id: 'kot-${DateTime.now().millisecondsSinceEpoch}',
       kotNumber: 'KOT-${DateTime.now().minute}${DateTime.now().second}',
       orderId: orderId,
@@ -371,6 +386,7 @@ class ApiService {
       timestamp: DateTime.now(),
       status: KotStatus.printed,
     );
+    return KotSubmitResult(ticket: fallbackTicket);
   }
 
   Future<bool> requestCancellation({
