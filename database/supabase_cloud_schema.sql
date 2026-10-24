@@ -81,8 +81,17 @@ ALTER TABLE cloud_backups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE revoked_hwids ENABLE ROW LEVEL SECURITY;
 
 -- Allow full access with service_role / apikey
-CREATE POLICY IF NOT EXISTS "Allow full access for service role" ON restaurants FOR ALL USING (true);
-CREATE POLICY IF NOT EXISTS "Allow full access for service role" ON licenses FOR ALL USING (true);
-CREATE POLICY IF NOT EXISTS "Allow full access for service role" ON audit_logs FOR ALL USING (true);
-CREATE POLICY IF NOT EXISTS "Allow full access for service role" ON cloud_backups FOR ALL USING (true);
-CREATE POLICY IF NOT EXISTS "Allow full access for service role" ON revoked_hwids FOR ALL USING (true);
+DROP POLICY IF EXISTS "Allow full access for service role" ON restaurants;
+CREATE POLICY "Allow full access for service role" ON restaurants FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow full access for service role" ON licenses;
+CREATE POLICY "Allow full access for service role" ON licenses FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow full access for service role" ON audit_logs;
+CREATE POLICY "Allow full access for service role" ON audit_logs FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow full access for service role" ON cloud_backups;
+CREATE POLICY "Allow full access for service role" ON cloud_backups FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow full access for service role" ON revoked_hwids;
+CREATE POLICY "Allow full access for service role" ON revoked_hwids FOR ALL USING (true);
