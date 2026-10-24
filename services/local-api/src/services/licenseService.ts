@@ -7,6 +7,12 @@ import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { BadRequestError } from '../utils/errors.js';
 
+export interface LicenseLimits {
+  menuItems: number;
+  captainDevices: number;
+  counterPcs: number;
+}
+
 export interface LicenseStatusResult {
   isValid: boolean;
   status: 'active' | 'grace' | 'expired' | 'suspended';
@@ -18,9 +24,72 @@ export interface LicenseStatusResult {
   daysRemaining: number;
   isOfflineGraceActive: boolean;
   features: string[];
+  limits?: LicenseLimits;
+  usage?: {
+    menuItems: number;
+    captainDevices: number;
+    counterPcs: number;
+  };
 }
 
 export class LicenseService {
+  public static getLimits(): LicenseLimits {
+    const lic = inMemoryStore.license;
+    const payload = (lic?.signedPayload || {}) as any;
+    const limits = lic?.limits || payload?.limits || {};
+    return {
+      menuItems: typeof limits.menuItems === 'number' ? limits.menuItems : 100,
+      captainDevices: typeof limits.captainDevices === 'number' ? limits.captainDevices : (typeof payload?.maxDevices === 'number' ? payload.maxDevices : 5),
+      counterPcs: typeof limits.counterPcs === 'number' ? limits.counterPcs : 1,
+    };
+  }
+
+  public static canAddMenuItem(): { allowed: boolean; current: number; limit: number; message?: string } {
+    const limits = this.getLimits();
+    const current = inMemoryStore.menuItems.size;
+    if (current >= limits.menuItems) {
+      return {
+        allowed: false,
+        current,
+        limit: limits.menuItems,
+        message: `License limit reached: You have reached the maximum of ${limits.menuItems} menu items allowed on your license (${current}/${limits.menuItems}). Please upgrade your license in Hinopt Admin.`,
+      };
+    }
+    return { allowed: true, current, limit: limits.menuItems };
+  }
+
+  public static canApproveCaptainDevice(): { allowed: boolean; current: number; limit: number; message?: string } {
+    const limits = this.getLimits();
+    const approvedCaptains = Array.from(inMemoryStore.devices.values()).filter(
+      (d) => d.role === 'captain' && d.status === 'approved'
+    ).length;
+    if (approvedCaptains >= limits.captainDevices) {
+      return {
+        allowed: false,
+        current: approvedCaptains,
+        limit: limits.captainDevices,
+        message: `Captain device limit reached: Your license allows up to ${limits.captainDevices} active captain devices (${approvedCaptains}/${limits.captainDevices} approved). Please upgrade your license in Hinopt Admin to connect more devices.`,
+      };
+    }
+    return { allowed: true, current: approvedCaptains, limit: limits.captainDevices };
+  }
+
+  public static canRegisterCounterPc(): { allowed: boolean; current: number; limit: number; message?: string } {
+    const limits = this.getLimits();
+    const approvedCounters = Array.from(inMemoryStore.devices.values()).filter(
+      (d) => d.role === 'counter' && d.status === 'approved'
+    ).length;
+    if (approvedCounters >= limits.counterPcs) {
+      return {
+        allowed: false,
+        current: approvedCounters,
+        limit: limits.counterPcs,
+        message: `Counter PC limit reached: Your license allows up to ${limits.counterPcs} Counter POS (${approvedCounters}/${limits.counterPcs} registered). Please upgrade your license in Hinopt Admin.`,
+      };
+    }
+    return { allowed: true, current: approvedCounters, limit: limits.counterPcs };
+  }
+
   public static async loadLicenseFromDisk(): Promise<void> {
     const candidatePaths = [
       process.env.LICENSE_FILE_PATH,
@@ -212,6 +281,14 @@ export class LicenseService {
     }
 
     const isValid = effectiveStatus === 'active' || effectiveStatus === 'grace';
+    const limits = this.getLimits();
+    const approvedCaptains = Array.from(inMemoryStore.devices.values()).filter(
+      (d) => d.role === 'captain' && d.status === 'approved'
+    ).length;
+    const counterPcs = Array.from(inMemoryStore.devices.values()).filter(
+      (d) => d.role === 'counter' && d.status === 'approved'
+    ).length;
+    const menuItems = inMemoryStore.menuItems.size;
 
     return {
       isValid,
@@ -224,6 +301,12 @@ export class LicenseService {
       daysRemaining: Math.max(0, daysRemaining),
       isOfflineGraceActive: effectiveStatus === 'grace',
       features: (license.signedPayload.features as string[]) || ['pos', 'kot', 'billing'],
+      limits,
+      usage: {
+        menuItems,
+        captainDevices: approvedCaptains,
+        counterPcs,
+      },
     };
   }
 
@@ -270,6 +353,12 @@ export class LicenseService {
       logger.warn('LICENSE_PUBLIC_KEY_PEM not set. Simulating verified license update.');
     }
 
+    const limits = payloadJson.limits || {
+      menuItems: typeof payloadJson.menuItemsLimit === 'number' ? payloadJson.menuItemsLimit : 100,
+      captainDevices: typeof payloadJson.maxDevices === 'number' ? payloadJson.maxDevices : 5,
+      counterPcs: typeof payloadJson.counterPcsLimit === 'number' ? payloadJson.counterPcsLimit : 1,
+    };
+
     const updatedLicense: LicenseRecord = {
       id: 'current_license',
       restaurantId: payloadJson.restaurantId,
@@ -280,6 +369,7 @@ export class LicenseService {
       validUntil: payloadJson.validUntil,
       lastVerifiedAt: new Date().toISOString(),
       signature: signatureHex,
+      limits,
       signedPayload: payloadJson,
     };
 

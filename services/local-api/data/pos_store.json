@@ -260,12 +260,12 @@
   ],
   "settings": {
     "restaurant_profile": {
-      "restaurantId": "rest_curry_leaf_01",
-      "name": "Curry Leaf Fine Dining",
-      "tagline": "Authentic Coastal & South Indian Cuisine",
-      "address": "123 Spice Garden Road, Indiranagar, Bengaluru, Karnataka 560038",
-      "phone": "+91 80 4123 4567",
-      "gstin": "29AABCU9603R1ZM",
+      "restaurantId": "rest_hinopt_lic_any",
+      "name": "Hinopt Client Restaurant",
+      "tagline": "Fine Dining & Hospitality",
+      "address": "Main Branch",
+      "phone": "+91 98490 00000",
+      "gstin": "36AABCU9603R1ZM",
       "currency": "INR"
     },
     "printer_counter_bill": {
@@ -295,5 +295,5 @@
       }
     }
   },
-  "updatedAt": "2026-10-24T11:33:15.729Z"
+  "updatedAt": "2026-10-24T15:12:47.648Z"
 }

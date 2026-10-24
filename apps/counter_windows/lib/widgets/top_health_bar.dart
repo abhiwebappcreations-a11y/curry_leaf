@@ -418,9 +418,22 @@ class _TopHealthBarState extends State<TopHealthBar> {
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             minimumSize: Size.zero,
                           ),
-                          onPressed: () {
-                            provider.approveDevice(devId);
-                            Navigator.pop(ctx);
+                          onPressed: () async {
+                            final res = await provider.approveDeviceWithResult(devId);
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                            }
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res.success
+                                      ? 'Captain device approved.'
+                                      : (res.errorMessage ?? 'Failed to approve device.')),
+                                  backgroundColor: res.success ? AppColors.success : AppColors.error,
+                                  duration: Duration(seconds: res.success ? 3 : 5),
+                                ),
+                              );
+                            }
                           },
                           child: const Text('Approve', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         ),

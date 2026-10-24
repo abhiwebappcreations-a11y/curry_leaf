@@ -48,9 +48,27 @@ class CounterProvider extends ChangeNotifier {
   String _restaurantName = 'Curry Leaf';
   String _printerMode = 'single';
 
+  // License Limits & Usage
+  int _menuItemsLimit = 100;
+  int _captainDevicesLimit = 5;
+  int _counterPcsLimit = 1;
+  int _menuItemsUsage = 0;
+  int _captainDevicesUsage = 0;
+  int _counterPcsUsage = 0;
+
   String get restaurantName => _restaurantName;
   String get printerMode => _printerMode;
   bool get isSinglePrinterMode => _printerMode == 'single';
+
+  int get menuItemsLimit => _menuItemsLimit;
+  int get captainDevicesLimit => _captainDevicesLimit;
+  int get counterPcsLimit => _counterPcsLimit;
+  int get menuItemsUsage => _menuItemsUsage;
+  int get captainDevicesUsage => _captainDevicesUsage;
+  int get counterPcsUsage => _counterPcsUsage;
+
+  bool get isMenuItemLimitReached => _menuItems.length >= _menuItemsLimit;
+  bool get isCaptainDeviceLimitReached => _captainDevicesUsage >= _captainDevicesLimit;
 
   // Background Auto-Polling & Pull-to-Refresh
   Timer? _autoPollTimer;
@@ -269,6 +287,12 @@ class CounterProvider extends ChangeNotifier {
       if (lic['restaurantName'] != null) {
         _restaurantName = lic['restaurantName'].toString();
       }
+      if (lic['limits'] != null && lic['limits'] is Map) {
+        final lim = lic['limits'] as Map<String, dynamic>;
+        if (lim['menuItems'] is num) _menuItemsLimit = (lim['menuItems'] as num).toInt();
+        if (lim['captainDevices'] is num) _captainDevicesLimit = (lim['captainDevices'] as num).toInt();
+        if (lim['counterPcs'] is num) _counterPcsLimit = (lim['counterPcs'] as num).toInt();
+      }
       notifyListeners();
       await refreshFromLiveApi(isManual: true);
       return true;
@@ -369,6 +393,12 @@ class CounterProvider extends ChangeNotifier {
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
       _restaurantName = health.restaurantName;
+      _menuItemsLimit = health.menuItemsLimit;
+      _captainDevicesLimit = health.captainDevicesLimit;
+      _counterPcsLimit = health.counterPcsLimit;
+      _menuItemsUsage = health.menuItemsUsage;
+      _captainDevicesUsage = health.captainDevicesUsage;
+      _counterPcsUsage = health.counterPcsUsage;
 
       if (_localServerHealthy) {
         final liveTables = await _apiClient.getTables();
@@ -418,6 +448,12 @@ class CounterProvider extends ChangeNotifier {
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
       _restaurantName = health.restaurantName;
+      _menuItemsLimit = health.menuItemsLimit;
+      _captainDevicesLimit = health.captainDevicesLimit;
+      _counterPcsLimit = health.counterPcsLimit;
+      _menuItemsUsage = health.menuItemsUsage;
+      _captainDevicesUsage = health.captainDevicesUsage;
+      _counterPcsUsage = health.counterPcsUsage;
 
       _lanInfo = await _apiClient.getLanInfo();
       _pendingDevices = await _apiClient.getPendingDevices();
@@ -723,7 +759,7 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> addNewMenuItem({
+  Future<({bool success, String? errorMessage})> addNewMenuItemWithResult({
     required String name,
     required String category,
     required int pricePaise,
@@ -731,7 +767,14 @@ class CounterProvider extends ChangeNotifier {
     String? description,
     String? imageUrl,
   }) async {
-    final created = await _apiClient.createMenuItem(
+    if (_menuItems.length >= _menuItemsLimit) {
+      return (
+        success: false,
+        errorMessage: 'Menu items limit reached ($_menuItemsLimit max). Upgrade your license in Hinopt Admin to add more items.'
+      );
+    }
+
+    final res = await _apiClient.createMenuItemWithDetails(
       name: name,
       category: category,
       pricePaise: pricePaise,
@@ -740,13 +783,22 @@ class CounterProvider extends ChangeNotifier {
       imageUrl: imageUrl,
     );
 
-    if (created != null) {
-      _menuItems.insert(0, created);
+    if (res.item != null) {
+      _menuItems.insert(0, res.item!);
+      _menuItemsUsage = _menuItems.length;
       notifyListeners();
-      return true;
+      return (success: true, errorMessage: null);
     }
 
-    // Local fallback if offline
+    if (res.errorMessage != null && res.errorMessage!.toLowerCase().contains('limit')) {
+      return (success: false, errorMessage: res.errorMessage);
+    }
+
+    if (_localServerHealthy) {
+      return (success: false, errorMessage: res.errorMessage ?? 'Failed to add dish to server.');
+    }
+
+    // Local fallback if completely offline and limit not reached
     final localItem = MenuItem(
       id: 'm-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
@@ -758,8 +810,28 @@ class CounterProvider extends ChangeNotifier {
       isAvailable: true,
     );
     _menuItems.insert(0, localItem);
+    _menuItemsUsage = _menuItems.length;
     notifyListeners();
-    return true;
+    return (success: true, errorMessage: null);
+  }
+
+  Future<bool> addNewMenuItem({
+    required String name,
+    required String category,
+    required int pricePaise,
+    required bool isVeg,
+    String? description,
+    String? imageUrl,
+  }) async {
+    final res = await addNewMenuItemWithResult(
+      name: name,
+      category: category,
+      pricePaise: pricePaise,
+      isVeg: isVeg,
+      description: description,
+      imageUrl: imageUrl,
+    );
+    return res.success;
   }
 
   Future<void> updateMenuItemPrice(String id, int newPricePaise) async {
@@ -793,13 +865,25 @@ class CounterProvider extends ChangeNotifier {
     return ok;
   }
 
-  Future<bool> approveDevice(String deviceId) async {
-    final ok = await _apiClient.approveDevice(deviceId);
-    if (ok) {
+  Future<({bool success, String? errorMessage})> approveDeviceWithResult(String deviceId) async {
+    if (_captainDevicesUsage >= _captainDevicesLimit) {
+      return (
+        success: false,
+        errorMessage: 'Captain devices limit reached ($_captainDevicesLimit max). Upgrade your license in Hinopt Admin to connect more devices.'
+      );
+    }
+    final res = await _apiClient.approveDeviceWithResult(deviceId);
+    if (res.success) {
       _pendingDevices.removeWhere((d) => d['id'] == deviceId);
+      _captainDevicesUsage++;
       notifyListeners();
     }
-    return ok;
+    return res;
+  }
+
+  Future<bool> approveDevice(String deviceId) async {
+    final res = await approveDeviceWithResult(deviceId);
+    return res.success;
   }
 
   Future<bool> rejectDevice(String deviceId) async {

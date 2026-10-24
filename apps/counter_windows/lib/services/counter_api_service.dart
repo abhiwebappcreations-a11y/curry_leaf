@@ -13,6 +13,12 @@ class SystemHealthInfo {
   final String licenseStatus;
   final int daysRemaining;
   final String restaurantName;
+  final int menuItemsLimit;
+  final int captainDevicesLimit;
+  final int counterPcsLimit;
+  final int menuItemsUsage;
+  final int captainDevicesUsage;
+  final int counterPcsUsage;
 
   SystemHealthInfo({
     required this.isServerHealthy,
@@ -20,6 +26,12 @@ class SystemHealthInfo {
     required this.licenseStatus,
     required this.daysRemaining,
     this.restaurantName = 'Curry Leaf Fine Dine',
+    this.menuItemsLimit = 100,
+    this.captainDevicesLimit = 5,
+    this.counterPcsLimit = 1,
+    this.menuItemsUsage = 0,
+    this.captainDevicesUsage = 0,
+    this.counterPcsUsage = 0,
   });
 }
 
@@ -94,12 +106,29 @@ class CounterApiService {
             : (lic?['status']?.toString() ?? 'Active');
         final days = lic?['daysRemaining'] as int? ?? 365;
 
+        final limits = lic?['limits'] as Map<String, dynamic>?;
+        final usage = lic?['usage'] as Map<String, dynamic>?;
+
+        final menuItemsLimit = limits?['menuItems'] is num ? (limits!['menuItems'] as num).toInt() : 100;
+        final captainDevicesLimit = limits?['captainDevices'] is num ? (limits!['captainDevices'] as num).toInt() : 5;
+        final counterPcsLimit = limits?['counterPcs'] is num ? (limits!['counterPcs'] as num).toInt() : 1;
+
+        final menuItemsUsage = usage?['menuItems'] is num ? (usage!['menuItems'] as num).toInt() : 0;
+        final captainDevicesUsage = usage?['captainDevices'] is num ? (usage!['captainDevices'] as num).toInt() : 0;
+        final counterPcsUsage = usage?['counterPcs'] is num ? (usage!['counterPcs'] as num).toInt() : 0;
+
         return SystemHealthInfo(
           isServerHealthy: isServer,
           isDatabaseHealthy: isDb,
           licenseStatus: licStatus,
           daysRemaining: days,
           restaurantName: restName,
+          menuItemsLimit: menuItemsLimit,
+          captainDevicesLimit: captainDevicesLimit,
+          counterPcsLimit: counterPcsLimit,
+          menuItemsUsage: menuItemsUsage,
+          captainDevicesUsage: captainDevicesUsage,
+          counterPcsUsage: counterPcsUsage,
         );
       }
     } catch (_) {}
@@ -110,6 +139,12 @@ class CounterApiService {
       licenseStatus: 'Connecting to Local API (localhost:4000)...',
       daysRemaining: 365,
       restaurantName: 'Hinopt POS',
+      menuItemsLimit: 100,
+      captainDevicesLimit: 5,
+      counterPcsLimit: 1,
+      menuItemsUsage: 0,
+      captainDevicesUsage: 0,
+      counterPcsUsage: 0,
     );
   }
 
@@ -394,7 +429,7 @@ class CounterApiService {
     return null;
   }
 
-  Future<MenuItem?> createMenuItem({
+  Future<({MenuItem? item, String? errorMessage})> createMenuItemWithDetails({
     required String name,
     required String category,
     required int pricePaise,
@@ -425,10 +460,38 @@ class CounterApiService {
         final itemJson = (data is Map<String, dynamic> && data['item'] != null)
             ? data['item'] as Map<String, dynamic>
             : data as Map<String, dynamic>;
-        return MenuItem.fromJson(itemJson);
+        return (item: MenuItem.fromJson(itemJson), errorMessage: null);
+      } else {
+        try {
+          final decoded = jsonDecode(response.body);
+          final msg = decoded['error']?['message']?.toString() ?? decoded['message']?.toString();
+          return (item: null, errorMessage: msg ?? 'Server returned ${response.statusCode}');
+        } catch (_) {
+          return (item: null, errorMessage: 'Server returned ${response.statusCode}');
+        }
       }
-    } catch (_) {}
-    return null;
+    } catch (e) {
+      return (item: null, errorMessage: e.toString());
+    }
+  }
+
+  Future<MenuItem?> createMenuItem({
+    required String name,
+    required String category,
+    required int pricePaise,
+    required bool isVeg,
+    String? description,
+    String? imageUrl,
+  }) async {
+    final res = await createMenuItemWithDetails(
+      name: name,
+      category: category,
+      pricePaise: pricePaise,
+      isVeg: isVeg,
+      description: description,
+      imageUrl: imageUrl,
+    );
+    return res.item;
   }
 
   Future<bool> toggleMenuItemAvailability(String id, bool isAvailable) async {
@@ -526,15 +589,29 @@ class CounterApiService {
     return [];
   }
 
-  Future<bool> approveDevice(String deviceId) async {
+  Future<({bool success, String? errorMessage})> approveDeviceWithResult(String deviceId) async {
     try {
       final response = await http
           .post(Uri.parse('$baseUrl/devices/$deviceId/approve'), headers: headers)
           .timeout(const Duration(seconds: 4));
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return (success: true, errorMessage: null);
+      }
+      try {
+        final decoded = jsonDecode(response.body);
+        final msg = decoded['error']?['message']?.toString() ?? decoded['message']?.toString();
+        return (success: false, errorMessage: msg ?? 'Failed with status ${response.statusCode}');
+      } catch (_) {
+        return (success: false, errorMessage: 'Failed to approve device (${response.statusCode})');
+      }
+    } catch (e) {
+      return (success: false, errorMessage: e.toString());
     }
+  }
+
+  Future<bool> approveDevice(String deviceId) async {
+    final res = await approveDeviceWithResult(deviceId);
+    return res.success;
   }
 
   Future<bool> rejectDevice(String deviceId) async {

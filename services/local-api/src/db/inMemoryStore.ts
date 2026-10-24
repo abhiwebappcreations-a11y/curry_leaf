@@ -189,6 +189,12 @@ export interface AuditLogRecord {
   createdAt: string;
 }
 
+export interface LicenseLimits {
+  menuItems: number;
+  captainDevices: number;
+  counterPcs: number;
+}
+
 export interface LicenseRecord {
   id: string;
   restaurantId: string;
@@ -199,6 +205,7 @@ export interface LicenseRecord {
   validUntil: string;
   lastVerifiedAt: string;
   signature: string;
+  limits?: LicenseLimits;
   signedPayload: Record<string, unknown>;
 }
 

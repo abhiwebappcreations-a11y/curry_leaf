@@ -1,3 +1,4 @@
+import { LicenseService } from '../services/licenseService.js';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { inMemoryStore, MenuItemRecord } from '../db/inMemoryStore.js';
@@ -146,6 +147,18 @@ menuRouter.post(
         variants,
         addOns,
       } = req.body;
+
+      // Check license menu items limit
+      const limitCheck = LicenseService.canAddMenuItem();
+      if (!limitCheck.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'LICENSE_LIMIT_EXCEEDED',
+            message: limitCheck.message,
+          },
+        });
+      }
 
       // Verify category exists or fallback
       let targetCategoryId = categoryId;

@@ -10,7 +10,12 @@ window.LicenseService = {
       status: restaurant.status,
       issuedAt: restaurant.issuedAt,
       expiresAt: restaurant.expiresAt,
-      maxDevices: restaurant.maxDevices || 10,
+      maxDevices: restaurant.captainDevicesLimit || restaurant.maxDevices || 5,
+      limits: {
+        menuItems: restaurant.menuItemsLimit !== undefined ? parseInt(restaurant.menuItemsLimit, 10) : (restaurant.limits?.menuItems || 100),
+        captainDevices: restaurant.captainDevicesLimit !== undefined ? parseInt(restaurant.captainDevicesLimit, 10) : (restaurant.maxDevices || restaurant.limits?.captainDevices || 5),
+        counterPcs: restaurant.counterPcsLimit !== undefined ? parseInt(restaurant.counterPcsLimit, 10) : (restaurant.limits?.counterPcs || 1)
+      },
       allowedFeatures: [
         "OFFLINE_POS",
         "CAPTAIN_LAN_SYNC",
@@ -59,6 +64,17 @@ window.LicenseService = {
     if (data.status) restaurant.status = data.status;
     if (data.expiresAt) restaurant.expiresAt = data.expiresAt;
     if (data.maxDevices) restaurant.maxDevices = parseInt(data.maxDevices, 10);
+    if (data.menuItemsLimit !== undefined) restaurant.menuItemsLimit = parseInt(data.menuItemsLimit, 10);
+    if (data.captainDevicesLimit !== undefined) {
+      restaurant.captainDevicesLimit = parseInt(data.captainDevicesLimit, 10);
+      restaurant.maxDevices = restaurant.captainDevicesLimit;
+    }
+    if (data.counterPcsLimit !== undefined) restaurant.counterPcsLimit = parseInt(data.counterPcsLimit, 10);
+    restaurant.limits = {
+      menuItems: restaurant.menuItemsLimit || 100,
+      captainDevices: restaurant.captainDevicesLimit || 5,
+      counterPcs: restaurant.counterPcsLimit || 1
+    };
 
     // Sync to Supabase
     if (window.SupabaseClient) {
@@ -186,7 +202,10 @@ window.LicenseService = {
     const id = "rest-0" + (window.HinoptData.restaurants.length + 1) + "-" + timestampId;
     const licenseKey = "HINOPT-" + new Date().getFullYear() + "-" + Math.random().toString(36).substring(2, 6).toUpperCase() + "-" + Math.floor(1000 + Math.random() * 9000);
     const validUntilDate = data.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const maxDevices = data.maxDevices ? parseInt(data.maxDevices, 10) : 10;
+    const menuItemsLimit = data.menuItemsLimit ? parseInt(data.menuItemsLimit, 10) : 100;
+    const captainDevicesLimit = data.captainDevicesLimit ? parseInt(data.captainDevicesLimit, 10) : (data.maxDevices ? parseInt(data.maxDevices, 10) : 5);
+    const counterPcsLimit = data.counterPcsLimit ? parseInt(data.counterPcsLimit, 10) : 1;
+    const maxDevices = captainDevicesLimit;
 
     const newRest = {
       id: id,
@@ -200,6 +219,14 @@ window.LicenseService = {
       issuedAt: new Date().toISOString().split('T')[0],
       expiresAt: validUntilDate,
       maxDevices: maxDevices,
+      menuItemsLimit: menuItemsLimit,
+      captainDevicesLimit: captainDevicesLimit,
+      counterPcsLimit: counterPcsLimit,
+      limits: {
+        menuItems: menuItemsLimit,
+        captainDevices: captainDevicesLimit,
+        counterPcs: counterPcsLimit
+      },
       counterIp: data.counterIp || "192.168.1.100",
       notes: data.notes || "Standard branch installation."
     };

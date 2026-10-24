@@ -197,12 +197,15 @@ class MainLayout extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             onPressed: () async {
-              final ok = await provider.approveDevice(id);
+              final res = await provider.approveDeviceWithResult(id);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(ok ? 'Captain device "$name" approved successfully.' : 'Failed to approve device.'),
-                    backgroundColor: ok ? AppColors.success : AppColors.error,
+                    content: Text(res.success
+                        ? 'Captain device "$name" approved successfully.'
+                        : (res.errorMessage ?? 'Failed to approve device.')),
+                    backgroundColor: res.success ? AppColors.success : AppColors.error,
+                    duration: Duration(seconds: res.success ? 3 : 5),
                   ),
                 );
               }

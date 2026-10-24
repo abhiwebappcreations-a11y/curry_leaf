@@ -116,13 +116,16 @@ function setupEventListeners() {
       const hwid = document.getElementById('reg-hwid').value.trim();
       const counterIp = document.getElementById('reg-ip') ? document.getElementById('reg-ip').value.trim() : '192.168.1.100';
       const expiresAt = document.getElementById('reg-expiry') ? document.getElementById('reg-expiry').value : null;
-      const maxDevices = document.getElementById('reg-devices') ? document.getElementById('reg-devices').value : 10;
+      const menuItemsLimit = document.getElementById('reg-limit-menu') ? parseInt(document.getElementById('reg-limit-menu').value, 10) : 100;
+      const captainDevicesLimit = document.getElementById('reg-limit-captains') ? parseInt(document.getElementById('reg-limit-captains').value, 10) : 5;
+      const counterPcsLimit = document.getElementById('reg-limit-counters') ? parseInt(document.getElementById('reg-limit-counters').value, 10) : 1;
+      const maxDevices = captainDevicesLimit;
       const notes = document.getElementById('reg-notes').value.trim();
 
       if (name) {
         showToast(`Registering "${name}" in Supabase...`);
         const newRest = await window.LicenseService.registerRestaurant({
-          name, city, contactName, phone, hwid, counterIp, expiresAt, maxDevices, notes
+          name, city, contactName, phone, hwid, counterIp, expiresAt, maxDevices, menuItemsLimit, captainDevicesLimit, counterPcsLimit, notes
         });
         closeModal('modal-register');
         regForm.reset();
@@ -146,12 +149,15 @@ function setupEventListeners() {
       const counterIp = document.getElementById('edit-ip').value.trim();
       const status = document.getElementById('edit-status').value;
       const expiresAt = document.getElementById('edit-expiry').value;
-      const maxDevices = document.getElementById('edit-devices').value;
+      const menuItemsLimit = document.getElementById('edit-limit-menu') ? parseInt(document.getElementById('edit-limit-menu').value, 10) : 100;
+      const captainDevicesLimit = document.getElementById('edit-limit-captains') ? parseInt(document.getElementById('edit-limit-captains').value, 10) : 5;
+      const counterPcsLimit = document.getElementById('edit-limit-counters') ? parseInt(document.getElementById('edit-limit-counters').value, 10) : 1;
+      const maxDevices = captainDevicesLimit;
       const notes = document.getElementById('edit-notes').value.trim();
 
       showToast(`Saving changes for "${name}" to Supabase...`);
       await window.LicenseService.updateRestaurantDetails(id, {
-        name, city, contactName, phone, hwid, counterIp, status, expiresAt, maxDevices, notes
+        name, city, contactName, phone, hwid, counterIp, status, expiresAt, maxDevices, menuItemsLimit, captainDevicesLimit, counterPcsLimit, notes
       });
 
       closeModal('modal-edit-restaurant');
@@ -285,7 +291,7 @@ function renderLicenses() {
       <tr>
         <td>
           <div style="font-weight: 800;">${r.name}</div>
-          <div style="font-size: 11px; color: var(--text-secondary);">ID: ${r.id} &bull; Max Devices: ${r.maxDevices || 10}</div>
+          <div style="font-size: 11px; color: var(--text-secondary);">Limits: ${r.menuItemsLimit || r.limits?.menuItems || 100} dishes &bull; ${r.captainDevicesLimit || r.limits?.captainDevices || r.maxDevices || 5} captains &bull; ${r.counterPcsLimit || r.limits?.counterPcs || 1} counter</div>
         </td>
         <td>
           <code style="background: var(--surface-muted); padding: 3px 6px; border-radius: 4px; font-size: 12px; font-weight: 700;">${r.licenseKey}</code>
@@ -368,7 +374,10 @@ window.openEditModal = function (restaurantId) {
   document.getElementById('edit-ip').value = r.counterIp || '192.168.1.100';
   document.getElementById('edit-status').value = r.status || 'ACTIVE';
   document.getElementById('edit-expiry').value = r.expiresAt || '';
-  document.getElementById('edit-devices').value = r.maxDevices || 10;
+  if (document.getElementById('edit-limit-menu')) document.getElementById('edit-limit-menu').value = r.menuItemsLimit || r.limits?.menuItems || 100;
+  if (document.getElementById('edit-limit-captains')) document.getElementById('edit-limit-captains').value = r.captainDevicesLimit || r.limits?.captainDevices || r.maxDevices || 5;
+  if (document.getElementById('edit-limit-counters')) document.getElementById('edit-limit-counters').value = r.counterPcsLimit || r.limits?.counterPcs || 1;
+  if (document.getElementById('edit-devices')) document.getElementById('edit-devices').value = r.captainDevicesLimit || r.maxDevices || 5;
   document.getElementById('edit-notes').value = r.notes || '';
 
   openModal('modal-edit-restaurant');

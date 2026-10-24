@@ -1,3 +1,4 @@
+import { LicenseService } from '../services/licenseService.js';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { inMemoryStore, DeviceRecord } from '../db/inMemoryStore.js';
@@ -179,6 +180,30 @@ devicesRouter.post('/:id/approve', requireRole('counter', 'admin'), (req: Reques
     const device = inMemoryStore.devices.get(id);
     if (!device) {
       throw new NotFoundError('Device', id);
+    }
+
+    if (device.role === 'captain') {
+      const check = LicenseService.canApproveCaptainDevice();
+      if (!check.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'LICENSE_LIMIT_EXCEEDED',
+            message: check.message,
+          },
+        });
+      }
+    } else if (device.role === 'counter') {
+      const check = LicenseService.canRegisterCounterPc();
+      if (!check.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'LICENSE_LIMIT_EXCEEDED',
+            message: check.message,
+          },
+        });
+      }
     }
 
     device.isActive = true;

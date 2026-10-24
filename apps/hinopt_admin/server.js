@@ -134,6 +134,11 @@ const server = http.createServer(async (req, res) => {
       validUntil: expiresAt,
       issuedAt: now.toISOString(),
       expiresAt: expiresAt,
+      limits: {
+        menuItems: 100,
+        captainDevices: 5,
+        counterPcs: 1,
+      },
       allowedFeatures: ['OFFLINE_POS', 'CAPTAIN_LAN_SYNC', 'DUAL_PRINTER_QUEUE', 'GOOGLE_DRIVE_CLOUD_BACKUP'],
     };
 

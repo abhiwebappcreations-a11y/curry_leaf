@@ -36,6 +36,26 @@ void showLicenseActivationDialog(BuildContext context, CounterProvider provider)
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Dishes: ${provider.menuItems.length}/${provider.menuItemsLimit}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text('Captains: ${provider.captainDevicesUsage}/${provider.captainDevicesLimit}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text('Counters: 1/${provider.counterPcsLimit}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
               const Divider(height: 24),
               const Text(
                 'Enter License / Renewal Key:',

@@ -9,6 +9,61 @@ class MenuManagementView extends StatelessWidget {
   const MenuManagementView({super.key});
 
   void _showAddDishDialog(BuildContext context, CounterProvider provider) {
+    if (provider.isMenuItemLimitReached) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Row(
+            children: [
+              Icon(Icons.lock_clock_outlined, color: AppColors.error, size: 24),
+              SizedBox(width: 8),
+              Text('Menu Limit Reached', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your current software license allows a maximum of ${provider.menuItemsLimit} menu items.\n\nYou currently have ${provider.menuItems.length} active dishes in the system.',
+                style: const TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFFB74D)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.admin_panel_settings_outlined, color: Color(0xFFE65100), size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'To add more dishes, please update or upgrade your license key via Hinopt Cloud Admin.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFFE65100), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Understood'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final nameController = TextEditingController();
     final priceController = TextEditingController();
     final descController = TextEditingController();
@@ -202,7 +257,7 @@ class MenuManagementView extends StatelessWidget {
                   return;
                 }
 
-                await provider.addNewMenuItem(
+                final res = await provider.addNewMenuItemWithResult(
                   name: name,
                   category: selectedCategory,
                   pricePaise: priceRupees * 100,
@@ -212,10 +267,23 @@ class MenuManagementView extends StatelessWidget {
                 );
 
                 if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Dish "$name" added to live menu!')),
-                  );
+                  if (res.success) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Dish "$name" added to live menu!'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res.errorMessage ?? 'Failed to add dish to menu'),
+                        backgroundColor: AppColors.error,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
                 }
               },
               icon: const Icon(Icons.check, size: 16),
@@ -417,6 +485,36 @@ class MenuManagementView extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: provider.isMenuItemLimitReached ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9),
+                          border: Border.all(
+                            color: provider.isMenuItemLimitReached ? AppColors.error : AppColors.success,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              provider.isMenuItemLimitReached ? Icons.lock_outline : Icons.inventory_2_outlined,
+                              size: 14,
+                              color: provider.isMenuItemLimitReached ? AppColors.error : AppColors.success,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Dishes: ${provider.menuItems.length} / ${provider.menuItemsLimit}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: provider.isMenuItemLimitReached ? AppColors.error : const Color(0xFF2E7D32),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       if (provider.menuItems.isNotEmpty) ...[
                         OutlinedButton.icon(
                           onPressed: () => _confirmWipeAllMenu(context, provider),

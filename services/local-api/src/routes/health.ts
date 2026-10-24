@@ -61,6 +61,8 @@ healthRouter.get('/', async (req: Request, res: Response) => {
           isOfflineGraceActive: license.isOfflineGraceActive,
           restaurantName: license.restaurantName,
           licenseKey: license.licenseKey,
+          limits: license.limits,
+          usage: license.usage,
         },
       },
     },

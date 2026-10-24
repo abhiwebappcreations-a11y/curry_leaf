@@ -267,9 +267,27 @@
             <input type="date" id="reg-expiry" class="form-input">
             <small style="color: var(--text-muted); font-size: 11px;">Default is 1 year from today if left empty.</small>
           </div>
-          <div class="form-group">
-            <label class="form-label">Allowed Max Captain Devices</label>
-            <input type="number" id="reg-devices" class="form-input" value="10" min="1" max="50">
+          <div style="background: var(--surface-muted); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+              POS Software License Limits
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11px;">Menu Items Limit</label>
+                <input type="number" id="reg-limit-menu" class="form-input" value="100" min="1" max="5000" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11px;">Captain Devices Limit</label>
+                <input type="number" id="reg-limit-captains" class="form-input" value="5" min="1" max="100" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11px;">Counter PCs Limit</label>
+                <input type="number" id="reg-limit-counters" class="form-input" value="1" min="1" max="20" required>
+              </div>
+            </div>
+            <small style="color: var(--text-muted); font-size: 10px; margin-top: 6px; display: block;">
+              Counter POS cannot accept more captains or create more menu dishes than these specified limits.
+            </small>
           </div>
           <div class="form-group">
             <label class="form-label">Installation Notes</label>
@@ -364,6 +382,25 @@
             </div>
           </div>
 
+          <div style="background: var(--surface-muted); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--primary-dark); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+              POS Software License Limits
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11px;">Menu Items Limit</label>
+                <input type="number" id="edit-limit-menu" class="form-input" value="100" min="1" max="5000" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11px;">Captain Devices Limit</label>
+                <input type="number" id="edit-limit-captains" class="form-input" value="5" min="1" max="100" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" style="font-size: 11px;">Counter PCs Limit</label>
+                <input type="number" id="edit-limit-counters" class="form-input" value="1" min="1" max="20" required>
+              </div>
+            </div>
+          </div>
           <div class="form-group">
             <label class="form-label">Installation Notes</label>
             <textarea id="edit-notes" class="form-textarea" rows="2"></textarea>

@@ -1,0 +1,27 @@
+{
+  "signedPayload": {
+    "version": "1.0",
+    "licenseKey": "HINOPT-LIC-ANY",
+    "restaurantId": "rest_hinopt_lic_any",
+    "restaurantName": "Hinopt Client Restaurant",
+    "status": "active",
+    "validFrom": "2026-10-24T15:12:47.641Z",
+    "validUntil": "2027-10-24T15:12:47.641Z",
+    "issuedAt": "2026-10-24T15:12:47.641Z",
+    "expiresAt": "2027-10-24T15:12:47.641Z",
+    "limits": {
+      "menuItems": 100,
+      "captainDevices": 5,
+      "counterPcs": 1
+    },
+    "allowedFeatures": [
+      "OFFLINE_POS",
+      "CAPTAIN_LAN_SYNC",
+      "DUAL_PRINTER_QUEUE",
+      "GOOGLE_DRIVE_CLOUD_BACKUP"
+    ]
+  },
+  "signature": "6092c3c25aa7f791556bb26bb946a72dc0c97dd4baa2a21d161b15d7d863acbc",
+  "token": "eyJ2ZXJzaW9uIjoiMS4wIiwibGljZW5zZUtleSI6IkhJTk9QVC1MSUMtQU5ZIiwicmVzdGF1cmFudElkIjoicmVzdF9oaW5vcHRfbGljX2FueSIsInJlc3RhdXJhbnROYW1lIjoiSGlub3B0IENsaWVudCBSZXN0YXVyYW50Iiwic3RhdHVzIjoiYWN0aXZlIiwidmFsaWRGcm9tIjoiMjAyNi0xMC0yNFQxNToxMjo0Ny42NDFaIiwidmFsaWRVbnRpbCI6IjIwMjctMTAtMjRUMTU6MTI6NDcuNjQxWiIsImlzc3VlZEF0IjoiMjAyNi0xMC0yNFQxNToxMjo0Ny42NDFaIiwiZXhwaXJlc0F0IjoiMjAyNy0xMC0yNFQxNToxMjo0Ny42NDFaIiwibGltaXRzIjp7Im1lbnVJdGVtcyI6MTAwLCJjYXB0YWluRGV2aWNlcyI6NSwiY291bnRlclBjcyI6MX0sImFsbG93ZWRGZWF0dXJlcyI6WyJPRkZMSU5FX1BPUyIsIkNBUFRBSU5fTEFOX1NZTkMiLCJEVUFMX1BSSU5URVJfUVVFVUUiLCJHT09HTEVfRFJJVkVfQ0xPVURfQkFDS1VQIl19.6092c3c25aa7f791556bb26bb946a72dc0c97dd4baa2a21d161b15d7d863acbc",
+  "updatedAt": "2026-10-24T15:12:47.647Z"
+}
