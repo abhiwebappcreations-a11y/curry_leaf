@@ -11,6 +11,8 @@ build/
 out/
 *.tsbuildinfo
 *.apk
+*.zip
+Restaurant_Client_Pack/
 
 # Environment and secrets
 .env
