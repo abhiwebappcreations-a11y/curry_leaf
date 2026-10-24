@@ -3,11 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let r of registrations) r.unregister();
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(keys) {
+        for (let k of keys) caches.delete(k);
+      });
+    }
+  </script>
   <title>Hinopt Restaurant POS — Cloud Admin & License Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261024_05">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#163B3A">
   <meta name="mobile-web-app-capable" content="yes">
@@ -75,8 +90,9 @@
     <main class="main-wrapper">
       <!-- Top Header -->
       <header class="top-header">
-        <div class="header-title-section">
-          <h2 id="header-title">Operations Overview & License Health</h2>
+        <div class="header-title-section" style="display: flex; align-items: center; gap: 12px;">
+          <h2 id="header-title" style="margin: 0;">Operations Overview & License Health</h2>
+          <span style="background: #2e7d32; color: white; font-weight: 800; padding: 4px 10px; border-radius: 20px; font-size: 11px; letter-spacing: 0.5px;">v2.6 Limits Live</span>
         </div>
         <div class="header-actions">
           <div class="cloud-status-badge">
