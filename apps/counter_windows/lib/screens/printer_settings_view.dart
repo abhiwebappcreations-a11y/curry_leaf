@@ -46,13 +46,124 @@ class PrinterSettingsView extends StatelessWidget {
                 ],
               ),
 
+              // 2-Option Mode Selector
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.tune, size: 16, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        Text(
+                          'PRINTER SETUP MODE',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => provider.setPrinterMode('single'),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: provider.isSinglePrinterMode ? AppColors.primary.withValues(alpha: 0.08) : AppColors.surfaceMuted,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: provider.isSinglePrinterMode ? AppColors.primary : AppColors.border,
+                                  width: provider.isSinglePrinterMode ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    provider.isSinglePrinterMode ? Icons.radio_button_checked : Icons.radio_button_off,
+                                    size: 18,
+                                    color: provider.isSinglePrinterMode ? AppColors.primary : AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('1. Single Printer Setup', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        Text(
+                                          'Only 1 printer available. Captain KOTs, Counter KOTs & Customer Bills all print to this printer.',
+                                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => provider.setPrinterMode('double'),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: !provider.isSinglePrinterMode ? AppColors.primary.withValues(alpha: 0.08) : AppColors.surfaceMuted,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: !provider.isSinglePrinterMode ? AppColors.primary : AppColors.border,
+                                  width: !provider.isSinglePrinterMode ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    !provider.isSinglePrinterMode ? Icons.radio_button_checked : Icons.radio_button_off,
+                                    size: 18,
+                                    color: !provider.isSinglePrinterMode ? AppColors.primary : AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('2. Double Printer Setup (Normal)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        Text(
+                                          'Separate printers: Kitchen printer only prints KOTs; Counter printer only prints Customer Bills.',
+                                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 16),
 
               // Cards Layout: Vertical ListView on Mobile, Two-Column Row on Desktop
               Expanded(
                 child: isMobile
                     ? ListView(
-                        children: provider.printers.map((printer) {
+                        children: (provider.isSinglePrinterMode
+                            ? [provider.printers.firstWhere((p) => p.role == PrinterRole.counterBill, orElse: () => provider.printers.first)]
+                            : provider.printers).map((printer) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 14),
                             child: _buildPrinterCard(context, provider, printer, isMobile: true),
@@ -61,7 +172,9 @@ class PrinterSettingsView extends StatelessWidget {
                       )
                     : Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: provider.printers.map((printer) {
+                        children: (provider.isSinglePrinterMode
+                            ? [provider.printers.firstWhere((p) => p.role == PrinterRole.counterBill, orElse: () => provider.printers.first)]
+                            : provider.printers).map((printer) {
                           return Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 8),

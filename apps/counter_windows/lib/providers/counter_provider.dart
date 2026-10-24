@@ -46,8 +46,11 @@ class CounterProvider extends ChangeNotifier {
   String _licenseStatus = 'Checking...';
   int _licenseDaysRemaining = 365;
   String _restaurantName = 'Curry Leaf';
+  String _printerMode = 'single';
 
   String get restaurantName => _restaurantName;
+  String get printerMode => _printerMode;
+  bool get isSinglePrinterMode => _printerMode == 'single';
 
   // Background Auto-Polling & Pull-to-Refresh
   Timer? _autoPollTimer;
@@ -274,6 +277,30 @@ class CounterProvider extends ChangeNotifier {
     return _counterApiService.checkHealthFor(host, port);
   }
 
+  Future<bool> setPrinterMode(String mode) async {
+    _printerMode = mode;
+    notifyListeners();
+    final ok = await _counterApiService.setPrinterMode(mode);
+    await refreshFromLiveApi(isManual: true);
+    return ok;
+  }
+
+  Future<bool> fireKotForTable({
+    required String tableId,
+    required List<Map<String, dynamic>> items,
+    String? customerNotes,
+  }) async {
+    final ok = await _counterApiService.fireKotForTable(
+      tableId: tableId,
+      items: items,
+      customerNotes: customerNotes,
+    );
+    if (ok) {
+      await refreshFromLiveApi(isManual: true);
+    }
+    return ok;
+  }
+
   ThermalPrinterConfig? get billPrinter =>
       _printers.where((p) => p.role == PrinterRole.counterBill).firstOrNull;
 
@@ -388,6 +415,7 @@ class CounterProvider extends ChangeNotifier {
       if (livePrinters != null && livePrinters.isNotEmpty) {
         _printers = livePrinters;
       }
+      _printerMode = await _apiClient.getPrinterMode();
 
       final liveMenu = await _apiClient.getMenu();
       if (liveMenu != null) {

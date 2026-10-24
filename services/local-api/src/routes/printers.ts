@@ -44,6 +44,7 @@ printersRouter.get('/', (req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
+      printerMode: config.printers.printerMode || 'single',
       printers: [
         {
           id: 'counter_bill',
@@ -65,6 +66,40 @@ printersRouter.get('/', (req: Request, res: Response) => {
     },
   });
 });
+
+
+const updateModeSchema = z.object({
+  mode: z.enum(['single', 'double']),
+});
+
+// POST /api/printers/mode - Toggle between Single vs Double printer mode
+printersRouter.post(
+  '/mode',
+  requireActiveLicense,
+  requireRole('counter', 'admin'),
+  validateBody(updateModeSchema),
+  (req: Request, res: Response) => {
+    const { mode } = req.body;
+    config.printers.printerMode = mode;
+    if (mode === 'single') {
+      config.printers.kitchenKot.target = config.printers.counterBill.target;
+      config.printers.kitchenKot.paperWidth = config.printers.counterBill.paperWidth;
+    }
+    inMemoryStore.settings.set('printer_settings', {
+      mode,
+      counterBill: config.printers.counterBill,
+      kitchenKot: config.printers.kitchenKot,
+    });
+    inMemoryStore.saveToDisk();
+
+    res.json({
+      success: true,
+      data: {
+        printerMode: config.printers.printerMode,
+      },
+    });
+  }
+);
 
 const updatePrinterSchema = z.object({
   target: z.string().min(3),

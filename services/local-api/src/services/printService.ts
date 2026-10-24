@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 let jobCounter = 5000;
 
 export class PrintService {
+  private static printMutex: Promise<any> = Promise.resolve();
   public static async enqueueJob(
     targetPrinter: 'counter_bill' | 'kitchen_kot',
     jobType: 'bill' | 'kot' | 'reprint_bill' | 'reprint_kot' | 'test_print' | 'report',
@@ -62,9 +63,10 @@ export class PrintService {
     job.updatedAt = new Date().toISOString();
 
     try {
-      const printerConfig = job.targetPrinter === 'kitchen_kot'
-        ? config.printers.kitchenKot
-        : config.printers.counterBill;
+      const isSingleMode = config.printers.printerMode === 'single';
+      const printerConfig = isSingleMode
+        ? config.printers.counterBill
+        : (job.targetPrinter === 'kitchen_kot' ? config.printers.kitchenKot : config.printers.counterBill);
 
       // 1. Build ESC/POS binary buffer
       const escposBuffer = this.buildEscPosPayload(job);
@@ -74,40 +76,29 @@ export class PrintService {
       //    - Otherwise            → treat as Windows printer name (USB via print spooler)
       const isEthernet = printerConfig.target.includes(':');
 
-      let didSend: boolean;
-      if (isEthernet) {
-        const targetParts = printerConfig.target.split(':');
-        const host = targetParts[0] || '127.0.0.1';
-        const port = parseInt(targetParts[1] || '9100', 10);
-        didSend = await this.sendRawTcp(host, port, escposBuffer, 2500);
-
-        if (didSend) {
-          logger.info(
-            { jobId: job.id, target: printerConfig.target, bytes: escposBuffer.length },
-            `[ETHERNET] Dispatched to thermal printer at ${printerConfig.target}`
-          );
+      let didSend = false;
+      await (this.printMutex = this.printMutex.then(async () => {
+        if (isEthernet) {
+          const targetParts = printerConfig.target.split(':');
+          const host = targetParts[0] || '127.0.0.1';
+          const port = parseInt(targetParts[1] || '9100', 10);
+          didSend = await this.sendRawTcp(host, port, escposBuffer, 2500);
+          if (didSend) {
+            logger.info({ jobId: job.id, target: printerConfig.target, bytes: escposBuffer.length }, `[ETHERNET] Dispatched to thermal printer at ${printerConfig.target}`);
+          } else {
+            logger.warn({ jobId: job.id, target: printerConfig.target }, `[ETHERNET] TCP send failed — printer unreachable at ${printerConfig.target}`);
+          }
         } else {
-          logger.warn(
-            { jobId: job.id, target: printerConfig.target },
-            `[ETHERNET] TCP send failed — printer unreachable at ${printerConfig.target}`
-          );
+          didSend = await this.sendRawUsb(printerConfig.target, escposBuffer);
+          if (didSend) {
+            logger.info({ jobId: job.id, printerName: printerConfig.target, bytes: escposBuffer.length }, `[USB] Dispatched to Windows printer "${printerConfig.target}"`);
+          } else {
+            logger.warn({ jobId: job.id, printerName: printerConfig.target }, `[USB] Failed to send to Windows printer "${printerConfig.target}".`);
+          }
         }
-      } else {
-        // USB / Windows print spooler path
-        didSend = await this.sendRawUsb(printerConfig.target, escposBuffer);
-
-        if (didSend) {
-          logger.info(
-            { jobId: job.id, printerName: printerConfig.target, bytes: escposBuffer.length },
-            `[USB] Dispatched to Windows printer "${printerConfig.target}"`
-          );
-        } else {
-          logger.warn(
-            { jobId: job.id, printerName: printerConfig.target },
-            `[USB] Failed to send to Windows printer "${printerConfig.target}". Verify the printer name matches exactly in Windows Devices & Printers.`
-          );
-        }
-      }
+        // 400ms delay for thermal cutter cycle before next job touches printer port
+        await new Promise((r) => setTimeout(r, 400));
+      }).catch(() => {}));
 
       if (didSend) {
         job.status = 'completed';

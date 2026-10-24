@@ -1,3 +1,4 @@
+import '../widgets/counter_order_punch_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,13 @@ import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
 
 class TablesFloorView extends StatelessWidget {
+  void _openOrderPunchDialog(BuildContext context, CounterProvider provider, RestaurantTable table) {
+    showDialog(
+      context: context,
+      builder: (ctx) => CounterOrderPunchDialog(initialTable: table, provider: provider),
+    );
+  }
+
   const TablesFloorView({super.key});
 
   void _showAddTableDialog(BuildContext context, CounterProvider provider) {
@@ -822,7 +830,17 @@ class TablesFloorView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (isOccupied)
+              if (isOccupied) ...[
+                OutlinedButton(
+                  onPressed: () => _openOrderPunchDialog(context, provider, table),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(50, 26),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('+ KOT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 6),
                 ElevatedButton(
                   onPressed: () => provider.selectOrderByTableId(table.id),
                   style: ElevatedButton.styleFrom(
@@ -831,9 +849,21 @@ class TablesFloorView extends StatelessWidget {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text('View Bill', style: TextStyle(fontSize: 11)),
-                )
-              else
-                const Text('Free', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                ),
+              ] else ...[
+                ElevatedButton.icon(
+                  onPressed: () => _openOrderPunchDialog(context, provider, table),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(80, 26),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.add, size: 12),
+                  label: const Text('Take Order / KOT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ],
           ),
         ],

@@ -830,7 +830,52 @@ class CounterApiService {
       return null;
     }
   }
-}
+  Future<bool> fireKotForTable({
+    required String tableId,
+    required List<Map<String, dynamic>> items,
+    String? customerNotes,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders/new/kot'),
+        headers: headers,
+        body: jsonEncode({
+          'tableId': tableId,
+          'items': items,
+          'customerNotes': customerNotes,
+        }),
+      ).timeout(const Duration(seconds: 5));
 
-/// Backward compatibility alias
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String> getPrinterMode() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/printers'), headers: headers).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map<String, dynamic> && data['printerMode'] != null) {
+          return data['printerMode'].toString();
+        }
+      }
+    } catch (_) {}
+    return 'single';
+  }
+
+  Future<bool> setPrinterMode(String mode) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/printers/mode'),
+        headers: headers,
+        body: jsonEncode({'mode': mode}),
+      ).timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+}
 typedef ApiClient = CounterApiService;

@@ -113,7 +113,7 @@
       "status": "approved",
       "deviceIp": "192.168.10.3",
       "registeredAt": "2026-10-24T08:57:26.524Z",
-      "lastSeenAt": "2026-10-24T09:02:27.960Z"
+      "lastSeenAt": "2026-10-24T09:49:16.261Z"
     }
   ],
   "settings": {
@@ -142,5 +142,5 @@
       "status": "verified"
     }
   },
-  "updatedAt": "2026-10-24T09:02:27.960Z"
+  "updatedAt": "2026-10-24T09:49:16.261Z"
 }

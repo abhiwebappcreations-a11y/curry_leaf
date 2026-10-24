@@ -38,6 +38,7 @@ export interface AppConfig {
       target: string;
       paperWidth: string;
     };
+    printerMode: 'single' | 'double';
   };
   logLevel: string;
 }
@@ -73,6 +74,7 @@ export const config: AppConfig = {
       target: process.env.BILL_PRINTER_TARGET || 'EPSON TM-T82X Receipt',
       paperWidth: process.env.BILL_PRINTER_PAPER_WIDTH || '80mm',
     },
+    printerMode: (process.env.PRINTER_MODE as 'single' | 'double') || 'single',
     kitchenKot: {
       // USB: use Windows printer name (e.g. 'EPSON TM-T82X Receipt6')
       // Ethernet: use 'host:port' format (e.g. '192.168.1.201:9100')

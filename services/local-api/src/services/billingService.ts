@@ -256,6 +256,26 @@ export class BillingService {
       table.activeOrderId = null;
     }
 
+    // Automatically enqueue Customer Bill receipt to Counter Printer upon settlement
+    try {
+      await PrintService.enqueueJob(
+        'counter_bill',
+        'bill',
+        bill.id,
+        {
+          billNumber: bill.billNumber,
+          tableNumber: table ? table.tableNumber : 'Counter',
+          items: bill.items,
+          subtotalPaise: bill.subtotalPaise,
+          taxPaise: bill.taxPaise,
+          discountPaise: bill.discountPaise,
+          totalPaise: bill.totalPaise,
+          paymentMethod: input.paymentMethod,
+          restaurantName: (inMemoryStore.settings.get('restaurant_profile') as any)?.name || 'Curry Leaf Fine Dining',
+        }
+      );
+    } catch (_) {}
+
     // Audit log
     inMemoryStore.auditLogs.push({
       id: `audit_${Date.now()}`,

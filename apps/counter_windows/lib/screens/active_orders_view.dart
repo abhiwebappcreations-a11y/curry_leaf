@@ -55,8 +55,10 @@ class ActiveOrdersView extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('New Table'),
+                      label: const Text('Take Order / Fire KOT'),
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       ),
                     ),
@@ -97,7 +99,11 @@ class ActiveOrdersView extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text('New Table / Order'),
+                      label: const Text('Take Order / Fire KOT'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ],
                 ),
