@@ -189,6 +189,32 @@ class CounterProvider extends ChangeNotifier {
     return false;
   }
 
+  Future<Map<String, dynamic>?> exportBackup() async {
+    return await _counterApiService.exportBackup();
+  }
+
+  Future<bool> restoreBackup(Map<String, dynamic> backupData) async {
+    final result = await _counterApiService.restoreBackup(backupData);
+    if (result != null) {
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> listBackupSnapshots() async {
+    return await _counterApiService.listBackupSnapshots();
+  }
+
+  Future<bool> restoreSnapshot(String fileName) async {
+    final ok = await _counterApiService.restoreSnapshot(fileName);
+    if (ok) {
+      await refreshFromLiveApi(isManual: true);
+      return true;
+    }
+    return false;
+  }
+
   Future<bool> testServerConnection(String host, int port) async {
     return _counterApiService.checkHealthFor(host, port);
   }

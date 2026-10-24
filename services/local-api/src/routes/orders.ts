@@ -6,6 +6,8 @@ import { KotService } from '../services/kotService.js';
 import { BillingService } from '../services/billingService.js';
 import { authenticateDevice, requireRole, requireActiveLicense } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { PrintService } from '../services/printService.js';
+import { NotFoundError } from '../utils/errors.js';
 
 export const ordersRouter = Router();
 
@@ -221,7 +223,7 @@ ordersRouter.post(
   validateBody(cancelOrderSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const { reason } = req.body;
 
       const order = inMemoryStore.orders.get(id);

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
 import 'server_connection_dialog.dart';
+import 'backup_restore_dialog.dart';
 
 class TopHealthBar extends StatefulWidget {
   final bool showMenuButton;
@@ -181,6 +182,42 @@ class _TopHealthBarState extends State<TopHealthBar> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+
+                  // USB / Disk Backup & Restore Button
+                  Tooltip(
+                    message: 'Database Backup & USB Restore',
+                    child: InkWell(
+                      onTap: () => _showBackupDialog(context, provider),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.usb_rounded, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Backup & USB',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 16),
 
                   // Live Clock
@@ -206,6 +243,15 @@ class _TopHealthBarState extends State<TopHealthBar> {
     showDialog(
       context: context,
       builder: (_) => ServerConnectionDialog(
+        provider: provider,
+      ),
+    );
+  }
+
+  void _showBackupDialog(BuildContext context, CounterProvider provider) {
+    showDialog(
+      context: context,
+      builder: (_) => BackupRestoreDialog(
         provider: provider,
       ),
     );

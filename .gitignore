@@ -27,6 +27,9 @@ out/
 *.sqlite3
 *.log
 logs/
+pos_store.json
+services/local-api/data/
+data/
 
 # IDE & OS
 .vscode/

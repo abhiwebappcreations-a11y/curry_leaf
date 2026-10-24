@@ -227,6 +227,10 @@ export class InMemoryStore {
         tables: Array.from(this.tables.values()),
         categories: Array.from(this.categories.values()),
         menuItems: Array.from(this.menuItems.values()),
+        orders: Array.from(this.orders.values()),
+        bills: Array.from(this.bills.values()),
+        payments: Array.from(this.payments.values()),
+        kots: Array.from(this.kots.values()),
         settings: Object.fromEntries(this.settings.entries()),
         updatedAt: new Date().toISOString(),
       };
@@ -260,6 +264,30 @@ export class InMemoryStore {
           this.menuItems.set(m.id, m);
         }
       }
+      if (Array.isArray(data.orders)) {
+        this.orders.clear();
+        for (const o of data.orders) {
+          this.orders.set(o.id, o);
+        }
+      }
+      if (Array.isArray(data.bills)) {
+        this.bills.clear();
+        for (const b of data.bills) {
+          this.bills.set(b.id, b);
+        }
+      }
+      if (Array.isArray(data.payments)) {
+        this.payments.clear();
+        for (const p of data.payments) {
+          this.payments.set(p.id, p);
+        }
+      }
+      if (Array.isArray(data.kots)) {
+        this.kots.clear();
+        for (const k of data.kots) {
+          this.kots.set(k.id, k);
+        }
+      }
       if (data.settings && typeof data.settings === 'object') {
         for (const [k, v] of Object.entries(data.settings)) {
           this.settings.set(k, v as Record<string, unknown>);
@@ -270,6 +298,98 @@ export class InMemoryStore {
       console.error('Failed to load inMemoryStore from disk:', err);
       return false;
     }
+  }
+
+  public exportBackupData(): Record<string, unknown> {
+    return {
+      version: '1.0.0',
+      system: 'HinoptRestaurantPOS',
+      exportedAt: new Date().toISOString(),
+      restaurantName: (this.settings.get('restaurant_profile') as any)?.name || 'Curry Leaf Restro',
+      tables: Array.from(this.tables.values()),
+      categories: Array.from(this.categories.values()),
+      menuItems: Array.from(this.menuItems.values()),
+      orders: Array.from(this.orders.values()),
+      bills: Array.from(this.bills.values()),
+      payments: Array.from(this.payments.values()),
+      kots: Array.from(this.kots.values()),
+      settings: Object.fromEntries(this.settings.entries()),
+    };
+  }
+
+  public restoreBackupData(data: any): {
+    tablesCount: number;
+    menuCount: number;
+    ordersCount: number;
+    billsCount: number;
+  } {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid backup data format: Root object required.');
+    }
+
+    if (Array.isArray(data.tables)) {
+      this.tables.clear();
+      for (const t of data.tables) {
+        this.tables.set(t.id, t);
+      }
+    }
+
+    if (Array.isArray(data.categories)) {
+      this.categories.clear();
+      for (const c of data.categories) {
+        this.categories.set(c.id, c);
+      }
+    }
+
+    if (Array.isArray(data.menuItems)) {
+      this.menuItems.clear();
+      for (const m of data.menuItems) {
+        this.menuItems.set(m.id, m);
+      }
+    }
+
+    if (Array.isArray(data.orders)) {
+      this.orders.clear();
+      for (const o of data.orders) {
+        this.orders.set(o.id, o);
+      }
+    }
+
+    if (Array.isArray(data.bills)) {
+      this.bills.clear();
+      for (const b of data.bills) {
+        this.bills.set(b.id, b);
+      }
+    }
+
+    if (Array.isArray(data.payments)) {
+      this.payments.clear();
+      for (const p of data.payments) {
+        this.payments.set(p.id, p);
+      }
+    }
+
+    if (Array.isArray(data.kots)) {
+      this.kots.clear();
+      for (const k of data.kots) {
+        this.kots.set(k.id, k);
+      }
+    }
+
+    if (data.settings && typeof data.settings === 'object') {
+      for (const [k, v] of Object.entries(data.settings)) {
+        this.settings.set(k, v as Record<string, unknown>);
+      }
+    }
+
+    this.saveToDisk();
+
+    return {
+      tablesCount: this.tables.size,
+      menuCount: this.menuItems.size,
+      ordersCount: this.orders.size,
+      billsCount: this.bills.size,
+    };
   }
 
   public seed() {

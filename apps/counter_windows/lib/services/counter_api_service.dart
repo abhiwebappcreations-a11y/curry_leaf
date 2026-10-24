@@ -555,6 +555,82 @@ class CounterApiService {
       return false;
     }
   }
+
+  Future<Map<String, dynamic>?> exportBackup() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/backup/export'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> restoreBackup(Map<String, dynamic> backupData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/backup/restore'),
+        headers: headers,
+        body: jsonEncode({'backupData': backupData}),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          return body['data'] as Map<String, dynamic>?;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listBackupSnapshots() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/backup/snapshots'),
+        headers: headers,
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true && body['data'] is List) {
+          return (body['data'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<bool> restoreSnapshot(String fileName) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/backup/restore-snapshot'),
+        headers: headers,
+        body: jsonEncode({'fileName': fileName}),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['success'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 /// Backward compatibility alias

@@ -15,6 +15,7 @@ import { billingRouter } from './routes/billing.js';
 import { printersRouter } from './routes/printers.js';
 import { licenseRouter } from './routes/license.js';
 import { reportsRouter } from './routes/reports.js';
+import { backupRouter } from './routes/backup.js';
 
 export const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/bills', billingRouter);
 app.use('/api/printers', printersRouter);
 app.use('/api/license', licenseRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/backup', backupRouter);
 
 // 404 handler
 app.use((req, res, next) => {
