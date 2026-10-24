@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/counter_provider.dart';
 import '../widgets/top_health_bar.dart';
 import '../widgets/license_activation_dialog.dart';
+import '../widgets/upgrade_request_dialog.dart';
 import '../theme/app_colors.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'active_orders_view.dart';
@@ -205,7 +206,14 @@ class MainLayout extends StatelessWidget {
                         ? 'Captain device "$name" approved successfully.'
                         : (res.errorMessage ?? 'Failed to approve device.')),
                     backgroundColor: res.success ? AppColors.success : AppColors.error,
-                    duration: Duration(seconds: res.success ? 3 : 5),
+                    duration: Duration(seconds: res.success ? 3 : 6),
+                    action: !res.success
+                        ? SnackBarAction(
+                            label: 'Upgrade Limits',
+                            textColor: Colors.yellowAccent,
+                            onPressed: () => UpgradeRequestDialog.show(context),
+                          )
+                        : null,
                   ),
                 );
               }

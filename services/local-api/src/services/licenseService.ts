@@ -532,4 +532,78 @@ export class LicenseService {
 
     return { online: false, status: license.status };
   }
+
+  public static async submitUpgradeRequest(data: {
+    requestedLimits: { menuItems?: number; captainDevices?: number; counterPcs?: number };
+    contactPhone?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; message: string; request: any }> {
+    const license = inMemoryStore.license;
+    const currentLimits = this.getLimits();
+
+    const record = {
+      id: `upg_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+      restaurantId: license?.restaurantId || config.restaurantId,
+      restaurantName: license?.restaurantName || config.restaurantName,
+      licenseKey: license?.licenseKey || 'UNKNOWN',
+      currentLimits,
+      requestedLimits: {
+        menuItems: data.requestedLimits?.menuItems ?? currentLimits.menuItems,
+        captainDevices: data.requestedLimits?.captainDevices ?? currentLimits.captainDevices,
+        counterPcs: data.requestedLimits?.counterPcs ?? currentLimits.counterPcs,
+      },
+      contactPhone: data.contactPhone || '',
+      notes: data.notes || '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Save locally
+    const reqFilePath = path.resolve(process.cwd(), 'data/upgrade_requests.json');
+    let localRequests: any[] = [];
+    try {
+      if (fs.existsSync(reqFilePath)) {
+        localRequests = JSON.parse(fs.readFileSync(reqFilePath, 'utf8'));
+      }
+    } catch (_) {}
+    localRequests.unshift(record);
+    try {
+      const dataDir = path.dirname(reqFilePath);
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(reqFilePath, JSON.stringify(localRequests, null, 2), 'utf8');
+    } catch (e: any) {
+      logger.warn(`Could not save local upgrade request file: ${e?.message || e}`);
+    }
+
+    // Forward to Hinopt Cloud Admin
+    const adminUrl = process.env.HINOPT_ADMIN_URL || 'http://127.0.0.1:5000';
+    try {
+      const resp = await fetch(`${adminUrl}/api/upgrade-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+      });
+      if (resp.ok) {
+        logger.info(`Upgrade request ${record.id} synced to Hinopt Admin`);
+      }
+    } catch (err: any) {
+      logger.warn(`Could not immediately sync upgrade request to Hinopt Admin (saved locally): ${err?.message || err}`);
+    }
+
+    return {
+      success: true,
+      message: 'Upgrade request submitted successfully to Hinopt Cloud Admin.',
+      request: record,
+    };
+  }
+
+  public static getUpgradeRequests(): any[] {
+    const reqFilePath = path.resolve(process.cwd(), 'data/upgrade_requests.json');
+    try {
+      if (fs.existsSync(reqFilePath)) {
+        return JSON.parse(fs.readFileSync(reqFilePath, 'utf8'));
+      }
+    } catch (_) {}
+    return [];
+  }
 }

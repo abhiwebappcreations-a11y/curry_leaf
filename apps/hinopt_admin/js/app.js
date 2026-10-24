@@ -86,6 +86,7 @@ function switchTab(tabName) {
     overview: 'Operations Overview & License Health',
     restaurants: 'Client Restaurants Directory',
     licenses: 'License Token Issuance & Lifecycle',
+    upgrades: 'Client License Limits Upgrade Requests',
     audit: 'Immutable Security & Administrative Audit Logs',
     security: 'Cloud Signing Keys & Protocol Info'
   };
@@ -172,6 +173,7 @@ function renderAll() {
   renderRestaurants();
   renderLicenses();
   renderAuditLogs();
+  fetchUpgradeRequests();
 }
 
 function renderKpis() {
@@ -502,3 +504,136 @@ function showToast(message) {
     setTimeout(() => toast.remove(), 300);
   }, 3500);
 }
+
+// Upgrade Requests Management
+async function fetchUpgradeRequests() {
+  const tbody = document.getElementById('table-upgrades-body');
+  const badge = document.getElementById('badge-upgrades-count');
+  try {
+    const res = await fetch('/api/upgrade-requests');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.requests)) {
+      const requests = data.requests;
+      const pendingCount = requests.filter(r => r.status === 'pending').length;
+      if (badge) {
+        badge.textContent = pendingCount;
+        badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+      }
+
+      if (!tbody) return;
+      if (requests.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 24px;">No upgrade requests received yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = requests.map(r => {
+        const cur = r.currentLimits || {};
+        const req = r.requestedLimits || {};
+        const isPending = r.status === 'pending';
+        const isApproved = r.status === 'approved';
+        const badgeClass = isApproved ? 'badge-success' : (isPending ? 'badge-warning' : 'badge-danger');
+        
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 800; font-size: 13px;">${r.restaurantName || r.restaurantId}</div>
+              <div style="font-size: 11px; color: var(--text-secondary);">Key: ${r.licenseKey || '-'}</div>
+            </td>
+            <td>
+              <div style="font-weight: 600; font-size: 12px;">${r.contactPhone || '-'}</div>
+              ${r.contactPhone ? `<a href="https://wa.me/${r.contactPhone.replace(/[^0-9]/g, '')}?text=Hello%2C%20regarding%20your%20Hinopt%20POS%20upgrade%20request..." target="_blank" style="font-size: 11px; color: #25D366; text-decoration: none; font-weight: 600;">Chat on WhatsApp &rarr;</a>` : ''}
+            </td>
+            <td>
+              <div style="font-size: 11px; line-height: 1.4;">
+                Dishes: <strong>${cur.menuItems || 100}</strong><br>
+                Captains: <strong>${cur.captainDevices || 5}</strong><br>
+                Counters: <strong>${cur.counterPcs || 1}</strong>
+              </div>
+            </td>
+            <td>
+              <div style="font-size: 11px; line-height: 1.4; color: #1565C0;">
+                ${req.menuItems ? `Dishes: <strong>${req.menuItems}</strong> (${req.menuItems > (cur.menuItems || 0) ? '+' + (req.menuItems - (cur.menuItems || 0)) : ''})<br>` : ''}
+                ${req.captainDevices ? `Captains: <strong>${req.captainDevices}</strong> (${req.captainDevices > (cur.captainDevices || 0) ? '+' + (req.captainDevices - (cur.captainDevices || 0)) : ''})<br>` : ''}
+                ${req.counterPcs ? `Counters: <strong>${req.counterPcs}</strong><br>` : ''}
+              </div>
+            </td>
+            <td style="max-width: 180px;">
+              <div style="font-size: 11px; color: var(--text-secondary); word-break: break-word;">${r.notes || 'None'}</div>
+            </td>
+            <td>
+              <div style="font-size: 11px;">${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '-'}</div>
+            </td>
+            <td>
+              <span class="badge ${badgeClass}">${(r.status || 'pending').toUpperCase()}</span>
+            </td>
+            <td>
+              ${isPending ? `
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-primary btn-sm" onclick="approveUpgradeRequest('${r.id}')" title="Approve & Increase Limits">Approve</button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectUpgradeRequest('${r.id}')" title="Reject Request">Reject</button>
+                </div>
+              ` : `
+                <span style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Processed</span>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    console.error('Failed to fetch upgrade requests:', err);
+  }
+}
+
+async function approveUpgradeRequest(reqId) {
+  try {
+    const res = await fetch(`/api/upgrade-requests/${reqId}/approve`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      const reqItem = data.request;
+      // If restaurant exists in HinoptData, update its limits
+      const rest = window.HinoptData.restaurants.find(r => r.id === reqItem.restaurantId || r.licenseKey === reqItem.licenseKey);
+      if (rest) {
+        if (reqItem.requestedLimits.menuItems) rest.menuItemsLimit = parseInt(reqItem.requestedLimits.menuItems, 10);
+        if (reqItem.requestedLimits.captainDevices) rest.captainDevicesLimit = parseInt(reqItem.requestedLimits.captainDevices, 10);
+        if (reqItem.requestedLimits.counterPcs) rest.counterPcsLimit = parseInt(reqItem.requestedLimits.counterPcs, 10);
+        rest.limits = {
+          menuItems: rest.menuItemsLimit || 100,
+          captainDevices: rest.captainDevicesLimit || 5,
+          counterPcs: rest.counterPcsLimit || 1
+        };
+        if (window.LicenseService) {
+          window.LicenseService.updateRestaurantDetails(rest.id, {
+            menuItemsLimit: rest.menuItemsLimit,
+            captainDevicesLimit: rest.captainDevicesLimit,
+            counterPcsLimit: rest.counterPcsLimit
+          });
+        }
+      }
+      showToast('Upgrade request approved! Restaurant limits updated.');
+      fetchUpgradeRequests();
+      renderAll();
+    } else {
+      showToast('Failed to approve request: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showToast('Network error: ' + e.message);
+  }
+}
+
+async function rejectUpgradeRequest(reqId) {
+  try {
+    const res = await fetch(`/api/upgrade-requests/${reqId}/reject`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Upgrade request marked as rejected.');
+      fetchUpgradeRequests();
+    }
+  } catch (e) {
+    showToast('Network error: ' + e.message);
+  }
+}
+
+window.fetchUpgradeRequests = fetchUpgradeRequests;
+window.approveUpgradeRequest = approveUpgradeRequest;
+window.rejectUpgradeRequest = rejectUpgradeRequest;

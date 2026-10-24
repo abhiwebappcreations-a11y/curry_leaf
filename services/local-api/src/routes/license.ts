@@ -63,6 +63,46 @@ licenseRouter.post(
   }
 );
 
+const upgradeRequestSchema = z.object({
+  requestedLimits: z.object({
+    menuItems: z.number().int().positive().optional(),
+    captainDevices: z.number().int().positive().optional(),
+    counterPcs: z.number().int().positive().optional(),
+  }),
+  contactPhone: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+// POST /api/license/upgrade-request - Submit limits upgrade request from Counter POS
+licenseRouter.post(
+  '/upgrade-request',
+  validateBody(upgradeRequestSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await LicenseService.submitUpgradeRequest(req.body);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/license/upgrade-requests - List local upgrade requests
+licenseRouter.get('/upgrade-requests', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const list = LicenseService.getUpgradeRequests();
+    res.json({
+      success: true,
+      data: { requests: list },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/license/verify - Apply renewed / updated license from Hinopt Cloud (Admin only)
 licenseRouter.post(
   '/verify',

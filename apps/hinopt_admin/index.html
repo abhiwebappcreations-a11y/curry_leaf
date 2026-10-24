@@ -43,6 +43,11 @@
           <span>License Keys</span>
           <span class="nav-badge warning" id="badge-expiring-count">1</span>
         </li>
+        <li class="nav-item" data-tab="upgrades">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          <span>Upgrade Requests</span>
+          <span class="nav-badge info" id="badge-upgrades-count" style="display:none;">0</span>
+        </li>
         <li class="nav-item" data-tab="audit">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
           <span>Audit Logs</span>
@@ -177,6 +182,38 @@
                 </tr>
               </thead>
               <tbody id="table-licenses-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tab: License Upgrade Requests -->
+        <section id="tab-upgrades" class="tab-view">
+          <div class="content-panel">
+            <div class="panel-header">
+              <div>
+                <h3>Client License Upgrade Requests</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
+                  Incoming upgrade requests from restaurant POS devices to increase menu dish limits, captain devices, or counter PCs.
+                </p>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="fetchUpgradeRequests()">Refresh Requests</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Restaurant</th>
+                  <th>Contact</th>
+                  <th>Current Limits</th>
+                  <th>Requested Upgrade</th>
+                  <th>Notes</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="table-upgrades-body">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 24px;">Loading upgrade requests...</td></tr>
+              </tbody>
             </table>
           </div>
         </section>

@@ -959,4 +959,20 @@ class CounterProvider extends ChangeNotifier {
     }
     return map;
   }
+
+  Future<({bool success, String? message})> submitUpgradeRequest({
+    required int requestedMenuItems,
+    required int requestedCaptainDevices,
+    required int requestedCounterPcs,
+    String? contactPhone,
+    String? notes,
+  }) async {
+    return await _counterApiService.submitUpgradeRequest(
+      requestedMenuItems: requestedMenuItems,
+      requestedCaptainDevices: requestedCaptainDevices,
+      requestedCounterPcs: requestedCounterPcs,
+      contactPhone: contactPhone,
+      notes: notes,
+    );
+  }
 }

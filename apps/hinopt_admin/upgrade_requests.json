@@ -1,0 +1,23 @@
+[
+  {
+    "id": "upg_1792855894097_ce9166",
+    "restaurantId": "rest_hinopt_lic_any",
+    "restaurantName": "Hinopt Client Restaurant",
+    "licenseKey": "HINOPT-LIC-ANY",
+    "currentLimits": {
+      "menuItems": 100,
+      "captainDevices": 5,
+      "counterPcs": 1
+    },
+    "requestedLimits": {
+      "menuItems": 250,
+      "captainDevices": 10,
+      "counterPcs": 2
+    },
+    "contactPhone": "+91 98490 12345",
+    "notes": "Need more dishes for new party menu and 5 more captain phones",
+    "status": "approved",
+    "createdAt": "2026-10-24T15:31:34.128Z",
+    "approvedAt": "2026-10-24T15:32:00.590Z"
+  }
+]

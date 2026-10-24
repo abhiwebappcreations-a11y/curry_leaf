@@ -1007,5 +1007,40 @@ class CounterApiService {
       return false;
     }
   }
+
+  Future<({bool success, String? message})> submitUpgradeRequest({
+    required int requestedMenuItems,
+    required int requestedCaptainDevices,
+    required int requestedCounterPcs,
+    String? contactPhone,
+    String? notes,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/license/upgrade-request'),
+        headers: headers,
+        body: jsonEncode({
+          'requestedLimits': {
+            'menuItems': requestedMenuItems,
+            'captainDevices': requestedCaptainDevices,
+            'counterPcs': requestedCounterPcs,
+          },
+          if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final msg = body['data']?['message']?.toString() ?? 'Upgrade request submitted successfully!';
+        return (success: true, message: msg);
+      } else {
+        final msg = body['error']?['message']?.toString() ?? 'Failed to submit upgrade request';
+        return (success: false, message: msg);
+      }
+    } catch (e) {
+      return (success: false, message: e.toString());
+    }
+  }
 }
 typedef ApiClient = CounterApiService;

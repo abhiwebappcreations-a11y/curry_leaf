@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../providers/counter_provider.dart';
+import 'upgrade_request_dialog.dart';
 
 void showLicenseActivationDialog(BuildContext context, CounterProvider provider) {
   final textController = TextEditingController();
@@ -56,7 +57,23 @@ void showLicenseActivationDialog(BuildContext context, CounterProvider provider)
                   ],
                 ),
               ),
-              const Divider(height: 24),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: AppColors.primary,
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    UpgradeRequestDialog.show(context);
+                  },
+                  icon: const Icon(Icons.arrow_upward_rounded, size: 14),
+                  label: const Text('Request Limits Upgrade', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const Divider(height: 18),
               const Text(
                 'Enter License / Renewal Key:',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),

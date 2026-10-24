@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/menu_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/upgrade_request_dialog.dart';
 
 class MenuManagementView extends StatelessWidget {
   const MenuManagementView({super.key});
@@ -53,10 +54,18 @@ class MenuManagementView extends StatelessWidget {
             ],
           ),
           actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Understood'),
+              child: const Text('Close'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              onPressed: () {
+                Navigator.pop(ctx);
+                UpgradeRequestDialog.show(context);
+              },
+              icon: const Icon(Icons.arrow_upward_rounded, size: 16),
+              label: const Text('Request Limit Upgrade'),
             ),
           ],
         ),
@@ -485,34 +494,43 @@ class MenuManagementView extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: provider.isMenuItemLimitReached ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9),
-                          border: Border.all(
-                            color: provider.isMenuItemLimitReached ? AppColors.error : AppColors.success,
-                          ),
+                      Tooltip(
+                        message: 'Click to request license limit upgrade',
+                        child: InkWell(
+                          onTap: () => UpgradeRequestDialog.show(context),
                           borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              provider.isMenuItemLimitReached ? Icons.lock_outline : Icons.inventory_2_outlined,
-                              size: 14,
-                              color: provider.isMenuItemLimitReached ? AppColors.error : AppColors.success,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Dishes: ${provider.menuItems.length} / ${provider.menuItemsLimit}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: provider.isMenuItemLimitReached ? AppColors.error : const Color(0xFF2E7D32),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: provider.isMenuItemLimitReached ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9),
+                              border: Border.all(
+                                color: provider.isMenuItemLimitReached ? AppColors.error : AppColors.success,
                               ),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  provider.isMenuItemLimitReached ? Icons.lock_outline : Icons.inventory_2_outlined,
+                                  size: 14,
+                                  color: provider.isMenuItemLimitReached ? AppColors.error : AppColors.success,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Dishes: ${provider.menuItems.length} / ${provider.menuItemsLimit}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: provider.isMenuItemLimitReached ? AppColors.error : const Color(0xFF2E7D32),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_upward_rounded, size: 12, color: AppColors.primary),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       if (provider.menuItems.isNotEmpty) ...[

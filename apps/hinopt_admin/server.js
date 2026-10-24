@@ -156,6 +156,110 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API Routes: License Upgrade Requests
+  const UPGRADE_REQUESTS_FILE = path.join(__dirname, 'upgrade_requests.json');
+
+  if (pathname === '/api/upgrade-requests' && req.method === 'GET') {
+    let requests = [];
+    try {
+      if (fs.existsSync(UPGRADE_REQUESTS_FILE)) {
+        requests = JSON.parse(fs.readFileSync(UPGRADE_REQUESTS_FILE, 'utf8'));
+      }
+    } catch (_) {}
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, requests }));
+    return;
+  }
+
+  if (pathname === '/api/upgrade-requests' && req.method === 'POST') {
+    let bodyStr = '';
+    req.on('data', chunk => { bodyStr += chunk; });
+    req.on('end', () => {
+      try {
+        const body = JSON.parse(bodyStr);
+        let requests = [];
+        try {
+          if (fs.existsSync(UPGRADE_REQUESTS_FILE)) {
+            requests = JSON.parse(fs.readFileSync(UPGRADE_REQUESTS_FILE, 'utf8'));
+          }
+        } catch (_) {}
+
+        const newRequest = {
+          id: body.id || `upg_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+          restaurantId: body.restaurantId || 'rest_curry_leaf_01',
+          restaurantName: body.restaurantName || 'Curry Leaf Fine Dining',
+          licenseKey: body.licenseKey || 'HINOPT-LIC-CL-2026-ACTIVE',
+          currentLimits: body.currentLimits || { menuItems: 100, captainDevices: 5, counterPcs: 1 },
+          requestedLimits: body.requestedLimits || {},
+          contactPhone: body.contactPhone || '',
+          notes: body.notes || '',
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
+
+        requests.unshift(newRequest);
+        fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, request: newRequest }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname.startsWith('/api/upgrade-requests/') && pathname.endsWith('/approve') && req.method === 'POST') {
+    const reqId = pathname.replace('/api/upgrade-requests/', '').replace('/approve', '').trim();
+    let requests = [];
+    try {
+      if (fs.existsSync(UPGRADE_REQUESTS_FILE)) {
+        requests = JSON.parse(fs.readFileSync(UPGRADE_REQUESTS_FILE, 'utf8'));
+      }
+    } catch (_) {}
+
+    const reqItem = requests.find(r => r.id === reqId);
+    if (!reqItem) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Upgrade request not found' }));
+      return;
+    }
+
+    reqItem.status = 'approved';
+    reqItem.approvedAt = new Date().toISOString();
+    fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, request: reqItem }));
+    return;
+  }
+
+  if (pathname.startsWith('/api/upgrade-requests/') && pathname.endsWith('/reject') && req.method === 'POST') {
+    const reqId = pathname.replace('/api/upgrade-requests/', '').replace('/reject', '').trim();
+    let requests = [];
+    try {
+      if (fs.existsSync(UPGRADE_REQUESTS_FILE)) {
+        requests = JSON.parse(fs.readFileSync(UPGRADE_REQUESTS_FILE, 'utf8'));
+      }
+    } catch (_) {}
+
+    const reqItem = requests.find(r => r.id === reqId);
+    if (!reqItem) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'Upgrade request not found' }));
+      return;
+    }
+
+    reqItem.status = 'rejected';
+    reqItem.rejectedAt = new Date().toISOString();
+    fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, request: reqItem }));
+    return;
+  }
+
   // API Route: Google Drive Connection Status
   if (pathname === '/api/google-drive/status' && req.method === 'GET') {
     const isConfigured = GoogleDriveUploader.isConfigured();
