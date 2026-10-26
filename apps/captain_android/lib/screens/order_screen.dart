@@ -313,14 +313,16 @@ class OrderScreen extends StatelessWidget {
                               onAdd: () => provider.addItemToDraft(item),
                               onIncrement: () {
                                 final existing = order?.draftItems
-                                    .firstWhere((i) => i.menuItemId == item.id);
+                                    .where((i) => i.menuItemId == item.id)
+                                    .firstOrNull;
                                 if (existing != null) {
                                   provider.updateDraftQuantity(existing.id, 1);
                                 }
                               },
                               onDecrement: () {
                                 final existing = order?.draftItems
-                                    .firstWhere((i) => i.menuItemId == item.id);
+                                    .where((i) => i.menuItemId == item.id)
+                                    .firstOrNull;
                                 if (existing != null) {
                                   provider.updateDraftQuantity(existing.id, -1);
                                 }

@@ -33,6 +33,8 @@ class PosProvider extends ChangeNotifier {
 
   bool _isPairingApproved = false;
   bool _isPairingPending = false;
+  bool _isLimitExceeded = false;
+  bool _isNameConfigured = false;
   String? _pairingMessage;
   String _deviceId = 'dev_captain_01';
   String _deviceName = 'Captain Phone';
@@ -55,6 +57,8 @@ class PosProvider extends ChangeNotifier {
   bool get isConnected => _isConnected;
   bool get isPairingApproved => _isPairingApproved;
   bool get isPairingPending => _isPairingPending;
+  bool get isLimitExceeded => _isLimitExceeded;
+  bool get isNameConfigured => _isNameConfigured;
   String? get pairingMessage => _pairingMessage;
   String get deviceName => _deviceName;
   String get deviceId => _deviceId;
@@ -119,8 +123,11 @@ class PosProvider extends ChangeNotifier {
         await prefs.setString('captain_device_id', _deviceId);
       }
 
-      if (savedDeviceName != null && savedDeviceName.isNotEmpty) {
-        _deviceName = savedDeviceName;
+      if (savedDeviceName != null && savedDeviceName.trim().isNotEmpty) {
+        _deviceName = savedDeviceName.trim();
+        _isNameConfigured = true;
+      } else {
+        _isNameConfigured = false;
       }
       if (savedApiKey != null && savedApiKey.isNotEmpty) {
         _apiService.apiKey = savedApiKey;
@@ -148,37 +155,17 @@ class PosProvider extends ChangeNotifier {
           }
         }
 
-        // 2. Pair / Permission Handshake with Counter POS
-        final pairRes = await _apiService.requestPairing(
-          deviceId: _deviceId,
-          deviceName: _deviceName,
-        );
-
-        if (pairRes != null) {
-          final status = pairRes['status']?.toString();
-          if (status == 'approved') {
-            _isPairingApproved = true;
-            _isPairingPending = false;
-            if (pairRes['apiKey'] != null) {
-              await prefs.setString('captain_api_key', pairRes['apiKey'].toString());
-            }
-          } else {
-            // Pending Counter Manager Approval
-            _isPairingApproved = false;
-            _isPairingPending = true;
-            _pairingMessage = pairRes['message']?.toString() ??
-                'New device detected. Please tap "Approve" on Counter POS screen.';
-            _startPairingPolling();
-          }
-        } else {
-          // If pair request fails (offline or demo), allow graceful local use
-          _isPairingApproved = true;
+        // 2. Handshake only if waiter name has been given
+        if (_isNameConfigured) {
+          await sendPairingRequest();
         }
       } else {
         _isPairingApproved = true;
       }
     } catch (_) {
-      _isPairingApproved = true;
+      _isPairingApproved = _apiService.useDemoMode;
+      _isPairingPending = false;
+      _pairingMessage = 'Network error connecting to Counter POS (${_apiService.host}:${_apiService.port}).';
     }
 
     _tables = await _apiService.fetchTables();
@@ -197,23 +184,113 @@ class PosProvider extends ChangeNotifier {
     startAutoPolling();
   }
 
+  Future<void> sendPairingRequest([String? customName]) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (customName != null && customName.trim().isNotEmpty) {
+      _deviceName = customName.trim();
+      await prefs.setString('captain_device_name', _deviceName);
+    }
+    _isNameConfigured = true;
+    notifyListeners();
+
+    try {
+      final pairRes = await _apiService.requestPairing(
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+      );
+
+      if (pairRes != null) {
+        final status = pairRes['status']?.toString();
+        if (status == 'approved') {
+          _isPairingApproved = true;
+          _isPairingPending = false;
+          _isLimitExceeded = false;
+          if (pairRes['apiKey'] != null) {
+            await prefs.setString('captain_api_key', pairRes['apiKey'].toString());
+          }
+        } else if (status == 'limit_exceeded') {
+          _isPairingApproved = false;
+          _isPairingPending = false;
+          _isLimitExceeded = true;
+          _pairingMessage = pairRes['message']?.toString() ??
+              'Captain device limit reached. Please upgrade your Hinopt license.';
+          _startPairingPolling();
+        } else {
+          // Pending Counter Manager Approval
+          _isPairingApproved = false;
+          _isPairingPending = true;
+          _isLimitExceeded = false;
+          _pairingMessage = pairRes['message']?.toString() ??
+              'New device detected. Please tap "Approve" on Counter POS screen.';
+          _startPairingPolling();
+        }
+      } else {
+        _isPairingApproved = false;
+        _isPairingPending = false;
+        _isLimitExceeded = false;
+        _pairingMessage = 'Cannot connect to Counter POS at ${_apiService.host}:${_apiService.port}. Please verify Wi-Fi connection.';
+      }
+    } catch (_) {
+      _isPairingApproved = _apiService.useDemoMode;
+      _isPairingPending = false;
+      _pairingMessage = 'Network error connecting to Counter POS (${_apiService.host}:${_apiService.port}).';
+    }
+
+    notifyListeners();
+  }
+
+  void promptRename() {
+    _isNameConfigured = false;
+    notifyListeners();
+  }
+
+  Future<void> updateDeviceName(String name) async {
+    await sendPairingRequest(name);
+  }
+
   void _startPairingPolling() {
     _pairingPollTimer?.cancel();
     _pairingPollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
       final res = await _apiService.checkPairStatus(_deviceId);
-      if (res != null && res['status'] == 'approved') {
-        _pairingPollTimer?.cancel();
-        _pairingPollTimer = null;
-        _isPairingApproved = true;
-        _isPairingPending = false;
+      if (res != null) {
+        final status = res['status']?.toString();
+        if (status == 'approved') {
+          _pairingPollTimer?.cancel();
+          _pairingPollTimer = null;
+          _isPairingApproved = true;
+          _isPairingPending = false;
+          _isLimitExceeded = false;
 
-        if (res['apiKey'] != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('captain_api_key', res['apiKey'].toString());
+          if (res['apiKey'] != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('captain_api_key', res['apiKey'].toString());
+          }
+
+          _tables = await _apiService.fetchTables();
+          _menuItems = await _apiService.fetchMenu();
+          final liveOrders = await _apiService.fetchActiveOrders();
+          _ordersByTableId.clear();
+          for (var o in liveOrders) {
+            _ordersByTableId[o.tableId] = o;
+          }
+
+          await pollLatestState();
+          notifyListeners();
+        } else if (status == 'declined' || status == 'rejected') {
+          _pairingPollTimer?.cancel();
+          _pairingPollTimer = null;
+          _isPairingApproved = false;
+          _isPairingPending = false;
+          _pairingMessage = 'Connection request was declined by Counter Cashier.';
+          notifyListeners();
+        } else if (status == 'limit_exceeded') {
+          _isPairingApproved = false;
+          _isPairingPending = false;
+          _isLimitExceeded = true;
+          _pairingMessage = res['message']?.toString() ??
+              'Captain device limit reached. Please upgrade your Hinopt license.';
+          notifyListeners();
         }
-
-        await pollLatestState();
-        notifyListeners();
       }
     });
   }
@@ -246,10 +323,20 @@ class PosProvider extends ChangeNotifier {
         final serverTableIds = <String>{};
         for (var o in liveOrders) {
           serverTableIds.add(o.tableId);
-          _ordersByTableId[o.tableId] = o;
+          // Preserve local unsent draft items if captain has drafts on this table
+          final existing = _ordersByTableId[o.tableId];
+          final existingDrafts = existing?.draftItems ?? [];
+          if (existingDrafts.isNotEmpty) {
+            final serverSubmitted = o.items.where((i) => !i.isDraft).toList();
+            _ordersByTableId[o.tableId] = o.copyWith(
+              items: [...serverSubmitted, ...existingDrafts],
+            );
+          } else {
+            _ordersByTableId[o.tableId] = o;
+          }
         }
 
-        // Clean up settled tables that no longer have server orders
+        // Clean up settled tables that no longer have server orders AND have no local drafts
         _ordersByTableId.removeWhere((tblId, ord) =>
             !serverTableIds.contains(tblId) && ord.draftItems.isEmpty);
 
@@ -265,16 +352,28 @@ class PosProvider extends ChangeNotifier {
             }
           }
 
-          // Keep current active order synchronized with real server item IDs
-          if (_currentOrder != null && _ordersByTableId.containsKey(_currentTable!.id)) {
-            final serverOrder = _ordersByTableId[_currentTable!.id]!;
+          // Keep current active order synchronized without duplicating drafts
+          if (_currentOrder != null) {
+            final serverOrder = liveOrders.where((o) => o.tableId == _currentTable!.id).firstOrNull;
             final localDrafts = _currentOrder!.draftItems;
-            if (localDrafts.isNotEmpty) {
-              _currentOrder = serverOrder.copyWith(
-                items: [...serverOrder.items, ...localDrafts],
-              );
+
+            if (serverOrder != null) {
+              // Server has an active order for this table: keep server's submitted items and local unsent drafts
+              final serverSubmitted = serverOrder.items.where((i) => !i.isDraft).toList();
+              if (localDrafts.isNotEmpty) {
+                _currentOrder = serverOrder.copyWith(
+                  items: [...serverSubmitted, ...localDrafts],
+                );
+              } else {
+                _currentOrder = serverOrder;
+              }
+              _ordersByTableId[_currentTable!.id] = _currentOrder!;
             } else {
-              _currentOrder = serverOrder;
+              // No server order for this table yet (e.g. fresh table with unsent drafts).
+              // Keep _currentOrder intact: NEVER duplicate local drafts!
+              if (localDrafts.isNotEmpty) {
+                _ordersByTableId[_currentTable!.id] = _currentOrder!;
+              }
             }
           }
         }
