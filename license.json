@@ -1,0 +1,31 @@
+{
+    "signedPayload":  {
+                          "version":  "1.0",
+                          "licenseKey":  "HINOPT-2026-XT5T-4614",
+                          "restaurantId":  "rest-01-2564",
+                          "restaurantName":  "curry leaf restaurant",
+                          "ownerName":  "pavan dewara",
+                          "contactName":  "pavan dewara",
+                          "phone":  "7893938366",
+                          "city":  "chakradwarabandham",
+                          "status":  "active",
+                          "validFrom":  "2026-10-25T09:37:02.941+00:00",
+                          "validUntil":  "2027-10-25T23:59:59+00:00",
+                          "issuedAt":  "2026-10-25T09:37:02.941+00:00",
+                          "expiresAt":  "2027-10-25T23:59:59+00:00",
+                          "limits":  {
+                                         "menuItems":  300,
+                                         "captainDevices":  6,
+                                         "counterPcs":  1
+                                     },
+                          "allowedFeatures":  [
+                                                  "OFFLINE_POS",
+                                                  "CAPTAIN_LAN_SYNC",
+                                                  "DUAL_PRINTER_QUEUE",
+                                                  "GOOGLE_DRIVE_CLOUD_BACKUP"
+                                              ]
+                      },
+    "signature":  "1bf8ff1713345ecf240d48306ee01738c345fa3c1eb8c64a4e561de01e03ef90",
+    "token":  "eyJ2ZXJzaW9uIjoiMS4wIiwibGljZW5zZUtleSI6IkhJTk9QVC0yMDI2LVhUNVQtNDYxNCIsInJlc3RhdXJhbnRJZCI6InJlc3QtMDEtMjU2NCIsInJlc3RhdXJhbnROYW1lIjoiY3VycnkgbGVhZiByZXN0YXVyYW50Iiwib3duZXJOYW1lIjoicGF2YW4gZGV3YXJhIiwiY29udGFjdE5hbWUiOiJwYXZhbiBkZXdhcmEiLCJwaG9uZSI6Ijc4OTM5MzgzNjYiLCJjaXR5IjoiY2hha3JhZHdhcmFiYW5kaGFtIiwic3RhdHVzIjoiYWN0aXZlIiwidmFsaWRGcm9tIjoiMjAyNi0xMC0yNVQwOTozNzowMi45NDErMDA6MDAiLCJ2YWxpZFVudGlsIjoiMjAyNy0xMC0yNVQyMzo1OTo1OSswMDowMCIsImlzc3VlZEF0IjoiMjAyNi0xMC0yNVQwOTozNzowMi45NDErMDA6MDAiLCJleHBpcmVzQXQiOiIyMDI3LTEwLTI1VDIzOjU5OjU5KzAwOjAwIiwibGltaXRzIjp7Im1lbnVJdGVtcyI6MjAwLCJjYXB0YWluRGV2aWNlcyI6NSwiY291bnRlclBjcyI6MX0sImFsbG93ZWRGZWF0dXJlcyI6WyJPRkZMSU5FX1BPUyIsIkNBUFRBSU5fTEFOX1NZTkMiLCJEVUFMX1BSSU5URVJfUVVFVUUiLCJHT09HTEVfRFJJVkVfQ0xPVURfQkFDS1VQIl19.1bf8ff1713345ecf240d48306ee01738c345fa3c1eb8c64a4e561de01e03ef90",
+    "updatedAt":  "2026-10-27T14:07:47.2053045Z"
+}

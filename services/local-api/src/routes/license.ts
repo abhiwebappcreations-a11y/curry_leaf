@@ -23,6 +23,23 @@ licenseRouter.post('/heartbeat', authenticateDevice, async (req: Request, res: R
   res.json({ success: true, data: result });
 });
 
+// POST /api/license/reload - Instantly reload updated limits from disk & cloud
+licenseRouter.post('/reload', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await LicenseService.loadLicenseFromDisk();
+    const status = await LicenseService.getLicenseStatus();
+    res.json({
+      success: true,
+      data: {
+        message: 'License limits reloaded successfully from disk',
+        license: status,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/license/status - Inspect local license verification status
 licenseRouter.get('/status', async (req: Request, res: Response, next: NextFunction) => {
   try {

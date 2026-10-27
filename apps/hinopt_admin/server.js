@@ -385,7 +385,7 @@ const server = http.createServer(async (req, res) => {
     reqItem.approvedAt = new Date().toISOString();
     fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
 
-    // Sync approval to Supabase Cloud
+    // 1. Sync approval and update license in Supabase Cloud
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/upgrade_requests?id=eq.${encodeURIComponent(reqId)}`, {
         method: 'PATCH',
@@ -399,6 +399,54 @@ const server = http.createServer(async (req, res) => {
           updated_at: new Date().toISOString()
         })
       });
+
+      // Update license limits in Supabase
+      if (reqItem.licenseKey) {
+        await fetch(`${SUPABASE_URL}/rest/v1/licenses?license_key=eq.${encodeURIComponent(reqItem.licenseKey)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            max_devices: reqItem.requestedLimits?.captainDevices || 6,
+            signed_payload: {
+              status: 'ACTIVE',
+              restaurantId: reqItem.restaurantId,
+              limits: reqItem.requestedLimits
+            },
+            updated_at: new Date().toISOString()
+          })
+        });
+      }
+    } catch (_) {}
+
+    // 2. Automatically apply updated limits to any local license.json files on disk
+    const licenseCandidatePaths = [
+      path.resolve(__dirname, '../../license.json'),
+      path.resolve(__dirname, '../../services/local-api/license.json'),
+      path.resolve(__dirname, '../../Restaurant_Client_Pack/Local_POS_Server/license.json'),
+    ];
+    for (const licPath of licenseCandidatePaths) {
+      try {
+        if (fs.existsSync(licPath)) {
+          const licData = JSON.parse(fs.readFileSync(licPath, 'utf8'));
+          if (licData.signedPayload) {
+            if (!licData.signedPayload.limits) licData.signedPayload.limits = {};
+            if (reqItem.requestedLimits?.menuItems) licData.signedPayload.limits.menuItems = parseInt(reqItem.requestedLimits.menuItems, 10);
+            if (reqItem.requestedLimits?.captainDevices) licData.signedPayload.limits.captainDevices = parseInt(reqItem.requestedLimits.captainDevices, 10);
+            if (reqItem.requestedLimits?.counterPcs) licData.signedPayload.limits.counterPcs = parseInt(reqItem.requestedLimits.counterPcs, 10);
+            licData.updatedAt = new Date().toISOString();
+            fs.writeFileSync(licPath, JSON.stringify(licData, null, 2), 'utf8');
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Notify running Local POS Server to reload license
+    try {
+      await fetch('http://127.0.0.1:4000/api/license/reload', { method: 'POST' });
     } catch (_) {}
 
     res.writeHead(200, { 'Content-Type': 'application/json' });

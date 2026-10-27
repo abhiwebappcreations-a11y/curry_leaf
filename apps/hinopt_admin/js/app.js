@@ -647,32 +647,55 @@ async function approveUpgradeRequest(reqId) {
     const data = await res.json();
     if (data.success) {
       const reqItem = data.request;
-      // If restaurant exists in HinoptData, update its limits
-      const rest = window.HinoptData.restaurants.find(r => r.id === reqItem.restaurantId || r.licenseKey === reqItem.licenseKey);
-      if (rest) {
-        if (reqItem.requestedLimits.menuItems) rest.menuItemsLimit = parseInt(reqItem.requestedLimits.menuItems, 10);
-        if (reqItem.requestedLimits.captainDevices) rest.captainDevicesLimit = parseInt(reqItem.requestedLimits.captainDevices, 10);
-        if (reqItem.requestedLimits.counterPcs) rest.counterPcsLimit = parseInt(reqItem.requestedLimits.counterPcs, 10);
-        rest.limits = {
-          menuItems: rest.menuItemsLimit || 100,
-          captainDevices: rest.captainDevicesLimit || 5,
-          counterPcs: rest.counterPcsLimit || 1
+      const requested = reqItem.requestedLimits || {};
+
+      // Find or create restaurant in HinoptData
+      let rest = window.HinoptData.restaurants.find(r => r.id === reqItem.restaurantId || r.licenseKey === reqItem.licenseKey);
+      if (!rest) {
+        rest = {
+          id: reqItem.restaurantId || 'rest_curry_leaf',
+          name: reqItem.restaurantName || 'curry leaf restaurant',
+          licenseKey: reqItem.licenseKey,
+          status: 'ACTIVE',
+          issuedAt: new Date().toISOString().split('T')[0],
+          expiresAt: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+          counterIp: '192.168.1.100',
+          notes: 'Auto-registered from approved upgrade request'
         };
-        if (window.LicenseService) {
-          window.LicenseService.updateRestaurantDetails(rest.id, {
-            menuItemsLimit: rest.menuItemsLimit,
-            captainDevicesLimit: rest.captainDevicesLimit,
-            counterPcsLimit: rest.counterPcsLimit
-          });
-        }
-        // Update Supabase license limits
-        if (window.SupabaseClient && rest.licenseKey) {
-          await window.SupabaseClient.updateLicense(rest.licenseKey, {
-            maxDevices: rest.captainDevicesLimit
-          });
-        }
+        window.HinoptData.restaurants.unshift(rest);
       }
-      showToast('Upgrade request approved! Restaurant limits updated.');
+
+      if (requested.menuItems) rest.menuItemsLimit = parseInt(requested.menuItems, 10);
+      if (requested.captainDevices) rest.captainDevicesLimit = parseInt(requested.captainDevices, 10);
+      if (requested.counterPcs) rest.counterPcsLimit = parseInt(requested.counterPcs, 10);
+      rest.limits = {
+        menuItems: rest.menuItemsLimit || 300,
+        captainDevices: rest.captainDevicesLimit || 6,
+        counterPcs: rest.counterPcsLimit || 1
+      };
+
+      if (window.LicenseService) {
+        window.LicenseService.updateRestaurantDetails(rest.id, {
+          menuItemsLimit: rest.menuItemsLimit,
+          captainDevicesLimit: rest.captainDevicesLimit,
+          counterPcsLimit: rest.counterPcsLimit
+        });
+      }
+
+      // Update Supabase license limits and signed_payload
+      if (window.SupabaseClient && (rest.licenseKey || reqItem.licenseKey)) {
+        const targetKey = rest.licenseKey || reqItem.licenseKey;
+        await window.SupabaseClient.updateLicense(targetKey, {
+          maxDevices: rest.captainDevicesLimit,
+          signedPayload: {
+            status: 'ACTIVE',
+            restaurantId: rest.id,
+            limits: rest.limits
+          }
+        });
+      }
+
+      showToast('Upgrade request approved! Restaurant limits updated to: ' + JSON.stringify(rest.limits));
       fetchUpgradeRequests();
       renderAll();
     } else {
