@@ -113,32 +113,107 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Extract restaurant name or fallback
-    const keyParts = rawKey.split('-');
+    const SUPABASE_URL = "https://ybalhfhqaduqsbjotbni.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0";
+
     let restName = 'Hinopt Client Restaurant';
-    if (keyParts.length >= 3 && keyParts[1] !== 'LIC') {
-      restName = keyParts[1].replace(/_/g, ' ');
-    } else if (keyParts.length >= 4 && keyParts[1] === 'LIC') {
-      restName = keyParts[2].replace(/_/g, ' ');
+    let ownerName = '';
+    let phone = '';
+    let city = '';
+    let restaurantId = `rest_${rawKey.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    let limits = {
+      menuItems: 200,
+      captainDevices: 5,
+      counterPcs: 1,
+    };
+    let validFrom = new Date().toISOString();
+    let validUntil = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
+    let status = 'active';
+
+    try {
+      const licRes = await fetch(`${SUPABASE_URL}/rest/v1/licenses?license_key=eq.${encodeURIComponent(rawKey)}&select=*`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      });
+      if (licRes.ok) {
+        const licenses = await licRes.json();
+        if (licenses && licenses.length > 0) {
+          const lic = licenses[0];
+          restaurantId = lic.restaurant_id || restaurantId;
+          status = (lic.status || 'ACTIVE').toLowerCase();
+          if (lic.valid_from) validFrom = lic.valid_from;
+          if (lic.valid_until) validUntil = lic.valid_until;
+          if (lic.max_devices) limits.captainDevices = lic.max_devices;
+          if (lic.menu_items_limit) limits.menuItems = lic.menu_items_limit;
+          if (lic.counter_pcs_limit) limits.counterPcs = lic.counter_pcs_limit;
+
+          // Fetch Restaurant details (name, owner, phone, city)
+          const restRes = await fetch(`${SUPABASE_URL}/rest/v1/restaurants?id=eq.${encodeURIComponent(restaurantId)}&select=*`, {
+            headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+          });
+          if (restRes.ok) {
+            const restaurants = await restRes.json();
+            if (restaurants && restaurants.length > 0) {
+              const r = restaurants[0];
+              restName = r.name || restName;
+              ownerName = r.contact_name || '';
+              phone = r.phone || '';
+              city = r.city || '';
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Hinopt Admin] Supabase lookup error:', err.message);
     }
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 365 * 24 * 3600 * 1000).toISOString();
+    // Fallback parsing if key was not found in Supabase
+    if (restName === 'Hinopt Client Restaurant') {
+      const keyParts = rawKey.split('-');
+      if (keyParts.length >= 3 && keyParts[1] !== 'LIC') {
+        restName = keyParts[1].replace(/_/g, ' ');
+      } else if (keyParts.length >= 4 && keyParts[1] === 'LIC') {
+        restName = keyParts[2].replace(/_/g, ' ');
+      }
+    }
+
+    // If client sent its hardware ID during lookup/activation, immediately persist it to Supabase!
+    const clientHwid = parsedUrl.searchParams.get('hwid');
+    if (clientHwid && restaurantId) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/restaurants?id=eq.${encodeURIComponent(restaurantId)}`, {
+          method: 'PATCH',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            hwid: clientHwid,
+            updated_at: new Date().toISOString(),
+          }),
+        });
+        console.log(`[Hinopt Admin] Bound client Hardware ID "${clientHwid}" to restaurant "${restaurantId}" in Supabase Cloud`);
+      } catch (err) {
+        console.warn('[Hinopt Admin] Failed to patch HWID into Supabase:', err.message);
+      }
+    }
+
     const payload = {
       version: '1.0',
       licenseKey: rawKey.toUpperCase(),
-      restaurantId: `rest_${rawKey.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+      restaurantId: restaurantId,
       restaurantName: restName,
-      status: 'active',
-      validFrom: now.toISOString(),
-      validUntil: expiresAt,
-      issuedAt: now.toISOString(),
-      expiresAt: expiresAt,
-      limits: {
-        menuItems: 100,
-        captainDevices: 5,
-        counterPcs: 1,
-      },
+      ownerName: ownerName,
+      contactName: ownerName,
+      phone: phone,
+      city: city,
+      status: status,
+      validFrom: validFrom,
+      validUntil: validUntil,
+      issuedAt: validFrom,
+      expiresAt: validUntil,
+      limits: limits,
       allowedFeatures: ['OFFLINE_POS', 'CAPTAIN_LAN_SYNC', 'DUAL_PRINTER_QUEUE', 'GOOGLE_DRIVE_CLOUD_BACKUP'],
     };
 
@@ -166,6 +241,86 @@ const server = http.createServer(async (req, res) => {
         requests = JSON.parse(fs.readFileSync(UPGRADE_REQUESTS_FILE, 'utf8'));
       }
     } catch (_) {}
+
+    // Auto-discover any pending requests created by local POS servers
+    const siblingPaths = [
+      path.resolve(__dirname, '../../services/local-api/data/upgrade_requests.json'),
+      path.resolve(__dirname, '../../Restaurant_Client_Pack/Local_POS_Server/data/upgrade_requests.json'),
+      path.resolve(__dirname, '../hinopt_admin/upgrade_requests.json'),
+    ];
+    if (process.env.LOCALAPPDATA) {
+      siblingPaths.push(
+        path.join(process.env.LOCALAPPDATA, 'Programs/HinoptAdmin/apps/hinopt_admin/upgrade_requests.json')
+      );
+    }
+
+    let modified = false;
+    for (const p of siblingPaths) {
+      try {
+        if (fs.existsSync(p) && p !== UPGRADE_REQUESTS_FILE) {
+          const list = JSON.parse(fs.readFileSync(p, 'utf8'));
+          if (Array.isArray(list)) {
+            for (const item of list) {
+              const existingIdx = requests.findIndex(r => r.id === item.id);
+              if (existingIdx === -1) {
+                requests.unshift(item);
+                modified = true;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Also sync with Supabase Cloud if available
+    const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+    const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+
+    try {
+      const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/upgrade_requests?select=*&order=created_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (sbRes.ok) {
+        const cloudList = await sbRes.json();
+        if (Array.isArray(cloudList)) {
+          for (const item of cloudList) {
+            const mapped = {
+              id: item.id,
+              restaurantId: item.restaurant_id || item.restaurantId,
+              restaurantName: item.restaurant_name || item.restaurantName,
+              licenseKey: item.license_key || item.licenseKey,
+              currentLimits: item.current_limits || item.currentLimits || {},
+              requestedLimits: item.requested_limits || item.requestedLimits || {},
+              contactPhone: item.contact_phone || item.contactPhone || '',
+              notes: item.notes || '',
+              status: item.status || 'pending',
+              createdAt: item.created_at || item.createdAt
+            };
+            const existingIdx = requests.findIndex(r => r.id === mapped.id);
+            if (existingIdx === -1) {
+              requests.unshift(mapped);
+              modified = true;
+            } else {
+              // Update status from cloud if changed
+              if (requests[existingIdx].status !== mapped.status) {
+                requests[existingIdx].status = mapped.status;
+                modified = true;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (modified) {
+      try {
+        fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
+      } catch (_) {}
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, requests }));
     return;
@@ -230,6 +385,22 @@ const server = http.createServer(async (req, res) => {
     reqItem.approvedAt = new Date().toISOString();
     fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
 
+    // Sync approval to Supabase Cloud
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/upgrade_requests?id=eq.${encodeURIComponent(reqId)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'approved',
+          updated_at: new Date().toISOString()
+        })
+      });
+    } catch (_) {}
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, request: reqItem }));
     return;
@@ -255,6 +426,22 @@ const server = http.createServer(async (req, res) => {
     reqItem.rejectedAt = new Date().toISOString();
     fs.writeFileSync(UPGRADE_REQUESTS_FILE, JSON.stringify(requests, null, 2), 'utf8');
 
+    // Sync rejection to Supabase Cloud
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/upgrade_requests?id=eq.${encodeURIComponent(reqId)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'rejected',
+          updated_at: new Date().toISOString()
+        })
+      });
+    } catch (_) {}
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, request: reqItem }));
     return;
@@ -264,16 +451,33 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/google-drive/status' && req.method === 'GET') {
     const isConfigured = GoogleDriveUploader.isConfigured();
     const creds = GoogleDriveUploader.getCredentials();
+    let folderFound = false;
+    let folderId = null;
+    let error = null;
+
+    if (isConfigured && creds) {
+      try {
+        const token = await GoogleDriveUploader.getAccessToken(creds);
+        folderId = await GoogleDriveUploader.findSharedFolderId(token);
+        folderFound = !!folderId;
+      } catch (e) {
+        error = e.message;
+      }
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
       googleDriveConnected: isConfigured,
-      clientEmail: creds?.client_email || null,
-      projectId: creds?.project_id || null,
-      credentialsPath: 'apps/hinopt_admin/google_drive_credentials.json',
-      instructions: isConfigured
-        ? 'Google Drive is connected and active!'
-        : 'Place your Google Cloud Service Account JSON key into apps/hinopt_admin/google_drive_credentials.json to link your Google Drive.'
+      serviceAccountEmail: creds?.client_email || null,
+      hasSharedFolder: folderFound,
+      folderId,
+      error,
+      instructions: !isConfigured
+        ? 'Place your Google Cloud Service Account JSON key into apps/hinopt_admin/google_drive_credentials.json.'
+        : (!folderFound
+            ? `Please create a folder in your personal Google Drive (e.g. 'Hinopt_POS_Backups') and click Share -> grant Editor access to: ${creds.client_email}`
+            : 'Google Drive is fully connected and ready to receive encrypted backups!')
     }));
     return;
   }
@@ -376,6 +580,37 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API Route: List all local Cloud Backups across restaurants
+  if (pathname === '/api/cloud-backups/list' && req.method === 'GET') {
+    const baseDir = path.join(__dirname, 'cloud_backups');
+    const backups = [];
+    if (fs.existsSync(baseDir)) {
+      const restDirs = fs.readdirSync(baseDir, { withFileTypes: true });
+      for (const d of restDirs) {
+        if (d.isDirectory()) {
+          const restId = d.name;
+          const rDir = path.join(baseDir, restId);
+          const files = fs.readdirSync(rDir).filter(f => f.endsWith('.enc'));
+          for (const f of files) {
+            const st = fs.statSync(path.join(rDir, f));
+            backups.push({
+              restaurant_id: restId,
+              restaurant_name: restId,
+              file_name: f,
+              size_bytes: st.size,
+              encryption_cipher: 'AES-256-GCM',
+              created_at: st.mtime.toISOString()
+            });
+          }
+        }
+      }
+    }
+    backups.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, backups }));
+    return;
+  }
+
   // API Route: 30-Day Check-in / Heartbeat & Hardware Revocation Check
   if (pathname === '/api/license/heartbeat' && req.method === 'POST') {
     let bodyStr = '';
@@ -402,12 +637,27 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+        let approvedLimits = null;
+        if (fs.existsSync(UPGRADE_REQUESTS_FILE)) {
+          try {
+            const upgList = JSON.parse(fs.readFileSync(UPGRADE_REQUESTS_FILE, 'utf8'));
+            const latestApproved = upgList.find(r => 
+              (r.restaurantId === payload.restaurantId || r.licenseKey === payload.licenseKey || (payload.hwid && r.hwid === payload.hwid)) && 
+              r.status === 'approved'
+            );
+            if (latestApproved && latestApproved.requestedLimits) {
+              approvedLimits = latestApproved.requestedLimits;
+            }
+          } catch (_) {}
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
           status: 'active',
           code: 'OK',
-          lastVerifiedAt: new Date().toISOString()
+          lastVerifiedAt: new Date().toISOString(),
+          approvedLimits: approvedLimits || undefined
         }));
       } catch (err) {
         res.writeHead(400, { 'Content-Type': 'application/json' });

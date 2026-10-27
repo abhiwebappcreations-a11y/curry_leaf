@@ -76,15 +76,32 @@ export class GoogleDriveUploader {
   }
 
   static async findSharedFolderId(token, folderName = 'Hinopt_POS_Backups') {
+    const creds = this.getCredentials();
+    if (creds?.folder_id) return creds.folder_id;
+    if (process.env.GOOGLE_DRIVE_FOLDER_ID) return process.env.GOOGLE_DRIVE_FOLDER_ID;
+
     try {
+      // 1. Search for designated folderName shared with the bot
       const q = encodeURIComponent(`name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`, {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         if (data.files && data.files.length > 0) {
           return data.files[0].id;
+        }
+      }
+
+      // 2. Fallback: Search for ANY folder shared with the bot
+      const anyFolderQ = encodeURIComponent(`mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+      const anyRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${anyFolderQ}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (anyRes.ok) {
+        const anyData = await anyRes.json();
+        if (anyData.files && anyData.files.length > 0) {
+          return anyData.files[0].id;
         }
       }
     } catch (_) {}
@@ -107,14 +124,20 @@ export class GoogleDriveUploader {
       targetFolderId = await this.findSharedFolderId(token);
     }
 
+    if (!targetFolderId) {
+      return {
+        success: false,
+        reason: 'no_shared_folder',
+        clientEmail: creds.client_email,
+        message: `No Google Drive folder has been shared with service account '${creds.client_email}'. Please create a folder in your Google Drive and share it with this email as Editor.`,
+      };
+    }
+
     const metadata = {
       name: fileName,
       mimeType: 'application/octet-stream',
+      parents: [targetFolderId],
     };
-
-    if (targetFolderId) {
-      metadata.parents = [targetFolderId];
-    }
 
     const boundary = '-------314159265358979323846';
     const delimiter = `\r\n--${boundary}\r\n`;
@@ -130,7 +153,7 @@ export class GoogleDriveUploader {
       closeDelimiter;
 
     const resp = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
       {
         method: 'POST',
         headers: {

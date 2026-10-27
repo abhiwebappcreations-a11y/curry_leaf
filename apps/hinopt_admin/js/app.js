@@ -101,6 +101,7 @@ function switchTab(tabName) {
     restaurants: 'Client Restaurants Directory',
     licenses: 'License Token Issuance & Lifecycle',
     upgrades: 'Client License Limits Upgrade Requests',
+    backups: 'Restaurant Cloud Backups (Partitioned by Restaurant ID)',
     audit: 'Immutable Security & Administrative Audit Logs',
     security: 'Cloud Signing Keys & Protocol Info'
   };
@@ -188,6 +189,7 @@ function renderAll() {
   renderLicenses();
   renderAuditLogs();
   fetchUpgradeRequests();
+  fetchCloudBackups();
 }
 
 function renderKpis() {
@@ -524,76 +526,110 @@ async function fetchUpgradeRequests() {
   const tbody = document.getElementById('table-upgrades-body');
   const badge = document.getElementById('badge-upgrades-count');
   try {
-    const res = await fetch('/api/upgrade-requests');
-    const data = await res.json();
-    if (data.success && Array.isArray(data.requests)) {
-      const requests = data.requests;
-      const pendingCount = requests.filter(r => r.status === 'pending').length;
-      if (badge) {
-        badge.textContent = pendingCount;
-        badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
-      }
+    let requests = [];
 
-      if (!tbody) return;
-      if (requests.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 24px;">No upgrade requests received yet.</td></tr>`;
-        return;
+    // 1. Try Supabase cloud first
+    if (window.SupabaseClient) {
+      try {
+        const sbData = await window.SupabaseClient.fetchUpgradeRequests();
+        if (Array.isArray(sbData)) {
+          requests = sbData.map(r => ({
+            id: r.id,
+            restaurantId: r.restaurant_id || r.restaurantId,
+            restaurantName: r.restaurant_name || r.restaurantName,
+            licenseKey: r.license_key || r.licenseKey,
+            currentLimits: r.current_limits || r.currentLimits || {},
+            requestedLimits: r.requested_limits || r.requestedLimits || {},
+            contactPhone: r.contact_phone || r.contactPhone || '',
+            notes: r.notes || '',
+            status: r.status || 'pending',
+            createdAt: r.created_at || r.createdAt
+          }));
+        }
+      } catch (sbErr) {
+        console.warn('Supabase fetchUpgradeRequests failed, fallback to local API:', sbErr);
       }
-
-      tbody.innerHTML = requests.map(r => {
-        const cur = r.currentLimits || {};
-        const req = r.requestedLimits || {};
-        const isPending = r.status === 'pending';
-        const isApproved = r.status === 'approved';
-        const badgeClass = isApproved ? 'badge-success' : (isPending ? 'badge-warning' : 'badge-danger');
-        
-        return `
-          <tr>
-            <td>
-              <div style="font-weight: 800; font-size: 13px;">${r.restaurantName || r.restaurantId}</div>
-              <div style="font-size: 11px; color: var(--text-secondary);">Key: ${r.licenseKey || '-'}</div>
-            </td>
-            <td>
-              <div style="font-weight: 600; font-size: 12px;">${r.contactPhone || '-'}</div>
-              ${r.contactPhone ? `<a href="https://wa.me/${r.contactPhone.replace(/[^0-9]/g, '')}?text=Hello%2C%20regarding%20your%20Hinopt%20POS%20upgrade%20request..." target="_blank" style="font-size: 11px; color: #25D366; text-decoration: none; font-weight: 600;">Chat on WhatsApp &rarr;</a>` : ''}
-            </td>
-            <td>
-              <div style="font-size: 11px; line-height: 1.4;">
-                Dishes: <strong>${cur.menuItems || 100}</strong><br>
-                Captains: <strong>${cur.captainDevices || 5}</strong><br>
-                Counters: <strong>${cur.counterPcs || 1}</strong>
-              </div>
-            </td>
-            <td>
-              <div style="font-size: 11px; line-height: 1.4; color: #1565C0;">
-                ${req.menuItems ? `Dishes: <strong>${req.menuItems}</strong> (${req.menuItems > (cur.menuItems || 0) ? '+' + (req.menuItems - (cur.menuItems || 0)) : ''})<br>` : ''}
-                ${req.captainDevices ? `Captains: <strong>${req.captainDevices}</strong> (${req.captainDevices > (cur.captainDevices || 0) ? '+' + (req.captainDevices - (cur.captainDevices || 0)) : ''})<br>` : ''}
-                ${req.counterPcs ? `Counters: <strong>${req.counterPcs}</strong><br>` : ''}
-              </div>
-            </td>
-            <td style="max-width: 180px;">
-              <div style="font-size: 11px; color: var(--text-secondary); word-break: break-word;">${r.notes || 'None'}</div>
-            </td>
-            <td>
-              <div style="font-size: 11px;">${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '-'}</div>
-            </td>
-            <td>
-              <span class="badge ${badgeClass}">${(r.status || 'pending').toUpperCase()}</span>
-            </td>
-            <td>
-              ${isPending ? `
-                <div style="display: flex; gap: 6px;">
-                  <button class="btn btn-primary btn-sm" onclick="approveUpgradeRequest('${r.id}')" title="Approve & Increase Limits">Approve</button>
-                  <button class="btn btn-danger btn-sm" onclick="rejectUpgradeRequest('${r.id}')" title="Reject Request">Reject</button>
-                </div>
-              ` : `
-                <span style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Processed</span>
-              `}
-            </td>
-          </tr>
-        `;
-      }).join('');
     }
+
+    // 2. Fetch local API requests and merge
+    try {
+      const res = await fetch('/api/upgrade-requests');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.requests)) {
+        for (const loc of data.requests) {
+          const idx = requests.findIndex(r => r.id === loc.id);
+          if (idx === -1) {
+            requests.push(loc);
+          }
+        }
+      }
+    } catch (_) {}
+
+    const pendingCount = requests.filter(r => r.status === 'pending').length;
+    if (badge) {
+      badge.textContent = pendingCount;
+      badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
+
+    if (!tbody) return;
+    if (requests.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 24px;">No upgrade requests received yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = requests.map(r => {
+      const cur = r.currentLimits || {};
+      const req = r.requestedLimits || {};
+      const isPending = r.status === 'pending';
+      const isApproved = r.status === 'approved';
+      const badgeClass = isApproved ? 'badge-success' : (isPending ? 'badge-warning' : 'badge-danger');
+      
+      return `
+        <tr>
+          <td>
+            <div style="font-weight: 800; font-size: 13px;">${r.restaurantName || r.restaurantId}</div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Key: ${r.licenseKey || '-'}</div>
+          </td>
+          <td>
+            <div style="font-weight: 600; font-size: 12px;">${r.contactPhone || '-'}</div>
+            ${r.contactPhone ? `<a href="https://wa.me/${r.contactPhone.replace(/[^0-9]/g, '')}?text=Hello%2C%20regarding%20your%20Hinopt%20POS%20upgrade%20request..." target="_blank" style="font-size: 11px; color: #25D366; text-decoration: none; font-weight: 600;">Chat on WhatsApp &rarr;</a>` : ''}
+          </td>
+          <td>
+            <div style="font-size: 11px; line-height: 1.4;">
+              Dishes: <strong>${cur.menuItems || 100}</strong><br>
+              Captains: <strong>${cur.captainDevices || 5}</strong><br>
+              Counters: <strong>${cur.counterPcs || 1}</strong>
+            </div>
+          </td>
+          <td>
+            <div style="font-size: 11px; line-height: 1.4; color: #1565C0;">
+              ${req.menuItems ? `Dishes: <strong>${req.menuItems}</strong> (${req.menuItems > (cur.menuItems || 0) ? '+' + (req.menuItems - (cur.menuItems || 0)) : ''})<br>` : ''}
+              ${req.captainDevices ? `Captains: <strong>${req.captainDevices}</strong> (${req.captainDevices > (cur.captainDevices || 0) ? '+' + (req.captainDevices - (cur.captainDevices || 0)) : ''})<br>` : ''}
+              ${req.counterPcs ? `Counters: <strong>${req.counterPcs}</strong><br>` : ''}
+            </div>
+          </td>
+          <td style="max-width: 180px;">
+            <div style="font-size: 11px; color: var(--text-secondary); word-break: break-word;">${r.notes || 'None'}</div>
+          </td>
+          <td>
+            <div style="font-size: 11px;">${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '-'}</div>
+          </td>
+          <td>
+            <span class="badge ${badgeClass}">${(r.status || 'pending').toUpperCase()}</span>
+          </td>
+          <td>
+            ${isPending ? `
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-primary btn-sm" onclick="approveUpgradeRequest('${r.id}')" title="Approve & Increase Limits">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectUpgradeRequest('${r.id}')" title="Reject Request">Reject</button>
+              </div>
+            ` : `
+              <span style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Processed</span>
+            `}
+          </td>
+        </tr>
+      `;
+    }).join('');
   } catch (err) {
     console.error('Failed to fetch upgrade requests:', err);
   }
@@ -601,6 +637,12 @@ async function fetchUpgradeRequests() {
 
 async function approveUpgradeRequest(reqId) {
   try {
+    // 1. Update in Supabase Cloud
+    if (window.SupabaseClient) {
+      await window.SupabaseClient.updateUpgradeRequestStatus(reqId, 'approved');
+    }
+
+    // 2. Update via Local API
     const res = await fetch(`/api/upgrade-requests/${reqId}/approve`, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
@@ -623,6 +665,12 @@ async function approveUpgradeRequest(reqId) {
             counterPcsLimit: rest.counterPcsLimit
           });
         }
+        // Update Supabase license limits
+        if (window.SupabaseClient && rest.licenseKey) {
+          await window.SupabaseClient.updateLicense(rest.licenseKey, {
+            maxDevices: rest.captainDevicesLimit
+          });
+        }
       }
       showToast('Upgrade request approved! Restaurant limits updated.');
       fetchUpgradeRequests();
@@ -637,6 +685,12 @@ async function approveUpgradeRequest(reqId) {
 
 async function rejectUpgradeRequest(reqId) {
   try {
+    // 1. Update in Supabase Cloud
+    if (window.SupabaseClient) {
+      await window.SupabaseClient.updateUpgradeRequestStatus(reqId, 'rejected');
+    }
+
+    // 2. Update via Local API
     const res = await fetch(`/api/upgrade-requests/${reqId}/reject`, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
@@ -651,3 +705,81 @@ async function rejectUpgradeRequest(reqId) {
 window.fetchUpgradeRequests = fetchUpgradeRequests;
 window.approveUpgradeRequest = approveUpgradeRequest;
 window.rejectUpgradeRequest = rejectUpgradeRequest;
+
+async function fetchCloudBackups() {
+  const tbody = document.getElementById('table-backups-body');
+  if (!tbody) return;
+
+  try {
+    let backups = [];
+    if (window.SupabaseClient && typeof window.SupabaseClient.fetchCloudBackups === 'function') {
+      const live = await window.SupabaseClient.fetchCloudBackups();
+      if (Array.isArray(live)) {
+        backups = live;
+      }
+    }
+
+    // Also fetch local cloud backups from server if available
+    try {
+      const localRes = await fetch('/api/cloud-backups/list');
+      if (localRes.ok) {
+        const localData = await localRes.json();
+        if (localData.success && Array.isArray(localData.backups)) {
+          const existingFiles = new Set(backups.map(b => b.file_name));
+          for (const lb of localData.backups) {
+            if (!existingFiles.has(lb.file_name)) {
+              backups.push(lb);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    const badge = document.getElementById('badge-backups-count');
+    if (badge) {
+      badge.textContent = backups.length;
+      badge.style.display = backups.length > 0 ? 'inline-block' : 'none';
+    }
+
+    if (!backups || backups.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">No backups found yet. When a client POS syncs, backups will automatically appear partitioned here.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = backups.map(b => {
+      const sizeStr = b.size_bytes ? `${Math.round(b.size_bytes / 1024)} KB` : 'N/A';
+      const createdStr = b.created_at ? new Date(b.created_at).toLocaleString() : 'N/A';
+      return `
+        <tr>
+          <td>
+            <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);">${b.restaurant_name || b.restaurant_id || 'Unknown'}</div>
+          </td>
+          <td>
+            <code style="background: var(--surface-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px; color: var(--primary); font-weight: 700;">${b.restaurant_id || 'default'}</code>
+          </td>
+          <td>
+            <span style="font-family: monospace; font-size: 12px;">${b.file_name || 'backup.enc'}</span>
+          </td>
+          <td>
+            <span style="font-size: 12px; font-weight: 600;">${sizeStr}</span>
+          </td>
+          <td>
+            <span class="badge badge-success" style="font-size: 10px;">${b.encryption_cipher || 'AES-256-GCM'}</span>
+          </td>
+          <td>
+            <div style="font-size: 12px; color: var(--text-secondary);">${createdStr}</div>
+          </td>
+          <td>
+            <span style="display: inline-flex; align-items: center; gap: 4px; color: #2e7d32; font-size: 12px; font-weight: 700;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #2e7d32;"></span> Saved
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to fetch cloud backups:', err);
+  }
+}
+
+window.fetchCloudBackups = fetchCloudBackups;

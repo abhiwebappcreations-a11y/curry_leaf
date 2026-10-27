@@ -58,6 +58,20 @@ window.SupabaseClient = {
     return null;
   },
 
+  fetchCloudBackups: async function() {
+    try {
+      const res = await fetch(`${this.url}/rest/v1/cloud_backups?select=*&order=created_at.desc&limit=100`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchCloudBackups error:', e);
+    }
+    return [];
+  },
+
   updateRestaurant: async function(id, data) {
     try {
       const body = {
@@ -164,5 +178,50 @@ window.SupabaseClient = {
         body: JSON.stringify(logEntry)
       });
     } catch (_) {}
+  },
+
+  fetchUpgradeRequests: async function() {
+    try {
+      const res = await fetch(`${this.url}/rest/v1/upgrade_requests?select=*&order=created_at.desc`, {
+        headers: this.getHeaders()
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchUpgradeRequests error:', e);
+    }
+    return null;
+  },
+
+  insertUpgradeRequest: async function(request) {
+    try {
+      const res = await fetch(`${this.url}/rest/v1/upgrade_requests`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(request)
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[Supabase] insertUpgradeRequest error:', e);
+      return false;
+    }
+  },
+
+  updateUpgradeRequestStatus: async function(reqId, status) {
+    try {
+      const res = await fetch(`${this.url}/rest/v1/upgrade_requests?id=eq.${reqId}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[Supabase] updateUpgradeRequestStatus error:', e);
+      return false;
+    }
   }
 };

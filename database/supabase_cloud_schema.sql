@@ -73,12 +73,28 @@ CREATE TABLE IF NOT EXISTS revoked_hwids (
     revoked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7. License Upgrade Requests Table (Syncs upgrade requests from POS clients to Cloud Admin)
+CREATE TABLE IF NOT EXISTS upgrade_requests (
+    id VARCHAR(100) PRIMARY KEY,
+    restaurant_id VARCHAR(50),
+    restaurant_name VARCHAR(150) NOT NULL,
+    license_key VARCHAR(100),
+    current_limits JSONB DEFAULT '{}'::jsonb,
+    requested_limits JSONB DEFAULT '{}'::jsonb,
+    contact_phone VARCHAR(50),
+    notes TEXT,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Enable RLS and Permissive Policies for Hinopt Admin Service Role
 ALTER TABLE restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE licenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cloud_backups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE revoked_hwids ENABLE ROW LEVEL SECURITY;
+ALTER TABLE upgrade_requests ENABLE ROW LEVEL SECURITY;
 
 -- Allow full access with service_role / apikey
 DROP POLICY IF EXISTS "Allow full access for service role" ON restaurants;
@@ -95,3 +111,6 @@ CREATE POLICY "Allow full access for service role" ON cloud_backups FOR ALL USIN
 
 DROP POLICY IF EXISTS "Allow full access for service role" ON revoked_hwids;
 CREATE POLICY "Allow full access for service role" ON revoked_hwids FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow full access for service role" ON upgrade_requests;
+CREATE POLICY "Allow full access for service role" ON upgrade_requests FOR ALL USING (true);
