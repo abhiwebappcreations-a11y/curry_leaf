@@ -22,14 +22,14 @@ class ApiService {
   String apiKey = 'captain_dev_token_01';
 
   ApiService({
-    this.host = '192.168.29.116', // Default to Counter PC IP (fallback: 192.168.1.100)
+    this.host = '192.168.10.5', // Default to Counter PC IP (fallback: 192.168.10.4 / 192.168.1.100)
     this.port = 4000,
     this.useDemoMode = false,    // Set default to false
   });
 
   String get baseUrl {
     // When running inside a browser preview on the host machine, route to 127.0.0.1
-    if (kIsWeb && (host == '192.168.1.100' || host == '192.168.29.116')) {
+    if (kIsWeb && (host == '192.168.1.100' || host == '192.168.10.4' || host == '192.168.10.5' || host == '192.168.29.116')) {
       return 'http://127.0.0.1:$port/api';
     }
     return 'http://$host:$port/api';
@@ -153,7 +153,7 @@ class ApiService {
         return list.map((json) => RestaurantTable.fromJson(json as Map<String, dynamic>)).toList();
       }
     } catch (_) {}
-    return MockData.getInitialTables();
+    return useDemoMode ? MockData.getInitialTables() : [];
   }
 
   Future<List<MenuItem>> fetchMenu() async {
@@ -194,7 +194,7 @@ class ApiService {
         return parsedItems;
       }
     } catch (_) {}
-    return MockData.getInitialMenu();
+    return useDemoMode ? MockData.getInitialMenu() : [];
   }
 
   Future<List<RestaurantOrder>> fetchActiveOrders() async {
@@ -408,5 +408,76 @@ class ApiService {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<({bool success, String message})> submitUpgradeRequest({
+    required int requestedCaptains,
+    String? contactPhone,
+    String? notes,
+  }) async {
+    if (useDemoMode) {
+      return (success: true, message: 'Demo Mode: Upgrade request simulated.');
+    }
+
+    // 1. Try local POS server endpoint
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/license/upgrade-request'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-Id': deviceId,
+        },
+        body: jsonEncode({
+          'requestedLimits': {
+            'captainDevices': requestedCaptains,
+          },
+          if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = jsonDecode(response.body);
+        final msg = body['data']?['message']?.toString() ?? 'Upgrade request submitted to Hinopt Admin!';
+        return (success: true, message: msg);
+      }
+    } catch (_) {}
+
+    // 2. Direct Cloud Fallback to Supabase
+    try {
+      const sbUrl = 'https://ybalhfhqaduqsbjotbni.supabase.co';
+      const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+
+      final sbRes = await http.post(
+        Uri.parse('$sbUrl/rest/v1/upgrade_requests'),
+        headers: {
+          'apikey': sbKey,
+          'Authorization': 'Bearer $sbKey',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: jsonEncode({
+          'id': 'upg_${DateTime.now().millisecondsSinceEpoch}',
+          'restaurant_id': 'rest-01-0435',
+          'restaurant_name': 'curry leaf restaurant',
+          'license_key': 'HINOPT-2026-1RE3-1878',
+          'current_limits': {'captainDevices': 2},
+          'requested_limits': {'captainDevices': requestedCaptains},
+          'contact_phone': contactPhone ?? '',
+          'notes': notes ?? 'Requested directly from Captain Tablet ($deviceId)',
+          'status': 'pending',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (sbRes.statusCode == 200 || sbRes.statusCode == 201) {
+        return (success: true, message: 'Upgrade request synced directly to Hinopt Cloud Admin!');
+      }
+    } catch (e) {
+      return (success: false, message: 'Could not connect to POS Server or Cloud Admin: $e');
+    }
+
+    return (success: false, message: 'Failed to submit upgrade request');
   }
 }

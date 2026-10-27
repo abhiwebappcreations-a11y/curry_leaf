@@ -6,7 +6,10 @@ import { validateBody } from '../middleware/validate.js';
 
 export const licenseRouter = Router();
 
-licenseRouter.use(authenticateDevice);
+// licenseRouter.use(authenticateDevice);
+// Note: Do NOT apply authenticateDevice globally here.
+// Endpoints like /upgrade-request, /hwid, and /activate-key must be reachable
+// even when a device is pending approval or when the device limit is reached.
 
 // GET /api/license/hwid - Inspect local PC Hardware ID
 licenseRouter.get('/hwid', async (req: Request, res: Response) => {
@@ -15,7 +18,7 @@ licenseRouter.get('/hwid', async (req: Request, res: Response) => {
 });
 
 // POST /api/license/heartbeat - 30-Day Check-in & Cloud Revocation Check
-licenseRouter.post('/heartbeat', async (req: Request, res: Response) => {
+licenseRouter.post('/heartbeat', authenticateDevice, async (req: Request, res: Response) => {
   const result = await LicenseService.performHeartbeat();
   res.json({ success: true, data: result });
 });
