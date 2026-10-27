@@ -27,13 +27,25 @@ export class OrderService {
   }
 
   public static async createOrder(input: CreateOrderInput, deviceId?: string): Promise<OrderRecord> {
-    const table = inMemoryStore.tables.get(input.tableId);
-    if (!table) {
+    const isTakeaway = input.tableId.startsWith('TA-') || input.tableId.toLowerCase().includes('takeaway');
+    let table = inMemoryStore.tables.get(input.tableId);
+    if (!table && isTakeaway) {
+      table = {
+        id: input.tableId,
+        tableNumber: input.tableId,
+        displayName: `Parcel ${input.tableId}`,
+        section: 'Takeaway',
+        capacity: 1,
+        status: 'occupied',
+        activeOrderId: null,
+        sortOrder: 999,
+      };
+    } else if (!table) {
       throw new NotFoundError('Table', input.tableId);
     }
 
-    // Check if table already has an active open order
-    if (table.activeOrderId) {
+    // Check if table already has an active open order (only for physical dine-in tables)
+    if (!isTakeaway && table.activeOrderId) {
       const existing = inMemoryStore.orders.get(table.activeOrderId);
       if (existing && !['settled', 'cancelled'].includes(existing.status)) {
         throw new ConflictError(

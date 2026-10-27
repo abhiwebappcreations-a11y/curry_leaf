@@ -199,6 +199,9 @@ export interface LicenseRecord {
   id: string;
   restaurantId: string;
   restaurantName: string;
+  ownerName?: string;
+  phone?: string;
+  city?: string;
   licenseKey: string;
   status: 'active' | 'grace' | 'expired' | 'suspended';
   validFrom: string;
@@ -388,12 +391,63 @@ export class InMemoryStore {
     }
   }
 
+  public resetToFreshProductionState(restaurantName: string, restaurantId: string): void {
+    // 1. Clear all live & historical demo orders
+    this.orders.clear();
+
+    // 2. Clear all bills & payments
+    this.bills.clear();
+    this.payments.clear();
+
+    // 3. Clear all KOTs & cancel requests
+    this.kots.clear();
+    this.cancelRequests.clear();
+
+    // 4. Clear all print jobs
+    this.printJobs.clear();
+
+    // 5. Reset devices: retain primary Counter PC and clear captain tablets for clean pairing
+    this.devices.clear();
+    const primaryCounter: DeviceRecord = {
+      id: 'dev_counter_01',
+      deviceName: 'Billing Counter PC',
+      role: 'counter',
+      deviceFingerprint: 'fp_counter_pc_01',
+      apiKeyHash: 'counter_dev_token_01',
+      isActive: true,
+      registeredAt: new Date().toISOString(),
+    };
+    this.devices.set(primaryCounter.id, primaryCounter);
+
+    // 6. Reset all tables to clean, available state with zero active orders
+    for (const table of this.tables.values()) {
+      table.status = 'available';
+      table.activeOrderId = null;
+    }
+
+    // 7. Update profile
+    const profile = (this.settings.get('restaurant_profile') || {}) as any;
+    profile.restaurantId = restaurantId;
+    profile.name = restaurantName;
+    this.settings.set('restaurant_profile', profile);
+
+    // 8. Save clean state to disk
+    this.saveToDisk();
+  }
+
   public exportBackupData(): Record<string, unknown> {
+    const profile = (this.settings.get('restaurant_profile') as any) || {};
+    const restId = profile.restaurantId || this.license?.restaurantId || 'unlicensed';
+    const restName = profile.name || this.license?.restaurantName || 'Curry Leaf Restro';
+    const owner = profile.ownerName || this.license?.ownerName || '';
+
     return {
       version: '1.0.0',
       system: 'HinoptRestaurantPOS',
       exportedAt: new Date().toISOString(),
-      restaurantName: (this.settings.get('restaurant_profile') as any)?.name || 'Curry Leaf Restro',
+      restaurantId: restId,
+      restaurantName: restName,
+      ownerName: owner,
       tables: Array.from(this.tables.values()),
       categories: Array.from(this.categories.values()),
       menuItems: Array.from(this.menuItems.values()),
@@ -988,22 +1042,8 @@ export class InMemoryStore {
       this.menuItems.set(item.id, item);
     }
 
-    // 6. Default active license cache
-    this.license = {
-      id: 'current_license',
-      restaurantId: 'rest_curry_leaf_01',
-      restaurantName: 'Curry Leaf Fine Dining',
-      licenseKey: 'HINOPT-LIC-CL-2026-ACTIVE',
-      status: 'active',
-      validFrom: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
-      validUntil: new Date(Date.now() + 335 * 24 * 3600 * 1000).toISOString(),
-      lastVerifiedAt: new Date().toISOString(),
-      signature: 'simulated_initial_seed_signature',
-      signedPayload: {
-        restaurantId: 'rest_curry_leaf_01',
-        features: ['pos', 'kot', 'billing', 'reports'],
-      },
-    };
+    // 6. License cache (Fresh install starts unlicensed until activated with real key)
+    this.license = undefined;
 
     // 7. Seed active live orders for real-time counter & captain processing
     const order1: OrderRecord = {

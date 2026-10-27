@@ -11,6 +11,32 @@ let jobCounter = 5000;
 
 export class PrintService {
   private static printMutex: Promise<any> = Promise.resolve();
+  private static isWorkerRunning = false;
+  private static activeJobIds = new Set<string>();
+
+  public static initQueueWorker(): void {
+    if (this.isWorkerRunning) return;
+    this.isWorkerRunning = true;
+    logger.info('PrintService auto-drain queue worker active (polls every 3s for queued prints)');
+
+    setInterval(async () => {
+      try {
+        const jobs = Array.from(inMemoryStore.printJobs.values());
+        for (const job of jobs) {
+          if (job.status === 'queued' && job.retryCount < job.maxRetries && !this.activeJobIds.has(job.id)) {
+            logger.info(
+              { jobId: job.id, target: job.targetPrinter, type: job.jobType, retryCount: job.retryCount },
+              'Auto-retrying queued thermal print job...'
+            );
+            await this.processJob(job.id);
+          }
+        }
+      } catch (err: any) {
+        logger.error({ err: err?.message }, 'Error in print auto-drain worker');
+      }
+    }, 3000);
+  }
+
   public static async enqueueJob(
     targetPrinter: 'counter_bill' | 'kitchen_kot',
     jobType: 'bill' | 'kot' | 'reprint_bill' | 'reprint_kot' | 'test_print' | 'report',
@@ -59,6 +85,9 @@ export class PrintService {
     const job = inMemoryStore.printJobs.get(jobId);
     if (!job) return;
 
+    if (this.activeJobIds.has(jobId)) return;
+    this.activeJobIds.add(jobId);
+
     job.status = 'processing';
     job.updatedAt = new Date().toISOString();
 
@@ -82,7 +111,7 @@ export class PrintService {
           const targetParts = printerConfig.target.split(':');
           const host = targetParts[0] || '127.0.0.1';
           const port = parseInt(targetParts[1] || '9100', 10);
-          didSend = await this.sendRawTcp(host, port, escposBuffer, 2500);
+          didSend = await this.sendRawTcpWithRetry(host, port, escposBuffer, 4000);
           if (didSend) {
             logger.info({ jobId: job.id, target: printerConfig.target, bytes: escposBuffer.length }, `[ETHERNET] Dispatched to thermal printer at ${printerConfig.target}`);
           } else {
@@ -116,10 +145,22 @@ export class PrintService {
       job.status = job.retryCount >= job.maxRetries ? 'failed' : 'queued';
       job.updatedAt = new Date().toISOString();
       logger.warn({ jobId, err: err.message }, 'Print job processing notice');
+    } finally {
+      this.activeJobIds.delete(jobId);
     }
   }
 
-  private static sendRawTcp(host: string, port: number, data: Buffer, timeoutMs = 2500): Promise<boolean> {
+  private static async sendRawTcpWithRetry(host: string, port: number, data: Buffer, timeoutMs = 4000): Promise<boolean> {
+    let success = await this.sendRawTcp(host, port, data, timeoutMs);
+    if (!success) {
+      logger.warn({ host, port }, '[ETHERNET] First socket attempt timed out or failed; auto-retrying in 400ms...');
+      await new Promise((r) => setTimeout(r, 400));
+      success = await this.sendRawTcp(host, port, data, timeoutMs);
+    }
+    return success;
+  }
+
+  private static sendRawTcp(host: string, port: number, data: Buffer, timeoutMs = 4000): Promise<boolean> {
     return new Promise((resolve) => {
       const socket = new net.Socket();
       let resolved = false;
@@ -253,30 +294,50 @@ export class PrintService {
       chunks.push(Buffer.from('Status    : HARDWARE OPERATIONAL\n', 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n\n\n', 'utf-8'));
     } else if (job.jobType === 'kot' || job.jobType === 'reprint_kot') {
-      chunks.push(Buffer.from([0x1B, 0x61, 0x01]));
-      chunks.push(Buffer.from([0x1D, 0x21, 0x11]));
-      chunks.push(Buffer.from('KITCHEN ORDER TICKET\n', 'utf-8'));
-      chunks.push(Buffer.from([0x1D, 0x21, 0x00]));
+      const isTakeaway = job.payload.orderType === 'takeaway' || job.payload.isTakeaway || String(job.payload.tableNumber || '').toUpperCase().startsWith('TA-');
+      chunks.push(Buffer.from([0x1B, 0x61, 0x01])); // Center
+      chunks.push(Buffer.from([0x1D, 0x21, 0x11])); // Double size
+      if (isTakeaway) {
+        chunks.push(Buffer.from('*** TAKEAWAY / PARCEL ***\n', 'utf-8'));
+      } else {
+        chunks.push(Buffer.from('KITCHEN ORDER TICKET\n', 'utf-8'));
+      }
+      chunks.push(Buffer.from([0x1D, 0x21, 0x00])); // Normal size
       if (job.isReprint) {
         chunks.push(Buffer.from('*** DUPLICATE REPRINT ***\n', 'utf-8'));
       }
       chunks.push(Buffer.from('================================\n', 'utf-8'));
-      chunks.push(Buffer.from([0x1B, 0x61, 0x00]));
+      chunks.push(Buffer.from([0x1B, 0x61, 0x00])); // Left
       chunks.push(Buffer.from(`KOT No: ${job.payload.kotNumber || job.referenceId || 'KOT'}\n`, 'utf-8'));
-      chunks.push(Buffer.from(`Table : ${job.payload.tableName || job.payload.tableNumber || 'Table'}\n`, 'utf-8'));
+      if (isTakeaway) {
+        chunks.push(Buffer.from(`Token : ${job.payload.tokenNumber || job.payload.tableName || job.payload.tableNumber || 'TAKEAWAY'}\n`, 'utf-8'));
+        if (job.payload.customerName) {
+          chunks.push(Buffer.from(`Client: ${job.payload.customerName} ${job.payload.customerPhone ? '(' + job.payload.customerPhone + ')' : ''}\n`, 'utf-8'));
+        }
+      } else {
+        chunks.push(Buffer.from(`Table : ${job.payload.tableName || job.payload.tableNumber || 'Table'}\n`, 'utf-8'));
+      }
       chunks.push(Buffer.from(`Time  : ${new Date().toLocaleTimeString()}\n`, 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
-      chunks.push(Buffer.from('QTY  ITEM NAME\n', 'utf-8'));
+      chunks.push(Buffer.from('QTY  ITEM NAME (KITCHEN PREP)\n', 'utf-8'));
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
 
       const items = (job.payload.items as any[]) || [];
       for (const item of items) {
-        const qty = String(item.quantity || 1).padEnd(4, ' ');
+        const qty = Number(item.quantity || 1);
         const name = String(item.name || item.nameSnapshot || 'Item');
-        chunks.push(Buffer.from(`${qty} ${name}\n`, 'utf-8'));
+
+        // Kitchen Chef Font: Bold + Double Height & Width (2x) for high visibility
+        chunks.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold ON
+        chunks.push(Buffer.from([0x1D, 0x21, 0x11])); // Double Height & Width (2x)
+        chunks.push(Buffer.from(`${qty}x ${name}\n`, 'utf-8'));
+        chunks.push(Buffer.from([0x1D, 0x21, 0x00])); // Normal size
+        chunks.push(Buffer.from([0x1B, 0x45, 0x00])); // Bold OFF
+
         if (item.itemNotes) {
-          chunks.push(Buffer.from(`     * Note: ${item.itemNotes}\n`, 'utf-8'));
+          chunks.push(Buffer.from(`   * Note: ${item.itemNotes}\n`, 'utf-8'));
         }
+        chunks.push(Buffer.from('\n', 'utf-8'));
       }
       chunks.push(Buffer.from('--------------------------------\n\n\n', 'utf-8'));
     } else {
@@ -287,8 +348,14 @@ export class PrintService {
       chunks.push(Buffer.from([0x1D, 0x21, 0x00])); // Normal size
       if (profile.address) chunks.push(Buffer.from(`${profile.address}\n`, 'utf-8'));
       if (profile.phone) chunks.push(Buffer.from(`Ph: ${profile.phone}\n`, 'utf-8'));
-      if (profile.gstin) chunks.push(Buffer.from(`GSTIN: ${profile.gstin}\n`, 'utf-8'));
-      if (job.isReprint) chunks.push(Buffer.from('*** DUPLICATE TAX INVOICE ***\n', 'utf-8'));
+
+      const isTaxInvoice = Number(job.payload.taxPaise || 0) > 0;
+      if (isTaxInvoice && profile.gstin) {
+        chunks.push(Buffer.from(`GSTIN: ${profile.gstin}\n`, 'utf-8'));
+      }
+      if (job.isReprint) {
+        chunks.push(Buffer.from(isTaxInvoice ? '*** DUPLICATE TAX INVOICE ***\n' : '*** DUPLICATE RECEIPT ***\n', 'utf-8'));
+      }
       chunks.push(Buffer.from('--------------------------------\n', 'utf-8'));
       chunks.push(Buffer.from([0x1B, 0x61, 0x00])); // Left
       chunks.push(Buffer.from(`Bill No: ${job.payload.billNumber || job.referenceId || 'BILL'}\n`, 'utf-8'));
@@ -336,16 +403,21 @@ export class PrintService {
         chunks.push(Buffer.from(`Subtotal:             ${subStr}\n`, 'utf-8'));
       }
 
-      const taxPaise = Number(job.payload.taxPaise);
-      if (!isNaN(taxPaise) && taxPaise > 0) {
-        const taxStr = (taxPaise / 100).toFixed(2).padStart(10, ' ');
-        chunks.push(Buffer.from(`GST Tax (5%):         ${taxStr}\n`, 'utf-8'));
-      }
-
       const discountPaise = Number(job.payload.discountPaise);
       if (!isNaN(discountPaise) && discountPaise > 0) {
         const discStr = (discountPaise / 100).toFixed(2).padStart(10, ' ');
         chunks.push(Buffer.from(`Discount:            -${discStr}\n`, 'utf-8'));
+      }
+
+      const taxPaise = Number(job.payload.taxPaise || 0);
+      if (taxPaise > 0) {
+        const gstRate = Number(job.payload.gstRatePercent || 5.0);
+        const halfRate = (gstRate / 2).toFixed(1);
+        const halfTax = Math.round(taxPaise / 2);
+        const cgstStr = (halfTax / 100).toFixed(2).padStart(10, ' ');
+        const sgstStr = ((taxPaise - halfTax) / 100).toFixed(2).padStart(10, ' ');
+        chunks.push(Buffer.from(`CGST (${halfRate}%):        ${cgstStr}\n`, 'utf-8'));
+        chunks.push(Buffer.from(`SGST (${halfRate}%):        ${sgstStr}\n`, 'utf-8'));
       }
 
       const totalPaise = Number(job.payload.totalPaise) || 0;

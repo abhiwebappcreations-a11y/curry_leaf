@@ -9,16 +9,20 @@ import { logger } from '../utils/logger.js';
 export const backupRouter = Router();
 backupRouter.use(authenticateDevice);
 
-function getBackupDir(): string {
-  const dir = path.resolve(process.cwd(), 'data', 'backups');
+function getBackupDir(restaurantId?: string): string {
+  const restId = restaurantId || inMemoryStore.license?.restaurantId || (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'default';
+  const sanitized = restId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const dir = path.resolve(process.cwd(), 'data', 'backups', sanitized);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
   return dir;
 }
 
-function getCloudBackupDir(): string {
-  const dir = path.resolve(process.cwd(), 'data', 'cloud_backups');
+function getCloudBackupDir(restaurantId?: string): string {
+  const restId = restaurantId || inMemoryStore.license?.restaurantId || (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'default';
+  const sanitized = restId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const dir = path.resolve(process.cwd(), 'data', 'cloud_backups', sanitized);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -72,14 +76,15 @@ backupRouter.get(
     try {
       const data = inMemoryStore.exportBackupData();
 
-      // Auto-save a timestamped local snapshot
-      const backupDir = getBackupDir();
+      // Auto-save a timestamped local snapshot isolated by restaurant ID
+      const restId = inMemoryStore.license?.restaurantId || (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'default';
+      const backupDir = getBackupDir(restId);
       const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const fileName = `pos_backup_${dateStr}.json`;
+      const fileName = `pos_backup_${restId}_${dateStr}.json`;
       const fullPath = path.join(backupDir, fileName);
 
       fs.writeFileSync(fullPath, JSON.stringify(data, null, 2), 'utf-8');
-      logger.info({ fileName }, 'Automated backup snapshot created');
+      logger.info({ fileName, restId }, 'Automated backup snapshot created for restaurant');
 
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Content-Type', 'application/json');
@@ -138,13 +143,14 @@ backupRouter.post(
   }
 );
 
-// GET /api/backup/snapshots - List local available snapshots
+// GET /api/backup/snapshots - List local available snapshots for current restaurant
 backupRouter.get(
   '/snapshots',
   requireRole('counter', 'admin'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const backupDir = getBackupDir();
+      const restId = inMemoryStore.license?.restaurantId || (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'default';
+      const backupDir = getBackupDir(restId);
       const files = fs.readdirSync(backupDir).filter((f) => f.endsWith('.json'));
 
       const snapshots = files
@@ -183,7 +189,8 @@ backupRouter.post(
         return;
       }
 
-      const backupDir = getBackupDir();
+      const restId = inMemoryStore.license?.restaurantId || (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'default';
+      const backupDir = getBackupDir(restId);
       const filePath = path.join(backupDir, path.basename(fileName));
 
       if (!fs.existsSync(filePath)) {
@@ -229,14 +236,16 @@ backupRouter.post(
       const rawData = inMemoryStore.exportBackupData();
       const encryptedBundle = encryptBackupPayload(rawData);
 
+      const restId = inMemoryStore.license?.restaurantId || (rawData.settings as any)?.restaurant_profile?.restaurantId || 'default';
+      const restName = inMemoryStore.license?.restaurantName || (rawData.settings as any)?.restaurant_profile?.name || rawData.restaurantName || restId;
       const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const fileName = `pos_cloud_${dateStr}.enc`;
-      const cloudDir = getCloudBackupDir();
+      const fileName = `pos_cloud_${restId}_${dateStr}.enc`;
+      const cloudDir = getCloudBackupDir(restId);
       const localCloudFile = path.join(cloudDir, fileName);
 
       const syncPayload = {
-        restaurantId: (rawData.settings as any)?.restaurant_profile?.restaurantId || 'rest_curry_leaf_01',
-        restaurantName: rawData.restaurantName,
+        restaurantId: restId,
+        restaurantName: restName,
         fileName,
         timestamp: new Date().toISOString(),
         encryption: 'AES-256-GCM',
@@ -246,8 +255,37 @@ backupRouter.post(
       // 1. Save local encrypted copy
       fs.writeFileSync(localCloudFile, JSON.stringify(syncPayload, null, 2), 'utf-8');
 
-      // 2. Transmit to Hinopt Central Cloud (Google Drive bridge) if reachable
+      // 2. Direct Supabase Cloud upload if configured
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+      
       let cloudSynced = false;
+      try {
+        const sbRes = await fetch(`${supabaseUrl}/rest/v1/cloud_backups`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            restaurant_id: restId,
+            restaurant_name: restName,
+            file_name: fileName,
+            size_bytes: fs.statSync(localCloudFile).size,
+            encryption_cipher: 'AES-256-GCM'
+          })
+        });
+        if (sbRes.ok) {
+          cloudSynced = true;
+          logger.info({ restId, fileName }, 'Backup metadata registered to Supabase Cloud');
+        }
+      } catch (err: any) {
+        logger.warn({ err: err?.message }, 'Failed to write cloud backup record directly to Supabase');
+      }
+
+      // 3. Transmit to Hinopt Central Cloud (Google Drive bridge) if reachable
       const adminCloudUrl = process.env.HINOPT_ADMIN_URL || 'http://127.0.0.1:5000';
       try {
         const cloudResp = await fetch(`${adminCloudUrl}/api/cloud-backups/upload`, {
@@ -268,7 +306,7 @@ backupRouter.post(
         fileName,
         cloudSynced,
         sizeBytes: fs.statSync(localCloudFile).size,
-        provider: 'Hinopt Google Drive (AES-256-GCM Encrypted)',
+        provider: 'Hinopt Supabase & Google Drive (AES-256-GCM Encrypted)',
       });
 
       inMemoryStore.saveToDisk();
@@ -278,10 +316,11 @@ backupRouter.post(
         data: {
           message: 'Backup encrypted with AES-256-GCM and synchronized to cloud!',
           fileName,
+          restaurantId: restId,
           cloudSynced,
           sizeBytes: fs.statSync(localCloudFile).size,
           lastSyncedAt: new Date().toISOString(),
-          provider: 'Hinopt Google Drive',
+          provider: 'Hinopt Cloud Storage',
         },
       });
     } catch (err: any) {
@@ -326,7 +365,7 @@ backupRouter.post(
 
       // 1. Try pulling latest from Hinopt Central Cloud (Google Drive)
       const adminCloudUrl = process.env.HINOPT_ADMIN_URL || 'http://127.0.0.1:5000';
-      const restaurantId = (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'rest_curry_leaf_01';
+      const restaurantId = inMemoryStore.license?.restaurantId || (inMemoryStore.settings.get('restaurant_profile') as any)?.restaurantId || 'default';
       try {
         const resp = await fetch(`${adminCloudUrl}/api/cloud-backups/latest/${restaurantId}`);
         if (resp.ok) {
@@ -339,7 +378,7 @@ backupRouter.post(
 
       // 2. Fallback to latest local cloud encrypted file
       if (!encryptedData) {
-        const cloudDir = getCloudBackupDir();
+        const cloudDir = getCloudBackupDir(restaurantId);
         const files = fs.readdirSync(cloudDir).filter((f) => f.endsWith('.enc'));
         if (files.length > 0) {
           files.sort((a, b) => fs.statSync(path.join(cloudDir, b)).mtimeMs - fs.statSync(path.join(cloudDir, a)).mtimeMs);

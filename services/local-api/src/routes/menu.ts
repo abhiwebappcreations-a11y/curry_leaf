@@ -56,13 +56,74 @@ menuRouter.get('/items', (req: Request, res: Response) => {
     );
   }
 
+  const enrichedItems = items.map((i) => {
+    const cat = inMemoryStore.categories.get(i.categoryId);
+    return {
+      ...i,
+      category: cat ? cat.name : i.categoryId,
+      categoryName: cat ? cat.name : i.categoryId,
+    };
+  });
+
   res.json({
     success: true,
     data: {
-      items: items.sort((a, b) => a.sortOrder - b.sortOrder),
+      items: enrichedItems.sort((a, b) => a.sortOrder - b.sortOrder),
     },
   });
 });
+
+// GET /api/menu/categories - List all active menu categories
+menuRouter.get('/categories', (req: Request, res: Response) => {
+  const categories = Array.from(inMemoryStore.categories.values())
+    .filter((c) => c.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  res.json({
+    success: true,
+    data: { categories },
+  });
+});
+
+const createCategorySchema = z.object({
+  name: z.string().min(1),
+  sortOrder: z.number().optional(),
+});
+
+// POST /api/menu/categories - Create custom category
+menuRouter.post(
+  '/categories',
+  requireRole('counter', 'admin'),
+  validateBody(createCategorySchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, sortOrder } = req.body;
+      const trimmed = name.trim();
+      const existing = Array.from(inMemoryStore.categories.values()).find(
+        (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (existing) {
+        return res.json({ success: true, data: { category: existing } });
+      }
+
+      const catId = `cat_${Date.now()}_${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+      const newCategory = {
+        id: catId,
+        name: trimmed,
+        sortOrder: sortOrder ?? inMemoryStore.categories.size + 1,
+        isActive: true,
+      };
+      inMemoryStore.categories.set(catId, newCategory);
+      inMemoryStore.saveToDisk();
+
+      res.status(201).json({
+        success: true,
+        data: { category: newCategory },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 const toggleAvailabilitySchema = z.object({
   isAvailable: z.boolean(),
@@ -160,17 +221,33 @@ menuRouter.post(
         });
       }
 
-      // Verify category exists or fallback
+      // Verify category exists or dynamically auto-create custom category
       let targetCategoryId = categoryId;
+      let categoryName = categoryId;
       const catById = inMemoryStore.categories.get(categoryId);
-      if (!catById) {
+      if (catById) {
+        targetCategoryId = catById.id;
+        categoryName = catById.name;
+      } else {
         const found = Array.from(inMemoryStore.categories.values()).find(
-          (c) => c.name.toLowerCase() === categoryId.toLowerCase()
+          (c) => c.name.toLowerCase() === categoryId.trim().toLowerCase()
         );
         if (found) {
           targetCategoryId = found.id;
-        } else if (inMemoryStore.categories.size > 0) {
-          targetCategoryId = Array.from(inMemoryStore.categories.values())[0].id;
+          categoryName = found.name;
+        } else {
+          // Auto-create custom category on the fly!
+          const trimmed = categoryId.trim();
+          const newCatId = `cat_${Date.now()}_${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+          const newCat = {
+            id: newCatId,
+            name: trimmed,
+            sortOrder: inMemoryStore.categories.size + 1,
+            isActive: true,
+          };
+          inMemoryStore.categories.set(newCatId, newCat);
+          targetCategoryId = newCatId;
+          categoryName = trimmed;
         }
       }
 
@@ -197,7 +274,85 @@ menuRouter.post(
       res.status(201).json({
         success: true,
         data: {
-          item: newItem,
+          item: {
+            ...newItem,
+            category: categoryName,
+            categoryName: categoryName,
+          },
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const updateItemSchema = z.object({
+  name: z.string().min(1).optional(),
+  categoryId: z.string().optional(),
+  category: z.string().optional(),
+  pricePaise: z.number().int().positive().optional(),
+  isVeg: z.boolean().optional(),
+  isAvailable: z.boolean().optional(),
+  description: z.string().optional(),
+});
+
+// PATCH /api/menu/items/:id - Update dish details (Counter / Admin)
+menuRouter.patch(
+  '/items/:id',
+  requireRole('counter', 'admin'),
+  validateBody(updateItemSchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const item = inMemoryStore.menuItems.get(id);
+      if (!item) {
+        throw new NotFoundError('Menu Item', id);
+      }
+
+      if (req.body.name) item.name = req.body.name;
+      if (req.body.pricePaise) item.pricePaise = req.body.pricePaise;
+      if (req.body.isVeg !== undefined) item.isVeg = req.body.isVeg;
+      if (req.body.isAvailable !== undefined) item.isAvailable = req.body.isAvailable;
+      if (req.body.description !== undefined) item.description = req.body.description;
+
+      const catInput = req.body.categoryId || req.body.category;
+      if (catInput) {
+        const catById = inMemoryStore.categories.get(catInput);
+        if (catById) {
+          item.categoryId = catById.id;
+        } else {
+          const found = Array.from(inMemoryStore.categories.values()).find(
+            (c) => c.name.toLowerCase() === catInput.trim().toLowerCase()
+          );
+          if (found) {
+            item.categoryId = found.id;
+          } else {
+            const trimmed = catInput.trim();
+            const newCatId = `cat_${Date.now()}_${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            const newCat = {
+              id: newCatId,
+              name: trimmed,
+              sortOrder: inMemoryStore.categories.size + 1,
+              isActive: true,
+            };
+            inMemoryStore.categories.set(newCatId, newCat);
+            item.categoryId = newCatId;
+          }
+        }
+      }
+
+      inMemoryStore.saveToDisk();
+
+      const cat = inMemoryStore.categories.get(item.categoryId);
+      res.json({
+        success: true,
+        data: {
+          item: {
+            ...item,
+            category: cat ? cat.name : item.categoryId,
+            categoryName: cat ? cat.name : item.categoryId,
+          },
         },
       });
     } catch (err) {

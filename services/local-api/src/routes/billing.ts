@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { BillingService } from '../services/billingService.js';
 import { authenticateDevice, requireRole, requireActiveLicense } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
+import { inMemoryStore } from '../db/inMemoryStore.js';
 
 export const billingRouter = Router();
 
@@ -10,7 +11,63 @@ billingRouter.use(authenticateDevice);
 
 const finalizeBillSchema = z.object({
   discountPaise: z.number().int().min(0).optional(),
+  isGstEnabled: z.boolean().optional(),
+  gstRatePercent: z.number().min(0).optional(),
 });
+
+const gstSettingsSchema = z.object({
+  enabled: z.boolean(),
+  ratePercent: z.number().min(0).optional(),
+  cgstRate: z.number().min(0).optional(),
+  sgstRate: z.number().min(0).optional(),
+  gstin: z.string().optional(),
+});
+
+// GET /api/billing/gst-settings or /api/billing/gst
+billingRouter.get(['/gst-settings', '/gst'], (req: Request, res: Response) => {
+  const gst = (inMemoryStore.settings.get('gst_settings') as any) || { enabled: true, ratePercent: 5.0, cgstRate: 2.5, sgstRate: 2.5 };
+  res.json({
+    success: true,
+    data: {
+      enabled: gst.enabled !== false,
+      ratePercent: gst.ratePercent ?? 5.0,
+      cgstRate: gst.cgstRate ?? 2.5,
+      sgstRate: gst.sgstRate ?? 2.5,
+      gstin: gst.gstin || '',
+    },
+  });
+});
+
+// POST /api/billing/gst-settings or /api/billing/gst - Update global GST settings (Counter / Admin)
+billingRouter.post(
+  ['/gst-settings', '/gst'],
+  requireActiveLicense,
+  requireRole('counter', 'admin'),
+  validateBody(gstSettingsSchema),
+  (req: Request, res: Response) => {
+    const { enabled, ratePercent, cgstRate, sgstRate, gstin } = req.body;
+    const current = (inMemoryStore.settings.get('gst_settings') as any) || {};
+    const effectiveCgst = cgstRate !== undefined ? cgstRate : (current.cgstRate ?? 2.5);
+    const effectiveSgst = sgstRate !== undefined ? sgstRate : (current.sgstRate ?? 2.5);
+    const totalRate = ratePercent !== undefined ? ratePercent : (effectiveCgst + effectiveSgst);
+    const isEnabled = enabled !== undefined ? Boolean(enabled) : (current.enabled !== false);
+    const updated = {
+      enabled: isEnabled,
+      ratePercent: totalRate,
+      cgstRate: effectiveCgst,
+      sgstRate: effectiveSgst,
+      gstin: gstin !== undefined ? gstin : (current.gstin || ''),
+      updatedAt: new Date().toISOString(),
+    };
+    inMemoryStore.settings.set('gst_settings', updated);
+    inMemoryStore.saveToDisk();
+
+    res.json({
+      success: true,
+      data: updated,
+    });
+  }
+);
 
 // POST /orders/:id/bill or /bills/orders/:id/bill - Finalize bill
 billingRouter.post(
@@ -102,7 +159,6 @@ billingRouter.post(
   }
 );
 
-
 // POST /:id/print or /bills/:id/print or /orders/:id/print-bill - Direct Customer Bill Print
 billingRouter.post(
   ['/:id/print', '/bills/:id/print', '/orders/:id/print-bill'],
@@ -170,5 +226,3 @@ billingRouter.post(
     }
   }
 );
-
-

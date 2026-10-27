@@ -1,3 +1,5 @@
+import os from 'os';
+import net from 'net';
 import { execSync } from 'child_process';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
@@ -28,6 +30,191 @@ printersRouter.get('/system-devices', (req: Request, res: Response) => {
     success: true,
     data: {
       devices,
+    },
+  });
+});
+
+// GET /api/printers/discover-all - Auto-discover both Windows Spooler USB printers & LAN Wi-Fi Port 9100 printers
+printersRouter.get('/discover-all', async (req: Request, res: Response) => {
+  const discovered: Array<{ name: string; target: string; type: 'usb' | 'network'; description: string }> = [];
+  const discoveredTargets = new Set<string>();
+
+  // 1. Windows Spooler Printers (USB / Driver)
+  if (process.platform === 'win32') {
+    try {
+      const output = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_Printer).Name"').toString();
+      const winPrinters = output
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && !s.includes('OneNote') && !s.includes('Fax') && !s.includes('XPS Document'));
+      for (const p of winPrinters) {
+        if (!discoveredTargets.has(p)) {
+          discoveredTargets.add(p);
+          discovered.push({
+            name: p,
+            target: p,
+            type: 'usb',
+            description: `USB / Windows Driver (${p})`,
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 2. Wi-Fi / Ethernet Network Scan (Port 9100 - RAW Thermal ESC/POS)
+  try {
+    const candidateIps = new Set<string>();
+
+    // A. Read active ARP cache (instant list of alive devices on the LAN)
+    if (process.platform === 'win32') {
+      try {
+        const arpOutput = execSync('arp -a', { timeout: 1500 }).toString();
+        const ipRegex = /\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/g;
+        let match;
+        while ((match = ipRegex.exec(arpOutput)) !== null) {
+          const ip = match[1];
+          if (
+            !ip.startsWith('127.') &&
+            !ip.startsWith('169.254.') &&
+            !ip.startsWith('224.') &&
+            !ip.startsWith('239.') &&
+            !ip.endsWith('.255') &&
+            ip !== '255.255.255.255'
+          ) {
+            candidateIps.add(ip);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // B. Known default static IPs for Ethernet thermal printers (Epson, Posiflex, Rongta, Everycom, TVS, Xprinter)
+    const factoryDefaultIps = [
+      '192.168.1.45',    // Epson TM-T82X active static IP
+      '192.168.192.168', // Epson TM-T82 / TM-T88 default static
+      '192.168.1.200',   // Rongta / Xprinter / Everycom default static
+      '192.168.1.100',   // Citizen / Posiflex default static
+      '192.168.1.87',    // Hoin default static
+      '192.168.0.200',
+      '192.168.0.100',
+      '192.168.123.100',
+    ];
+    for (const fIp of factoryDefaultIps) {
+      candidateIps.add(fIp);
+    }
+
+    // C. All active IPv4 network interface subnets (Wi-Fi, Ethernet)
+    const ifaces = os.networkInterfaces();
+    const activeSubnets = new Set<string>();
+    for (const name of Object.keys(ifaces)) {
+      for (const iface of ifaces[name] || []) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          const ip = iface.address;
+          if (!ip.startsWith('127.') && !ip.startsWith('169.254.')) {
+            const parts = ip.split('.');
+            activeSubnets.add(parts.slice(0, 3).join('.'));
+          }
+        }
+      }
+    }
+
+    // Helper to probe an IP on port 9100 with timeout
+    const probeIp = (ip: string, timeoutMs = 700): Promise<boolean> => {
+      return new Promise((resolve) => {
+        const s = new net.Socket();
+        let resolved = false;
+
+        const done = (success: boolean) => {
+          if (!resolved) {
+            resolved = true;
+            s.destroy();
+            resolve(success);
+          }
+        };
+
+        s.setTimeout(timeoutMs);
+        s.once('connect', () => done(true));
+        s.once('timeout', () => done(false));
+        s.once('error', () => done(false));
+
+        try {
+          s.connect(9100, ip);
+        } catch (_) {
+          done(false);
+        }
+      });
+    };
+
+    // Phase 1: Rapidly probe high-priority ARP and factory default IPs
+    const priorityIps = Array.from(candidateIps);
+    const priorityResults = await Promise.all(
+      priorityIps.map(async (ip) => {
+        const ok = await probeIp(ip, 800);
+        return { ip, ok };
+      })
+    );
+
+    for (const res of priorityResults) {
+      if (res.ok) {
+        const target = `${res.ip}:9100`;
+        if (!discoveredTargets.has(target)) {
+          discoveredTargets.add(target);
+          discovered.push({
+            name: `Wi-Fi / Ethernet Printer (${res.ip})`,
+            target,
+            type: 'network',
+            description: `Network ESC/POS Printer (${res.ip}:9100)`,
+          });
+        }
+      }
+    }
+
+    // Phase 2: If no network printer found in priority list, sweep full active subnets in chunks
+    if (discovered.filter((d) => d.type === 'network').length === 0) {
+      for (const subnet of activeSubnets) {
+        const subnetIps: string[] = [];
+        for (let i = 1; i <= 254; i++) {
+          const ip = `${subnet}.${i}`;
+          if (!candidateIps.has(ip)) {
+            subnetIps.push(ip);
+          }
+        }
+
+        // Run in batches of 32 to respect Windows socket queue
+        const chunkSize = 32;
+        for (let i = 0; i < subnetIps.length; i += chunkSize) {
+          const chunk = subnetIps.slice(i, i + chunkSize);
+          const chunkResults = await Promise.all(
+            chunk.map(async (ip) => {
+              const ok = await probeIp(ip, 650);
+              return { ip, ok };
+            })
+          );
+          for (const res of chunkResults) {
+            if (res.ok) {
+              const target = `${res.ip}:9100`;
+              if (!discoveredTargets.has(target)) {
+                discoveredTargets.add(target);
+                discovered.push({
+                  name: `Wi-Fi / Ethernet Printer (${res.ip})`,
+                  target,
+                  type: 'network',
+                  description: `Network ESC/POS Printer (${res.ip}:9100)`,
+                });
+              }
+            }
+          }
+          if (discovered.filter((d) => d.type === 'network').length > 0) {
+            break; // Found printer, stop further subnet scanning
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
+  res.json({
+    success: true,
+    data: {
+      discovered,
     },
   });
 });
@@ -84,6 +271,11 @@ printersRouter.post(
     if (mode === 'single') {
       config.printers.kitchenKot.target = config.printers.counterBill.target;
       config.printers.kitchenKot.paperWidth = config.printers.counterBill.paperWidth;
+    } else {
+      // In 2-printer mode, ensure kitchenKot is not pointing to an invalid dead IP
+      if (!config.printers.kitchenKot.target || config.printers.kitchenKot.target === '192.168.1.201:9100') {
+        config.printers.kitchenKot.target = config.printers.counterBill.target;
+      }
     }
     inMemoryStore.settings.set('printer_settings', {
       mode,

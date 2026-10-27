@@ -83,7 +83,12 @@ window.LicenseService = {
       await window.SupabaseClient.updateLicense(restaurant.licenseKey, {
         status: restaurant.status,
         validUntil: validUntilIso,
-        maxDevices: restaurant.maxDevices
+        maxDevices: restaurant.maxDevices,
+        signedPayload: {
+          status: restaurant.status,
+          restaurantId: restaurant.id,
+          limits: restaurant.limits
+        }
       });
     }
 
@@ -257,7 +262,11 @@ window.LicenseService = {
           max_devices: maxDevices,
           features: ["OFFLINE_POS", "CAPTAIN_LAN_SYNC", "DUAL_PRINTER_QUEUE", "AUDIT_REPRINTS"],
           signature: "ed25519_sig_" + btoa(licenseKey + ":" + validUntilDate).substring(0, 32),
-          signed_payload: { status: "ACTIVE", restaurantId: id }
+          signed_payload: {
+            status: "ACTIVE",
+            restaurantId: id,
+            limits: newRest.limits
+          }
         });
       } catch (err) {
         console.error('[Supabase Register Error]', err);

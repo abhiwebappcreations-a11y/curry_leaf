@@ -59,13 +59,14 @@ export class KotService {
     }
 
     // Persist records before enqueuing print job
+    const isTakeaway = order.tableId.startsWith('TA-') || (order.customerNotes && order.customerNotes.includes('Takeaway'));
     await PrintService.enqueueJob(
       'kitchen_kot',
       'kot',
       kot.id,
       {
         kotNumber: kot.kotNumber,
-        tableNumber: table ? table.tableNumber : 'Unknown',
+        tableNumber: isTakeaway ? `PARCEL ${order.tableId}` : (table ? table.tableNumber : 'Table'),
         orderNumber: order.orderNumber,
         items: draftItems.map((i) => ({
           name: i.nameSnapshot,

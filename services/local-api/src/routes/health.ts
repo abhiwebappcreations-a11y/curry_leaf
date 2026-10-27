@@ -15,6 +15,7 @@ healthRouter.get('/', async (req: Request, res: Response) => {
   const failedJobs = printJobs.filter((j) => j.status === 'failed').length;
 
   const uptimeSeconds = Math.floor(process.uptime());
+  const gstSettings = (inMemoryStore.settings.get('gst_settings') as any) || { enabled: false, ratePercent: 5.0 };
 
   res.json({
     success: true,
@@ -27,6 +28,17 @@ healthRouter.get('/', async (req: Request, res: Response) => {
       restaurant: {
         id: license.restaurantId || config.restaurantId,
         name: license.restaurantName || config.restaurantName,
+        ownerName: license.ownerName || (inMemoryStore.settings.get('restaurant_profile') as any)?.ownerName || '',
+        phone: license.phone || (inMemoryStore.settings.get('restaurant_profile') as any)?.phone || '',
+        city: license.city || (inMemoryStore.settings.get('restaurant_profile') as any)?.address || '',
+        hwid: license.hwid || license.hardwareId || LicenseService.getSystemHardwareId(),
+      },
+      gst: {
+        enabled: gstSettings.enabled !== false,
+        ratePercent: gstSettings.ratePercent ?? 5.0,
+        cgstRate: gstSettings.cgstRate ?? 2.5,
+        sgstRate: gstSettings.sgstRate ?? 2.5,
+        gstin: gstSettings.gstin || '',
       },
       components: {
         apiServer: {
@@ -55,12 +67,8 @@ healthRouter.get('/', async (req: Request, res: Response) => {
           },
         },
         license: {
-          isValid: license.isValid,
           status: license.status,
           daysRemaining: license.daysRemaining,
-          isOfflineGraceActive: license.isOfflineGraceActive,
-          restaurantName: license.restaurantName,
-          licenseKey: license.licenseKey,
           limits: license.limits,
           usage: license.usage,
         },

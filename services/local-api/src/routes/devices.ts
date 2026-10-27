@@ -79,6 +79,24 @@ devicesRouter.post(
           });
         }
 
+        // Check if device limit is already reached
+        if (existing.role === 'captain') {
+          const check = LicenseService.canApproveCaptainDevice();
+          if (!check.allowed) {
+            return res.json({
+              success: true,
+              data: {
+                status: 'limit_exceeded',
+                deviceId: existing.id,
+                message: check.message || 'Captain device limit reached. Please upgrade your Hinopt license.',
+                limitExceeded: true,
+                currentLimit: check.limit,
+                currentUsage: check.current,
+              },
+            });
+          }
+        }
+
         // Still pending
         existing.deviceName = deviceName;
         existing.deviceIp = clientIp;
@@ -92,6 +110,24 @@ devicesRouter.post(
             message: 'Waiting for Counter Manager approval on Counter POS screen.',
           },
         });
+      }
+
+      // Check if captain device limit reached before creating a new pending request
+      if (deviceRole === 'captain') {
+        const check = LicenseService.canApproveCaptainDevice();
+        if (!check.allowed) {
+          return res.json({
+            success: true,
+            data: {
+              status: 'limit_exceeded',
+              deviceId,
+              message: check.message || 'Captain device limit reached. Please upgrade your Hinopt license.',
+              limitExceeded: true,
+              currentLimit: check.limit,
+              currentUsage: check.current,
+            },
+          });
+        }
       }
 
       // Create new pending device record
@@ -140,6 +176,23 @@ devicesRouter.get('/pair-status/:deviceId', (req: Request, res: Response, next: 
           message: 'Device not registered yet.',
         },
       });
+    }
+
+    if (device.role === 'captain' && device.status !== 'approved') {
+      const check = LicenseService.canApproveCaptainDevice();
+      if (!check.allowed) {
+        return res.json({
+          success: true,
+          data: {
+            status: 'limit_exceeded',
+            deviceId: device.id,
+            message: check.message || 'Captain device limit reached. Please upgrade your Hinopt license.',
+            limitExceeded: true,
+            currentLimit: check.limit,
+            currentUsage: check.current,
+          },
+        });
+      }
     }
 
     res.json({

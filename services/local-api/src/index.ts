@@ -4,6 +4,7 @@ import { logger } from './utils/logger.js';
 import { db } from './db/index.js';
 import { LicenseService } from './services/licenseService.js';
 import { DiscoveryService } from './services/discoveryService.js';
+import { PrintService } from './services/printService.js';
 
 async function bootstrap() {
   logger.info(
@@ -49,6 +50,15 @@ async function bootstrap() {
 
     // Start UDP Wi-Fi Auto-Discovery Beacon
     DiscoveryService.start();
+
+    // Start Print Queue Worker (auto-retries any pending thermal print jobs)
+    PrintService.initQueueWorker();
+
+    // Check Supabase Cloud immediately on boot, then periodically every 20 seconds
+    LicenseService.syncCloudLicenseLimits();
+    setInterval(() => {
+      LicenseService.syncCloudLicenseLimits().catch(() => {});
+    }, 20000);
   });
 
   // Graceful shutdown

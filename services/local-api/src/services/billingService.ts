@@ -14,6 +14,8 @@ let billCounter = 3000;
 export interface FinalizeBillInput {
   discountPaise?: number;
   voidReason?: string;
+  isGstEnabled?: boolean;
+  gstRatePercent?: number;
 }
 
 export interface SettlePaymentInput {
@@ -62,13 +64,16 @@ export class BillingService {
         return existingBill;
       }
       // If the bill is not yet settled, update it with latest order items & discount
+      const gstSettings = (inMemoryStore.settings.get('gst_settings') as any) || { enabled: false, ratePercent: 5.0 };
+      const isGstEnabled = input.isGstEnabled !== undefined ? input.isGstEnabled : (gstSettings.enabled !== false);
+      const gstRate = isGstEnabled ? (input.gstRatePercent !== undefined ? input.gstRatePercent : (gstSettings.ratePercent ?? 5.0)) : 0;
       const discountPaise = input.discountPaise !== undefined ? input.discountPaise : existingBill.discountPaise;
       let subtotalPaise = 0;
       let taxPaise = 0;
       const now = new Date().toISOString();
       const updatedItems: BillItemRecord[] = billableItems.map((item) => {
         const itemTotal = item.pricePaiseSnapshot * item.quantity;
-        const itemTax = calculateTaxPaise(itemTotal, item.taxRateSnapshot);
+        const itemTax = isGstEnabled ? calculateTaxPaise(itemTotal, gstRate) : 0;
         subtotalPaise += itemTotal;
         taxPaise += itemTax;
 
@@ -111,10 +116,13 @@ export class BillingService {
 
     let subtotalPaise = 0;
     let taxPaise = 0;
+    const gstSettings = (inMemoryStore.settings.get('gst_settings') as any) || { enabled: false, ratePercent: 5.0 };
+    const isGstEnabled = input.isGstEnabled !== undefined ? input.isGstEnabled : (gstSettings.enabled !== false);
+    const gstRate = isGstEnabled ? (input.gstRatePercent !== undefined ? input.gstRatePercent : (gstSettings.ratePercent ?? 5.0)) : 0;
 
     const immutableBillItems: BillItemRecord[] = billableItems.map((item) => {
       const itemTotal = item.pricePaiseSnapshot * item.quantity;
-      const itemTax = calculateTaxPaise(itemTotal, item.taxRateSnapshot);
+      const itemTax = isGstEnabled ? calculateTaxPaise(itemTotal, gstRate) : 0;
       subtotalPaise += itemTotal;
       taxPaise += itemTax;
 
@@ -273,6 +281,7 @@ export class BillingService {
           })),
           subtotalPaise: bill.subtotalPaise,
           taxPaise: bill.taxPaise,
+          gstRatePercent: (inMemoryStore.settings.get('gst_settings') as any)?.ratePercent ?? 5.0,
           discountPaise: bill.discountPaise,
           totalPaise: bill.totalPaise,
           paymentMethod: input.paymentMethod,

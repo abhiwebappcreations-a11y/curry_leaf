@@ -139,10 +139,12 @@ window.SupabaseClient = {
 
   insertLicense: async function(license) {
     try {
+      const cleanLic = { ...license };
+      delete cleanLic.restaurant_name;
       const res = await fetch(`${this.url}/rest/v1/licenses`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify(license)
+        body: JSON.stringify(cleanLic)
       });
       return res.ok;
     } catch (e) {

@@ -53,22 +53,48 @@
       "name": "Desserts",
       "sortOrder": 7,
       "isActive": true
+    },
+    {
+      "id": "cat_1792919427182_sizzlers___chinese_specials",
+      "name": "Sizzlers & Chinese Specials",
+      "sortOrder": 8,
+      "isActive": true
+    },
+    {
+      "id": "cat_1792919461070_gourmet_sizzlers",
+      "name": "Gourmet Sizzlers",
+      "sortOrder": 9,
+      "isActive": true
     }
   ],
   "menuItems": [
     {
       "id": "item_1792832487598_734",
-      "categoryId": "cat_biryani",
-      "name": "CHICKEN DUM BIRYANI",
+      "categoryId": "cat_1792919461070_gourmet_sizzlers",
+      "name": "Crispy Chilli Paneer Sizzler XL",
       "shortCode": "CHI",
       "description": "",
-      "pricePaise": 22900,
+      "pricePaise": 36000,
       "taxRatePercent": 5,
       "isAvailable": true,
       "isVeg": false,
       "variants": [],
       "addOns": [],
       "sortOrder": 1
+    },
+    {
+      "id": "item_1792919427182_882",
+      "categoryId": "cat_1792919427182_sizzlers___chinese_specials",
+      "name": "Crispy Chilli Paneer Sizzler",
+      "shortCode": "CRI",
+      "description": "Hot iron sizzler with fresh paneer and peppers",
+      "pricePaise": 32000,
+      "taxRatePercent": 5,
+      "isAvailable": true,
+      "isVeg": true,
+      "variants": [],
+      "addOns": [],
+      "sortOrder": 2
     }
   ],
   "orders": [
@@ -260,11 +286,11 @@
   ],
   "settings": {
     "restaurant_profile": {
-      "restaurantId": "rest_hinopt_lic_any",
-      "name": "Hinopt Client Restaurant",
+      "restaurantId": "rest-01-0962",
+      "name": "curry leaf restaurant",
       "tagline": "Fine Dining & Hospitality",
-      "address": "Main Branch",
-      "phone": "+91 98490 00000",
+      "address": "chekradearabandham",
+      "phone": "7893938366",
       "gstin": "36AABCU9603R1ZM",
       "currency": "INR"
     },
@@ -273,11 +299,11 @@
       "paperWidth": "80mm"
     },
     "cloud_backup_meta": {
-      "lastSyncedAt": "2026-10-24T07:26:13.727Z",
-      "fileName": "pos_cloud_2026-10-24T07-26-13.enc",
+      "lastSyncedAt": "2026-10-25T08:49:42.207Z",
+      "fileName": "pos_cloud_rest-01-0962_2026-10-25T08-49-42.enc",
       "cloudSynced": true,
-      "sizeBytes": 36512,
-      "provider": "Hinopt Google Drive (AES-256-GCM Encrypted)"
+      "sizeBytes": 10024,
+      "provider": "Hinopt Supabase & Google Drive (AES-256-GCM Encrypted)"
     },
     "license_heartbeat": {
       "lastOnlineAt": "2026-10-24T06:56:20.427Z",
@@ -295,5 +321,5 @@
       }
     }
   },
-  "updatedAt": "2026-10-24T15:12:47.648Z"
+  "updatedAt": "2026-10-25T09:11:01.070Z"
 }
