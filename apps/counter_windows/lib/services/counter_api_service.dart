@@ -13,6 +13,15 @@ class SystemHealthInfo {
   final String licenseStatus;
   final int daysRemaining;
   final String restaurantName;
+  final String ownerName;
+  final String phone;
+  final String city;
+  final String hardwareId;
+  final bool isGstEnabled;
+  final double gstRatePercent;
+  final double cgstRatePercent;
+  final double sgstRatePercent;
+  final String gstin;
   final int menuItemsLimit;
   final int captainDevicesLimit;
   final int counterPcsLimit;
@@ -26,6 +35,15 @@ class SystemHealthInfo {
     required this.licenseStatus,
     required this.daysRemaining,
     this.restaurantName = 'Curry Leaf Fine Dine',
+    this.ownerName = '',
+    this.phone = '',
+    this.city = '',
+    this.hardwareId = '',
+    this.isGstEnabled = false,
+    this.gstRatePercent = 5.0,
+    this.cgstRatePercent = 2.5,
+    this.sgstRatePercent = 2.5,
+    this.gstin = '',
     this.menuItemsLimit = 100,
     this.captainDevicesLimit = 5,
     this.counterPcsLimit = 1,
@@ -99,8 +117,19 @@ class CounterApiService {
         final lic = components?['license'] as Map<String, dynamic>? ??
             (data is Map ? data['license'] as Map<String, dynamic>? : null);
         final restData = data is Map ? data['restaurant'] as Map<String, dynamic>? : null;
+        final gstData = data is Map ? data['gst'] as Map<String, dynamic>? : null;
         final restName = restData?['name']?.toString() ??
             (lic?['restaurantName']?.toString() ?? 'Hinopt POS');
+        final ownerName = restData?['ownerName']?.toString() ?? '';
+        final phone = restData?['phone']?.toString() ?? '';
+        final city = restData?['city']?.toString() ?? '';
+        final hardwareId = restData?['hwid']?.toString() ?? '';
+        final isGstEnabled = gstData?['enabled'] as bool? ?? false;
+        final gstRatePercent = (gstData?['ratePercent'] as num?)?.toDouble() ?? 5.0;
+        final cgstRatePercent = (gstData?['cgstRate'] as num?)?.toDouble() ?? (gstRatePercent / 2.0);
+        final sgstRatePercent = (gstData?['sgstRate'] as num?)?.toDouble() ?? (gstRatePercent / 2.0);
+        final gstin = gstData?['gstin']?.toString() ?? '';
+
         final licStatus = lic?['status']?.toString().toUpperCase() == 'ACTIVE'
             ? 'Active (Licensed to $restName)'
             : (lic?['status']?.toString() ?? 'Active');
@@ -123,6 +152,15 @@ class CounterApiService {
           licenseStatus: licStatus,
           daysRemaining: days,
           restaurantName: restName,
+          ownerName: ownerName,
+          phone: phone,
+          city: city,
+          hardwareId: hardwareId,
+          isGstEnabled: isGstEnabled,
+          gstRatePercent: gstRatePercent,
+          cgstRatePercent: cgstRatePercent,
+          sgstRatePercent: sgstRatePercent,
+          gstin: gstin,
           menuItemsLimit: menuItemsLimit,
           captainDevicesLimit: captainDevicesLimit,
           counterPcsLimit: counterPcsLimit,
@@ -625,7 +663,12 @@ class CounterApiService {
     }
   }
 
-  Future<RestaurantBill?> generateBill(String orderId, {int discountPaise = 0}) async {
+  Future<RestaurantBill?> generateBill(
+    String orderId, {
+    int discountPaise = 0,
+    bool? isGstEnabled,
+    double? gstRatePercent,
+  }) async {
     final idempotencyKey = generateUuidV4();
     try {
       final response = await http.post(
@@ -636,6 +679,8 @@ class CounterApiService {
         },
         body: jsonEncode({
           'discountPaise': discountPaise,
+          if (isGstEnabled != null) 'isGstEnabled': isGstEnabled,
+          if (gstRatePercent != null) 'gstRatePercent': gstRatePercent,
         }),
       ).timeout(const Duration(seconds: 5));
 
@@ -1015,6 +1060,7 @@ class CounterApiService {
     String? contactPhone,
     String? notes,
   }) async {
+    // 1. Try local POS server endpoint
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/license/upgrade-request'),
@@ -1028,18 +1074,198 @@ class CounterApiService {
           if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
           if (notes != null && notes.isNotEmpty) 'notes': notes,
         }),
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 4));
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200 || response.statusCode == 201) {
         final msg = body['data']?['message']?.toString() ?? 'Upgrade request submitted successfully!';
         return (success: true, message: msg);
-      } else {
-        final msg = body['error']?['message']?.toString() ?? 'Failed to submit upgrade request';
-        return (success: false, message: msg);
+      }
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud Push Fallback
+    try {
+      const sbUrl = 'https://ybalhfhqaduqsbjotbni.supabase.co';
+      const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+
+      final sbRes = await http.post(
+        Uri.parse('$sbUrl/rest/v1/upgrade_requests'),
+        headers: {
+          'apikey': sbKey,
+          'Authorization': 'Bearer $sbKey',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode({
+          'id': 'upg_${DateTime.now().millisecondsSinceEpoch}',
+          'restaurant_id': 'rest-01-0435',
+          'restaurant_name': 'curry leaf restaurant',
+          'license_key': 'HINOPT-2026-1RE3-1878',
+          'current_limits': {
+            'menuItems': 100,
+            'captainDevices': 2,
+            'counterPcs': 1,
+          },
+          'requested_limits': {
+            'menuItems': requestedMenuItems,
+            'captainDevices': requestedCaptainDevices,
+            'counterPcs': requestedCounterPcs,
+          },
+          'contact_phone': contactPhone ?? '',
+          'notes': notes ?? 'PC Counter POS Limit Upgrade Request',
+          'status': 'pending',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (sbRes.statusCode == 200 || sbRes.statusCode == 201) {
+        return (success: true, message: 'Upgrade request synced directly to Hinopt Cloud Admin!');
       }
     } catch (e) {
-      return (success: false, message: e.toString());
+      return (success: false, message: 'Could not connect to POS Server or Cloud Admin: $e');
+    }
+
+    return (success: false, message: 'Failed to submit upgrade request');
+  }
+
+  Future<bool> createTakeawayBackendOrder({
+    required String tableId,
+    required String customerName,
+    required String customerPhone,
+    required List<Map<String, dynamic>> items,
+    bool fireKot = true,
+  }) async {
+    try {
+      final createRes = await http.post(
+        Uri.parse('$baseUrl/orders'),
+        headers: headers,
+        body: jsonEncode({
+          'tableId': tableId,
+          'customerNotes': 'Takeaway - $customerName ($customerPhone)',
+          'guestCount': 1,
+          'items': items,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (createRes.statusCode == 200 || createRes.statusCode == 201) {
+        final data = unwrapResponse(createRes);
+        String? orderId;
+        if (data is Map && data['order'] != null) {
+          orderId = data['order']['id']?.toString();
+        }
+        if (orderId != null && fireKot) {
+          await http.post(
+            Uri.parse('$baseUrl/orders/$orderId/kot'),
+            headers: headers,
+          ).timeout(const Duration(seconds: 5));
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> discoverAllPrinters() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/printers/discover-all'), headers: headers)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map<String, dynamic> && data['discovered'] is List) {
+          return List<Map<String, dynamic>>.from(data['discovered']);
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<List<RestaurantBill>> getBills() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/bills'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map<String, dynamic> && data['bills'] is List) {
+          return (data['bills'] as List)
+              .map((b) => RestaurantBill.fromJson(b as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<String?> getHardwareId() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/license/hardware-id'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = unwrapResponse(response);
+        if (data is Map && data['hardwareId'] != null) {
+          return data['hardwareId'].toString();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> updateGstSettings({
+    required bool enabled,
+    required double ratePercent,
+    double? cgstRate,
+    double? sgstRate,
+    String? gstin,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/billing/gst-settings'),
+            headers: headers,
+            body: jsonEncode({
+              'enabled': enabled,
+              'ratePercent': ratePercent,
+              if (cgstRate != null) 'cgstRate': cgstRate,
+              if (sgstRate != null) 'sgstRate': sgstRate,
+              if (gstin != null) 'gstin': gstin,
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateMenuItem({
+    required String id,
+    required String name,
+    required String category,
+    required int pricePaise,
+    required bool isVeg,
+    String description = '',
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/menu/items/$id'),
+            headers: headers,
+            body: jsonEncode({
+              'id': id,
+              'name': name,
+              'category': category,
+              'pricePaise': pricePaise,
+              'isVeg': isVeg,
+              'description': description,
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 }
