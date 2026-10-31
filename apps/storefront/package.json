@@ -1,0 +1,9 @@
+{
+  "name": "hinopt-storefront",
+  "version": "1.0.0",
+  "description": "Hinopt Universal Cloud Storefront for Customer Online Orders",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Storefront ready'"
+  }
+}

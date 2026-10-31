@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Online Delivery - Hinopt Cloud Storefront</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top App Bar -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-info">
+        <div class="brand-avatar">🍃</div>
+        <div>
+          <h1 id="restaurantName" class="brand-title">Curry Leaf Restaurant</h1>
+          <div class="brand-badge-row">
+            <span class="status-indicator live">● Accepting Orders</span>
+            <span id="restaurantCity" class="brand-city">Direct Restaurant Delivery</span>
+          </div>
+        </div>
+      </div>
+      <div class="customer-actions">
+        <button id="authBtn" class="btn-auth" onclick="openAuthModal()">
+          <span class="auth-icon">👤</span>
+          <span id="authBtnText">Sign In</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Swiggy-Style Saved Delivery Location Bar -->
+    <div class="location-banner" onclick="openLocationModal()">
+      <div class="location-content">
+        <span class="loc-pin-icon">📍</span>
+        <div class="loc-text-col">
+          <div class="loc-label">DELIVERING TO</div>
+          <div id="activeAddressDisplay" class="loc-address">Tap to enter delivery address...</div>
+        </div>
+      </div>
+      <button class="btn-change-loc" type="button">Change Location</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="store-container">
+    <!-- Category Horizontal Scroll Bar -->
+    <nav class="category-nav-wrapper">
+      <div id="categoryTabs" class="category-tabs">
+        <button class="cat-pill active" onclick="filterCategory('All')">All Items</button>
+      </div>
+    </nav>
+
+    <!-- Search Bar -->
+    <div class="search-wrapper">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search dishes by name (e.g. Biryani, Paneer)..." oninput="handleSearch()">
+      </div>
+    </div>
+
+    <!-- Menu Dishes List (No Bulky Images - Fast & Light) -->
+    <section id="menuContainer" class="menu-sections-wrapper">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading fresh restaurant menu...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Sticky Bottom Cart Bar -->
+  <div id="bottomCartBar" class="bottom-cart-bar" style="display: none;">
+    <div class="cart-bar-inner">
+      <div class="cart-bar-info">
+        <span id="cartCountBadge" class="cart-count">0 ITEMS</span>
+        <span class="cart-divider">•</span>
+        <span id="cartTotalBadge" class="cart-total">₹0</span>
+      </div>
+      <button class="btn-view-cart" onclick="openCheckoutModal()">
+        <span>View Cart & Checkout</span>
+        <span class="arrow-icon">➔</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sign In / Phone Verification Modal -->
+  <div id="authModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Sign In to Order</h3>
+        <button class="btn-close" onclick="closeAuthModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-hint">Quick phone verification via Hinopt Billing to save your delivery location & track orders.</p>
+        <div class="form-group">
+          <label class="form-label">Your Full Name *</label>
+          <input type="text" id="custNameInput" class="form-input" placeholder="e.g. Rahul Sharma">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mobile Number *</label>
+          <div class="phone-input-row">
+            <span class="country-code">+91</span>
+            <input type="tel" id="custPhoneInput" class="form-input" placeholder="9876543210" maxlength="10">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeAuthModal()">Cancel</button>
+        <button class="btn-modal-primary" onclick="saveCustomerProfile()">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Swiggy-Style Location Modal with Google Maps Disclaimer -->
+  <div id="locationModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Select Delivery Location</h3>
+        <button class="btn-close" onclick="closeLocationModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <button type="button" class="btn-use-gps" onclick="detectGpsLocation()">
+          <span>📍 Use Current Device GPS</span>
+        </button>
+
+        <!-- Google Maps 3rd-Party Charges Disclaimer Notice -->
+        <div class="third-party-disclaimer">
+          <div class="disclaimer-title">⚠️ Location Service Policy</div>
+          <div class="disclaimer-text">
+            Hinopt utilizes browser device GPS coordinates for delivery accuracy. For dynamic Google Maps Places autocomplete, the client restaurant connects their own Google Cloud billing account with auto-pay enabled. Hinopt is not responsible for 3rd-party Google API charges.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Flat / House No. / Building Name *</label>
+          <input type="text" id="locHouseInput" class="form-input" placeholder="e.g. Flat 302, Green Heights Apartments">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Street / Area / Colony *</label>
+          <input type="text" id="locAreaInput" class="form-input" placeholder="e.g. 12th Main, 4th Sector, HSR Layout">
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Landmark (Optional)</label>
+            <input type="text" id="locLandmarkInput" class="form-input" placeholder="e.g. Near Water Tank">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pincode *</label>
+            <input type="text" id="locPincodeInput" class="form-input" placeholder="e.g. 560102" maxlength="6">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeLocationModal()">Cancel</button>
+        <button class="btn-modal-primary" onclick="saveLocationForm()">Save Location</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cart / Checkout Modal -->
+  <div id="checkoutModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card modal-checkout">
+      <div class="modal-header">
+        <h3 class="modal-title">Review & Place Order</h3>
+        <button class="btn-close" onclick="closeCheckoutModal()">✕</button>
+      </div>
+      <div class="modal-body checkout-body">
+        <!-- Delivery Address Summary -->
+        <div class="checkout-section-box">
+          <div class="sec-box-header">
+            <span class="sec-title">📍 Delivery Address</span>
+            <button class="btn-link" onclick="openLocationModal()">Change</button>
+          </div>
+          <div id="checkoutAddressText" class="sec-box-body">No location set</div>
+        </div>
+
+        <!-- Customer Phone Summary -->
+        <div class="checkout-section-box">
+          <div class="sec-box-header">
+            <span class="sec-title">👤 Contact Details</span>
+            <button class="btn-link" onclick="openAuthModal()">Change</button>
+          </div>
+          <div id="checkoutContactText" class="sec-box-body">Sign in required to place order</div>
+        </div>
+
+        <!-- Order Items List -->
+        <div class="checkout-items-list">
+          <div class="sec-box-header">
+            <span class="sec-title">🍽️ Selected Dishes</span>
+          </div>
+          <div id="checkoutItemsListContainer"></div>
+        </div>
+
+        <!-- Cooking / Delivery Notes -->
+        <div class="form-group" style="margin-top: 14px;">
+          <label class="form-label">Cooking / Delivery Instructions (Optional)</label>
+          <input type="text" id="orderNotesInput" class="form-input" placeholder="e.g. Less spicy, ring bell twice, keep at door...">
+        </div>
+
+        <!-- Bill Breakdown -->
+        <div class="bill-summary-box">
+          <div class="bill-row">
+            <span>Item Subtotal</span>
+            <span id="billSubtotal">₹0</span>
+          </div>
+          <div class="bill-row">
+            <span>Restaurant Packaging & Delivery</span>
+            <span class="text-free">FREE</span>
+          </div>
+          <div class="bill-divider"></div>
+          <div class="bill-row bill-total-row">
+            <span>To Pay (Cash/UPI on Delivery)</span>
+            <span id="billGrandTotal" class="total-amount">₹0</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeCheckoutModal()">Add More Items</button>
+        <button id="btnPlaceOrder" class="btn-modal-primary btn-place-order" onclick="placeOrder()">
+          <span>Place Delivery Order</span>
+          <span id="btnPlaceOrderTotal">₹0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Success Confirmation Modal -->
+  <div id="orderSuccessModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card modal-success">
+      <div class="success-icon-wrap">🎉</div>
+      <h3 class="modal-title success-title">Order Received!</h3>
+      <p class="success-msg">Your online delivery order has been sent directly to the restaurant kitchen printer.</p>
+      
+      <div class="order-token-box">
+        <div class="token-label">ORDER NUMBER</div>
+        <div id="successOrderNumber" class="token-value">ORD-2026-1001</div>
+        <div class="token-status">🟢 Kitchen Preparing • Approx 30-40 mins</div>
+      </div>
+
+      <div class="order-details-summary">
+        <div class="summary-line">
+          <span>Delivering To:</span>
+          <strong id="successAddress">...</strong>
+        </div>
+        <div class="summary-line">
+          <span>Contact Number:</span>
+          <strong id="successPhone">...</strong>
+        </div>
+        <div class="summary-line">
+          <span>Total Amount:</span>
+          <strong id="successTotal">₹0</strong>
+        </div>
+      </div>
+
+      <button class="btn-modal-primary" style="width: 100%; margin-top: 20px;" onclick="closeSuccessAndReset()">
+        Order More Items
+      </button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
