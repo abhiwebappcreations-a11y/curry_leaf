@@ -4,6 +4,7 @@ import '../models/table_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
 import 'server_connection_dialog.dart';
+import 'license_activation_dialog.dart';
 
 class SidebarNavigation extends StatelessWidget {
   final bool isDrawer;
@@ -21,45 +22,65 @@ class SidebarNavigation extends StatelessWidget {
         children: [
           const SizedBox(height: 16),
 
-          // User Profile Box
+          // User Profile Box (Click to view license, HWID & limits)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.primaryLight,
-                  child: Icon(Icons.person, size: 18, color: Colors.white),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => showLicenseActivationDialog(context, provider),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
                     children: [
-                      Text(
-                        'Deepa',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.primaryLight,
+                        child: Text(
+                          (provider.ownerName.isNotEmpty
+                                  ? provider.ownerName[0]
+                                  : (provider.restaurantName.isNotEmpty ? provider.restaurantName[0] : 'H'))
+                              .toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ),
-                      Text(
-                        'Cashier • Shift A',
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: 11,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              provider.ownerName.isNotEmpty ? provider.ownerName : provider.restaurantName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${provider.restaurantName} • Terminal',
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
+                      const Icon(Icons.verified, size: 14, color: AppColors.primaryLight),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
 
@@ -131,7 +152,7 @@ class SidebarNavigation extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Quick Server Connection Tile
+                // Clean Terminal Connection Status
                 InkWell(
                   onTap: () {
                     showDialog(
@@ -148,8 +169,8 @@ class SidebarNavigation extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: provider.localServerHealthy
-                            ? AppColors.success.withValues(alpha: 0.4)
-                            : AppColors.warning.withValues(alpha: 0.4),
+                            ? AppColors.accent.withValues(alpha: 0.3)
+                            : AppColors.warning.withValues(alpha: 0.3),
                         width: 0.8,
                       ),
                     ),
@@ -160,35 +181,20 @@ class SidebarNavigation extends StatelessWidget {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: provider.localServerHealthy ? AppColors.success : AppColors.warning,
+                            color: provider.localServerHealthy ? AppColors.accent : AppColors.warning,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                provider.localServerHealthy ? 'Server Online' : 'Server Offline',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${provider.serverHost}:${provider.serverPort}',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.6),
-                                  fontSize: 10,
-                                  fontFeatures: const [FontFeature.tabularFigures()],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                          child: Text(
+                            provider.localServerHealthy ? 'Terminal Connected' : 'Terminal Offline',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
                         const Icon(Icons.settings_outlined, size: 14, color: Colors.white54),
                       ],
                     ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../models/table_model.dart';
@@ -15,6 +16,8 @@ class PosProvider extends ChangeNotifier {
   List<RestaurantTable> _tables = [];
   List<MenuItem> _menuItems = [];
   final Map<String, RestaurantOrder> _ordersByTableId = {};
+  // Device-local draft storage: maps tableId -> unsent OrderItem list
+  final Map<String, List<OrderItem>> _localDraftsByTableId = {};
   final List<KotTicket> _kotHistory = [];
 
   String _selectedSection = 'All';
@@ -64,6 +67,71 @@ class PosProvider extends ChangeNotifier {
   String get deviceId => _deviceId;
   List<KotTicket> get kotHistory => _kotHistory;
   ApiService get apiService => _apiService;
+
+  bool hasDraft(String tableId) =>
+      (_localDraftsByTableId[tableId]?.isNotEmpty ?? false) ||
+      (_ordersByTableId[tableId]?.draftItems.isNotEmpty ?? false);
+
+  int getDraftCount(String tableId) {
+    final drafts = _localDraftsByTableId[tableId];
+    if (drafts != null && drafts.isNotEmpty) {
+      return drafts.fold(0, (sum, i) => sum + i.quantity);
+    }
+    return _ordersByTableId[tableId]?.draftItems.fold(0, (sum, i) => sum + i.quantity) ?? 0;
+  }
+
+  static int naturalTableCompare(RestaurantTable a, RestaurantTable b) {
+    final regex = RegExp(r'(\d+|\D+)');
+    final aMatches = regex.allMatches(a.name).map((m) => m.group(0)!).toList();
+    final bMatches = regex.allMatches(b.name).map((m) => m.group(0)!).toList();
+
+    for (int i = 0; i < aMatches.length && i < bMatches.length; i++) {
+      final aPart = aMatches[i];
+      final bPart = bMatches[i];
+      final aNum = int.tryParse(aPart);
+      final bNum = int.tryParse(bPart);
+
+      if (aNum != null && bNum != null) {
+        final comp = aNum.compareTo(bNum);
+        if (comp != 0) return comp;
+      } else {
+        final comp = aPart.toLowerCase().compareTo(bPart.toLowerCase());
+        if (comp != 0) return comp;
+      }
+    }
+    return aMatches.length.compareTo(bMatches.length);
+  }
+
+  Future<void> _saveLocalDraftsToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final Map<String, dynamic> data = {};
+      _localDraftsByTableId.forEach((tblId, items) {
+        if (items.isNotEmpty) {
+          data[tblId] = items.map((i) => i.toJson()).toList();
+        }
+      });
+      await prefs.setString('local_captain_drafts_v1', jsonEncode(data));
+    } catch (_) {}
+  }
+
+  Future<void> _loadLocalDraftsFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('local_captain_drafts_v1');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
+        _localDraftsByTableId.clear();
+        decoded.forEach((tblId, itemsList) {
+          if (itemsList is List) {
+            _localDraftsByTableId[tblId] = itemsList
+                .map((itemMap) => OrderItem.fromJson(itemMap as Map<String, dynamic>))
+                .toList();
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   List<String> get availableSections {
     final sections = {'All'};
@@ -168,14 +236,38 @@ class PosProvider extends ChangeNotifier {
       _pairingMessage = 'Network error connecting to Counter POS (${_apiService.host}:${_apiService.port}).';
     }
 
-    _tables = await _apiService.fetchTables();
+    await _loadLocalDraftsFromPrefs();
+
+    _tables = (await _apiService.fetchTables())..sort(naturalTableCompare);
     _menuItems = await _apiService.fetchMenu();
     if (_apiService.useDemoMode) {
       _ordersByTableId.addAll(MockData.getSeedOrders());
     } else {
       final liveOrders = await _apiService.fetchActiveOrders();
       for (var o in liveOrders) {
-        _ordersByTableId[o.tableId] = o;
+        final localDrafts = _localDraftsByTableId[o.tableId] ?? [];
+        if (localDrafts.isNotEmpty) {
+          final serverSubmitted = o.items.where((i) => !i.isDraft).toList();
+          _ordersByTableId[o.tableId] = o.copyWith(
+            items: [...serverSubmitted, ...localDrafts],
+          );
+        } else {
+          _ordersByTableId[o.tableId] = o;
+        }
+      }
+      // Ensure tables with local drafts that have no server order are also represented in _ordersByTableId
+      for (var entry in _localDraftsByTableId.entries) {
+        if (entry.value.isNotEmpty && !_ordersByTableId.containsKey(entry.key)) {
+          final tbl = _tables.where((t) => t.id == entry.key).firstOrNull;
+          _ordersByTableId[entry.key] = RestaurantOrder(
+            id: tbl?.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
+            tableId: entry.key,
+            tableName: tbl?.name ?? 'Table',
+            items: List.from(entry.value),
+            createdAt: DateTime.now(),
+            guestCount: tbl?.capacity ?? 4,
+          );
+        }
       }
     }
 
@@ -337,20 +429,20 @@ class PosProvider extends ChangeNotifier {
         }
 
         // Clean up settled tables that no longer have server orders AND have no local drafts
+        // Never purge the table the captain is currently viewing
         _ordersByTableId.removeWhere((tblId, ord) =>
-            !serverTableIds.contains(tblId) && ord.draftItems.isEmpty);
+            tblId != _currentTable?.id &&
+            !serverTableIds.contains(tblId) &&
+            ord.draftItems.isEmpty);
 
         if (_currentTable != null) {
           final updatedTable = _tables.where((t) => t.id == _currentTable!.id).firstOrNull;
           if (updatedTable != null) {
             _currentTable = updatedTable;
-            if (updatedTable.status == TableStatus.available &&
-                _currentOrder != null &&
-                _currentOrder!.draftItems.isEmpty) {
-              _ordersByTableId.remove(_currentTable!.id);
-              _currentOrder = null;
-            }
           }
+
+          // Ensure active order object exists for the table being edited
+          _ensureActiveOrder();
 
           // Keep current active order synchronized without duplicating drafts
           if (_currentOrder != null) {
@@ -371,9 +463,7 @@ class PosProvider extends ChangeNotifier {
             } else {
               // No server order for this table yet (e.g. fresh table with unsent drafts).
               // Keep _currentOrder intact: NEVER duplicate local drafts!
-              if (localDrafts.isNotEmpty) {
-                _ordersByTableId[_currentTable!.id] = _currentOrder!;
-              }
+              _ordersByTableId[_currentTable!.id] = _currentOrder!;
             }
           }
         }
@@ -424,6 +514,25 @@ class PosProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _ensureActiveOrder() {
+    if (_currentTable == null) return;
+    if (_currentOrder == null) {
+      if (_ordersByTableId.containsKey(_currentTable!.id)) {
+        _currentOrder = _ordersByTableId[_currentTable!.id];
+      } else {
+        _currentOrder = RestaurantOrder(
+          id: _currentTable!.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
+          tableId: _currentTable!.id,
+          tableName: _currentTable!.name,
+          items: [],
+          createdAt: DateTime.now(),
+          guestCount: _currentTable!.capacity,
+        );
+        _ordersByTableId[_currentTable!.id] = _currentOrder!;
+      }
+    }
+  }
+
   void clearSelectedTable() {
     _currentTable = null;
     _currentOrder = null;
@@ -438,7 +547,8 @@ class PosProvider extends ChangeNotifier {
     String? variant,
     List<String> addons = const [],
   }) {
-    if (_currentOrder == null) return;
+    _ensureActiveOrder();
+    if (_currentOrder == null || _currentTable == null) return;
 
     final existingIndex = _currentOrder!.items.indexWhere(
       (i) =>
@@ -479,7 +589,8 @@ class PosProvider extends ChangeNotifier {
   }
 
   void updateDraftQuantity(String itemId, int delta) {
-    if (_currentOrder == null) return;
+    _ensureActiveOrder();
+    if (_currentOrder == null || _currentTable == null) return;
 
     final index = _currentOrder!.items.indexWhere((i) => i.id == itemId);
     if (index < 0) return;
@@ -502,7 +613,8 @@ class PosProvider extends ChangeNotifier {
   }
 
   void removeDraftItem(String itemId) {
-    if (_currentOrder == null) return;
+    _ensureActiveOrder();
+    if (_currentOrder == null || _currentTable == null) return;
     List<OrderItem> updated = List.from(_currentOrder!.items);
     updated.removeWhere((i) => i.id == itemId && i.isDraft);
 
@@ -512,6 +624,7 @@ class PosProvider extends ChangeNotifier {
   }
 
   Future<KotTicket?> sendDraftToKitchen() async {
+    _ensureActiveOrder();
     if (_currentOrder == null || _currentOrder!.draftItems.isEmpty) return null;
 
     _isSubmittingKot = true;

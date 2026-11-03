@@ -133,6 +133,10 @@ class RestaurantOrder {
   final String status;
   final int guestCount;
   final DateTime createdAt;
+  final String orderType;
+  final String customerName;
+  final String customerPhone;
+  final String deliveryAddress;
 
   RestaurantOrder({
     required this.id,
@@ -142,7 +146,21 @@ class RestaurantOrder {
     this.status = 'ACTIVE',
     this.guestCount = 2,
     required this.createdAt,
+    this.orderType = 'dine_in',
+    this.customerName = '',
+    this.customerPhone = '',
+    this.deliveryAddress = '',
   });
+
+  bool get isTakeaway =>
+      orderType == 'takeaway' ||
+      tableId.startsWith('TA-') ||
+      tableName.toLowerCase().contains('takeaway');
+
+  bool get isDelivery =>
+      orderType == 'delivery' ||
+      tableId.startsWith('DEL-') ||
+      tableName.toLowerCase().contains('delivery');
 
   List<OrderItem> get activeItems =>
       items.where((i) => i.status != OrderItemStatus.cancelled).toList();
@@ -163,6 +181,10 @@ class RestaurantOrder {
     String? status,
     int? guestCount,
     DateTime? createdAt,
+    String? orderType,
+    String? customerName,
+    String? customerPhone,
+    String? deliveryAddress,
   }) {
     return RestaurantOrder(
       id: id ?? this.id,
@@ -172,6 +194,10 @@ class RestaurantOrder {
       status: status ?? this.status,
       guestCount: guestCount ?? this.guestCount,
       createdAt: createdAt ?? this.createdAt,
+      orderType: orderType ?? this.orderType,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
     );
   }
 
@@ -189,6 +215,10 @@ class RestaurantOrder {
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
           : DateTime.now(),
+      orderType: json['orderType'] as String? ?? 'dine_in',
+      customerName: json['customerName'] as String? ?? '',
+      customerPhone: json['customerPhone'] as String? ?? '',
+      deliveryAddress: json['deliveryAddress'] as String? ?? '',
     );
   }
 
@@ -201,6 +231,10 @@ class RestaurantOrder {
       'status': status,
       'guestCount': guestCount,
       'createdAt': createdAt.toIso8601String(),
+      'orderType': orderType,
+      'customerName': customerName,
+      'customerPhone': customerPhone,
+      'deliveryAddress': deliveryAddress,
     };
   }
 }

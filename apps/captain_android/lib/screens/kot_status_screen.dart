@@ -22,7 +22,7 @@ class KotStatusScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.kitchen_outlined, size: 64, color: AppColors.textMuted.withOpacity(0.5)),
+                  Icon(Icons.kitchen_outlined, size: 64, color: AppColors.textMuted.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
                   const Text(
                     'No KOTs sent during this shift yet.',
@@ -85,7 +85,7 @@ class KotStatusScreen extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -132,7 +132,7 @@ class KotStatusScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

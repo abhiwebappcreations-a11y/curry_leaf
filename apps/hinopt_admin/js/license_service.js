@@ -1,6 +1,21 @@
 // Hinopt License Cryptographic Service
 window.LicenseService = {
   generateSignedPayload: function(restaurant) {
+    const isOnlineOrdering = Boolean(restaurant.onlineOrderingEnabled);
+    const storeSlug = restaurant.storeSlug || (restaurant.name ? restaurant.name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'store');
+    const customDomain = restaurant.customDomain ? restaurant.customDomain.trim().toLowerCase() : '';
+    const storeUrl = customDomain ? `https://${customDomain}` : `https://${storeSlug}.orders.hinopt.com`;
+
+    const allowedFeatures = [
+      "OFFLINE_POS",
+      "CAPTAIN_LAN_SYNC",
+      "DUAL_PRINTER_QUEUE",
+      "AUDIT_REPRINTS"
+    ];
+    if (isOnlineOrdering) {
+      allowedFeatures.push("ONLINE_ORDERING");
+    }
+
     const payload = {
       version: "1.0",
       licenseKey: restaurant.licenseKey,
@@ -16,12 +31,11 @@ window.LicenseService = {
         captainDevices: restaurant.captainDevicesLimit !== undefined ? parseInt(restaurant.captainDevicesLimit, 10) : (restaurant.maxDevices || restaurant.limits?.captainDevices || 5),
         counterPcs: restaurant.counterPcsLimit !== undefined ? parseInt(restaurant.counterPcsLimit, 10) : (restaurant.limits?.counterPcs || 1)
       },
-      allowedFeatures: [
-        "OFFLINE_POS",
-        "CAPTAIN_LAN_SYNC",
-        "DUAL_PRINTER_QUEUE",
-        "AUDIT_REPRINTS"
-      ],
+      onlineOrderingEnabled: isOnlineOrdering,
+      storeSlug: storeSlug,
+      customDomain: customDomain,
+      storeUrl: storeUrl,
+      allowedFeatures: allowedFeatures,
       // Ed25519 Deterministic Asymmetric Signature
       signature: "ed25519_sig_" + btoa(restaurant.licenseKey + ":" + restaurant.expiresAt + ":" + restaurant.hwid).substring(0, 64)
     };
@@ -76,18 +90,32 @@ window.LicenseService = {
       counterPcs: restaurant.counterPcsLimit || 1
     };
 
+    if (data.onlineOrderingEnabled !== undefined) restaurant.onlineOrderingEnabled = Boolean(data.onlineOrderingEnabled);
+    if (data.storeSlug !== undefined) restaurant.storeSlug = data.storeSlug;
+    if (data.customDomain !== undefined) restaurant.customDomain = data.customDomain ? data.customDomain.trim().toLowerCase() : '';
+    restaurant.storeUrl = restaurant.customDomain ? `https://${restaurant.customDomain}` : `https://${restaurant.storeSlug || (restaurant.name ? restaurant.name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'store')}.orders.hinopt.com`;
+
     // Sync to Supabase
     if (window.SupabaseClient) {
       await window.SupabaseClient.updateRestaurant(restaurantId, restaurant);
       const validUntilIso = new Date(restaurant.expiresAt + "T23:59:59Z").toISOString();
+      const features = ["OFFLINE_POS", "CAPTAIN_LAN_SYNC", "DUAL_PRINTER_QUEUE", "AUDIT_REPRINTS"];
+      if (restaurant.onlineOrderingEnabled) {
+        features.push("ONLINE_ORDERING");
+      }
       await window.SupabaseClient.updateLicense(restaurant.licenseKey, {
         status: restaurant.status,
         validUntil: validUntilIso,
         maxDevices: restaurant.maxDevices,
+        features: features,
         signedPayload: {
           status: restaurant.status,
           restaurantId: restaurant.id,
-          limits: restaurant.limits
+          limits: restaurant.limits,
+          onlineOrderingEnabled: restaurant.onlineOrderingEnabled,
+          customDomain: restaurant.customDomain,
+          storeSlug: restaurant.storeSlug,
+          storeUrl: restaurant.storeUrl
         }
       });
     }
@@ -211,6 +239,10 @@ window.LicenseService = {
     const captainDevicesLimit = data.captainDevicesLimit ? parseInt(data.captainDevicesLimit, 10) : (data.maxDevices ? parseInt(data.maxDevices, 10) : 5);
     const counterPcsLimit = data.counterPcsLimit ? parseInt(data.counterPcsLimit, 10) : 1;
     const maxDevices = captainDevicesLimit;
+    const isOnlineOrdering = Boolean(data.onlineOrderingEnabled);
+    const storeSlug = data.storeSlug || (data.name ? data.name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'store');
+    const customDomain = data.customDomain ? data.customDomain.trim().toLowerCase() : '';
+    const storeUrl = customDomain ? `https://${customDomain}` : `https://${storeSlug}.orders.hinopt.com`;
 
     const newRest = {
       id: id,
@@ -232,6 +264,10 @@ window.LicenseService = {
         captainDevices: captainDevicesLimit,
         counterPcs: counterPcsLimit
       },
+      onlineOrderingEnabled: isOnlineOrdering,
+      storeSlug: storeSlug,
+      customDomain: customDomain,
+      storeUrl: storeUrl,
       counterIp: data.counterIp || "192.168.1.100",
       notes: data.notes || "Standard branch installation."
     };
@@ -252,6 +288,11 @@ window.LicenseService = {
           notes: newRest.notes
         });
 
+        const features = ["OFFLINE_POS", "CAPTAIN_LAN_SYNC", "DUAL_PRINTER_QUEUE", "AUDIT_REPRINTS"];
+        if (isOnlineOrdering) {
+          features.push("ONLINE_ORDERING");
+        }
+
         await window.SupabaseClient.insertLicense({
           id: "lic-" + timestampId,
           restaurant_id: id,
@@ -260,12 +301,16 @@ window.LicenseService = {
           valid_from: new Date().toISOString(),
           valid_until: new Date(validUntilDate + "T23:59:59Z").toISOString(),
           max_devices: maxDevices,
-          features: ["OFFLINE_POS", "CAPTAIN_LAN_SYNC", "DUAL_PRINTER_QUEUE", "AUDIT_REPRINTS"],
+          features: features,
           signature: "ed25519_sig_" + btoa(licenseKey + ":" + validUntilDate).substring(0, 32),
           signed_payload: {
             status: "ACTIVE",
             restaurantId: id,
-            limits: newRest.limits
+            limits: newRest.limits,
+            onlineOrderingEnabled: isOnlineOrdering,
+            customDomain: customDomain,
+            storeSlug: storeSlug,
+            storeUrl: storeUrl
           }
         });
       } catch (err) {

@@ -5,6 +5,7 @@ class MenuItem {
   final int pricePaise;
   final bool isVeg;
   final bool isAvailable;
+  final bool isDeliveryAvailable;
   final String description;
   final String? imageUrl;
 
@@ -15,6 +16,7 @@ class MenuItem {
     required this.pricePaise,
     required this.isVeg,
     this.isAvailable = true,
+    this.isDeliveryAvailable = true,
     this.description = '',
     this.imageUrl,
   });
@@ -28,6 +30,7 @@ class MenuItem {
     int? pricePaise,
     bool? isVeg,
     bool? isAvailable,
+    bool? isDeliveryAvailable,
     String? description,
     String? imageUrl,
   }) {
@@ -38,6 +41,7 @@ class MenuItem {
       pricePaise: pricePaise ?? this.pricePaise,
       isVeg: isVeg ?? this.isVeg,
       isAvailable: isAvailable ?? this.isAvailable,
+      isDeliveryAvailable: isDeliveryAvailable ?? this.isDeliveryAvailable,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
     );
@@ -51,6 +55,7 @@ class MenuItem {
       pricePaise: (json['pricePaise'] ?? json['pricePaiseSnapshot'] ?? 0) as int,
       isVeg: json['isVeg'] as bool? ?? true,
       isAvailable: json['isAvailable'] as bool? ?? true,
+      isDeliveryAvailable: json['isDeliveryAvailable'] as bool? ?? true,
       description: json['description'] as String? ?? '',
       imageUrl: json['imageUrl'] as String?,
     );
@@ -64,6 +69,7 @@ class MenuItem {
       'pricePaise': pricePaise,
       'isVeg': isVeg,
       'isAvailable': isAvailable,
+      'isDeliveryAvailable': isDeliveryAvailable,
       'description': description,
       'imageUrl': imageUrl,
     };

@@ -129,6 +129,9 @@ const server = http.createServer(async (req, res) => {
     let validFrom = new Date().toISOString();
     let validUntil = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
     let status = 'active';
+    let onlineOrderingEnabled = false;
+    let customDomain = '';
+    let storeSlug = '';
 
     try {
       const licRes = await fetch(`${SUPABASE_URL}/rest/v1/licenses?license_key=eq.${encodeURIComponent(rawKey)}&select=*`, {
@@ -145,6 +148,18 @@ const server = http.createServer(async (req, res) => {
           if (lic.max_devices) limits.captainDevices = lic.max_devices;
           if (lic.menu_items_limit) limits.menuItems = lic.menu_items_limit;
           if (lic.counter_pcs_limit) limits.counterPcs = lic.counter_pcs_limit;
+
+          if (lic.signed_payload) {
+            try {
+              const sp = typeof lic.signed_payload === 'string' ? JSON.parse(lic.signed_payload) : lic.signed_payload;
+              if (sp.onlineOrderingEnabled !== undefined) onlineOrderingEnabled = Boolean(sp.onlineOrderingEnabled);
+              if (sp.customDomain) customDomain = sp.customDomain;
+              if (sp.storeSlug) storeSlug = sp.storeSlug;
+            } catch (_) {}
+          }
+          if (lic.features && Array.isArray(lic.features) && lic.features.includes('ONLINE_ORDERING')) {
+            onlineOrderingEnabled = true;
+          }
 
           // Fetch Restaurant details (name, owner, phone, city)
           const restRes = await fetch(`${SUPABASE_URL}/rest/v1/restaurants?id=eq.${encodeURIComponent(restaurantId)}&select=*`, {
@@ -199,6 +214,15 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (!storeSlug) {
+      storeSlug = restName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    const storeUrl = customDomain ? `https://${customDomain}` : `https://${storeSlug}.orders.hinopt.com`;
+    const allowedFeatures = ['OFFLINE_POS', 'CAPTAIN_LAN_SYNC', 'DUAL_PRINTER_QUEUE', 'GOOGLE_DRIVE_CLOUD_BACKUP'];
+    if (onlineOrderingEnabled) {
+      allowedFeatures.push('ONLINE_ORDERING');
+    }
+
     const payload = {
       version: '1.0',
       licenseKey: rawKey.toUpperCase(),
@@ -214,7 +238,11 @@ const server = http.createServer(async (req, res) => {
       issuedAt: validFrom,
       expiresAt: validUntil,
       limits: limits,
-      allowedFeatures: ['OFFLINE_POS', 'CAPTAIN_LAN_SYNC', 'DUAL_PRINTER_QUEUE', 'GOOGLE_DRIVE_CLOUD_BACKUP'],
+      onlineOrderingEnabled: onlineOrderingEnabled,
+      storeSlug: storeSlug,
+      customDomain: customDomain,
+      storeUrl: storeUrl,
+      allowedFeatures: allowedFeatures,
     };
 
     const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');
@@ -769,6 +797,226 @@ const server = http.createServer(async (req, res) => {
       }
     });
     return;
+  }
+
+  // API Route: Storefront Resolver (Resolves restaurant by slug or custom domain)
+  if (pathname === '/api/storefront/resolve' && req.method === 'GET') {
+    const slug = (parsedUrl.searchParams.get('slug') || '').toLowerCase().trim();
+    const domain = (parsedUrl.searchParams.get('domain') || '').toLowerCase().trim();
+
+    const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+    const SUPABASE_KEY =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+
+    try {
+      const licRes = await fetch(`${SUPABASE_URL}/rest/v1/licenses?select=*`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      if (licRes.ok) {
+        const licenses = await licRes.json();
+        for (const lic of licenses) {
+          const payload = lic.signed_payload || {};
+          const licSlug = (payload.storeSlug || lic.restaurant_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const licDomain = (payload.customDomain || '').toLowerCase().trim();
+
+          const isMatch =
+            (slug && (licSlug === slug || lic.restaurant_id === slug || slug === 'curryleaf')) ||
+            (domain && licDomain === domain) ||
+            (!slug && !domain); // fallback default to first client
+
+          if (isMatch) {
+            let onlineMenu = [];
+            try {
+              const rRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/restaurants?id=eq.${encodeURIComponent(lic.restaurant_id)}&select=*`,
+                {
+                  headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+                }
+              );
+              if (rRes.ok) {
+                const rList = await rRes.json();
+                if (rList.length > 0 && rList[0].online_menu) {
+                  onlineMenu = rList[0].online_menu;
+                }
+              }
+            } catch (_) {}
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                success: true,
+                data: {
+                  restaurantId: lic.restaurant_id,
+                  restaurantName: payload.restaurantName || lic.restaurant_name,
+                  phone: payload.phone || '',
+                  city: payload.city || '',
+                  storeSlug: licSlug,
+                  customDomain: licDomain,
+                  onlineOrderingEnabled: payload.onlineOrderingEnabled !== false,
+                  onlineMenu,
+                },
+              })
+            );
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Storefront] Resolve error:', err.message);
+    }
+
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Restaurant storefront not found' }));
+    return;
+  }
+
+  // API Route: Storefront Submit Online Order (Inserts into Supabase queue)
+  if (pathname === '/api/storefront/order' && req.method === 'POST') {
+    let bodyStr = '';
+    req.on('data', (chunk) => {
+      bodyStr += chunk;
+    });
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(bodyStr);
+        const {
+          restaurantId,
+          customerName,
+          customerPhone,
+          deliveryAddress,
+          customerNotes,
+          items,
+          deliveryCoordinates,
+        } = body;
+
+        if (!restaurantId || !customerPhone || !deliveryAddress || !items || !items.length) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Missing required delivery order details' }));
+          return;
+        }
+
+        const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+        const SUPABASE_KEY =
+          process.env.SUPABASE_SERVICE_ROLE_KEY ||
+          process.env.SUPABASE_KEY ||
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+
+        const orderId = `ord_cloud_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const orderNumber = `ORD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Date.now()
+          .toString()
+          .slice(-4)}`;
+
+        let subtotalPaise = 0;
+        for (const it of items) {
+          const paise = (it.priceRupees ? it.priceRupees * 100 : it.pricePaise) || 0;
+          subtotalPaise += paise * (it.quantity || 1);
+        }
+
+        const record = {
+          id: orderId,
+          restaurant_id: restaurantId,
+          order_number: orderNumber,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          delivery_address: deliveryAddress,
+          delivery_coordinates: deliveryCoordinates || null,
+          customer_notes: customerNotes || null,
+          items: items,
+          subtotal_paise: subtotalPaise,
+          tax_paise: 0,
+          total_paise: subtotalPaise,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const insRes = await fetch(`${SUPABASE_URL}/rest/v1/online_orders`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify(record),
+        });
+
+        if (insRes.ok) {
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              success: true,
+              data: {
+                orderId,
+                orderNumber,
+                totalRupees: subtotalPaise / 100,
+                customerPhone,
+                deliveryAddress,
+              },
+            })
+          );
+        } else {
+          const errText = await insRes.text();
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Database queue error: ' + errText }));
+        }
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // API Route: Storefront Track Order Status
+  if (pathname.startsWith('/api/storefront/order/') && req.method === 'GET') {
+    const orderId = pathname.replace('/api/storefront/order/', '').trim();
+    const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ybalhfhqaduqsbjotbni.supabase.co';
+    const SUPABASE_KEY =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InliYWxoZmhxYWR1cXNiam90Ym5pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjM5MzM4NCwiZXhwIjoyMTA3OTY5Mzg0fQ.Sw_edT0eB7HdN4jQ5vIfk9oGM_LSsCCJMw16Pv5MJH0';
+
+    try {
+      const qRes = await fetch(`${SUPABASE_URL}/rest/v1/online_orders?id=eq.${encodeURIComponent(orderId)}&select=*`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      });
+      if (qRes.ok) {
+        const list = await qRes.json();
+        if (list.length > 0) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, data: list[0] }));
+          return;
+        }
+      }
+    } catch (_) {}
+
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Order not found' }));
+    return;
+  }
+
+  // Storefront Static File Serving (/orders and /orders/*)
+  const STOREFRONT_DIR = path.resolve(__dirname, '../../services/local-api/public/orders');
+  if (pathname.startsWith('/orders') || pathname === '/orders') {
+    let sub = pathname.replace(/^\/orders/, '');
+    if (!sub || sub === '/') sub = '/index.html';
+    const sFile = path.join(STOREFRONT_DIR, sub);
+    const targetFile =
+      fs.existsSync(sFile) && !fs.statSync(sFile).isDirectory()
+        ? sFile
+        : path.join(STOREFRONT_DIR, 'index.html');
+
+    const ext = path.extname(targetFile).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    try {
+      const data = fs.readFileSync(targetFile);
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(data);
+      return;
+    } catch (_) {}
   }
 
   // Static File Serving

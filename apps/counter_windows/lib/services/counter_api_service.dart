@@ -28,6 +28,9 @@ class SystemHealthInfo {
   final int menuItemsUsage;
   final int captainDevicesUsage;
   final int counterPcsUsage;
+  final bool isOnlineOrderingEnabled;
+  final String onlineStoreUrl;
+  final String customDomain;
 
   SystemHealthInfo({
     required this.isServerHealthy,
@@ -50,6 +53,9 @@ class SystemHealthInfo {
     this.menuItemsUsage = 0,
     this.captainDevicesUsage = 0,
     this.counterPcsUsage = 0,
+    this.isOnlineOrderingEnabled = false,
+    this.onlineStoreUrl = '',
+    this.customDomain = '',
   });
 }
 
@@ -146,6 +152,12 @@ class CounterApiService {
         final captainDevicesUsage = usage?['captainDevices'] is num ? (usage!['captainDevices'] as num).toInt() : 0;
         final counterPcsUsage = usage?['counterPcs'] is num ? (usage!['counterPcs'] as num).toInt() : 0;
 
+        final onlineData = components?['onlineOrdering'] as Map<String, dynamic>? ??
+            (data is Map ? data['onlineOrdering'] as Map<String, dynamic>? : null);
+        final isOnlineOrdering = onlineData?['enabled'] as bool? ?? false;
+        final storeUrl = onlineData?['storeUrl']?.toString() ?? '';
+        final customDomain = onlineData?['customDomain']?.toString() ?? '';
+
         return SystemHealthInfo(
           isServerHealthy: isServer,
           isDatabaseHealthy: isDb,
@@ -167,6 +179,9 @@ class CounterApiService {
           menuItemsUsage: menuItemsUsage,
           captainDevicesUsage: captainDevicesUsage,
           counterPcsUsage: counterPcsUsage,
+          isOnlineOrderingEnabled: isOnlineOrdering,
+          onlineStoreUrl: storeUrl,
+          customDomain: customDomain,
         );
       }
     } catch (_) {}
@@ -539,6 +554,22 @@ class CounterApiService {
         headers: headers,
         body: jsonEncode({
           'isAvailable': isAvailable,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> toggleMenuItemDeliveryAvailability(String id, bool isDeliveryAvailable) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/menu/items/$id/delivery-availability'),
+        headers: headers,
+        body: jsonEncode({
+          'isDeliveryAvailable': isDeliveryAvailable,
         }),
       ).timeout(const Duration(seconds: 4));
 
@@ -1261,6 +1292,38 @@ class CounterApiService {
               'isVeg': isVeg,
               'description': description,
             }),
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> renameCategory(String oldName, String newName) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/menu/categories/rename'),
+            headers: headers,
+            body: jsonEncode({
+              'oldName': oldName.trim(),
+              'newName': newName.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteCategory(String name, [String reassignTo = 'Others']) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$baseUrl/menu/categories/${Uri.encodeComponent(name)}?reassignTo=${Uri.encodeComponent(reassignTo)}'),
+            headers: headers,
           )
           .timeout(const Duration(seconds: 4));
       return response.statusCode == 200;

@@ -317,6 +317,8 @@ class OrderScreen extends StatelessWidget {
                                     .firstOrNull;
                                 if (existing != null) {
                                   provider.updateDraftQuantity(existing.id, 1);
+                                } else {
+                                  provider.addItemToDraft(item);
                                 }
                               },
                               onDecrement: () {

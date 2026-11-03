@@ -9,10 +9,18 @@ export const tablesRouter = Router();
 
 tablesRouter.use(authenticateDevice);
 
+// Helper: Natural alphanumeric sort for tables ("1" < "2" < "10", "T1" < "T2" < "T10")
+export function naturalTableCompare(
+  a: { tableNumber: string; displayName?: string; sortOrder?: number },
+  b: { tableNumber: string; displayName?: string; sortOrder?: number }
+): number {
+  return a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 // GET /api/tables - List tables with live order metadata
 tablesRouter.get('/', (req: Request, res: Response) => {
   const tables = Array.from(inMemoryStore.tables.values())
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort(naturalTableCompare)
     .map((table) => {
       let activeOrderSummary = null;
       if (table.activeOrderId) {

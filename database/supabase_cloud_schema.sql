@@ -88,6 +88,42 @@ CREATE TABLE IF NOT EXISTS upgrade_requests (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 8. Online Orders Queue Table (Syncs Customer Web Orders to Local Counter POS)
+CREATE TABLE IF NOT EXISTS online_orders (
+    id VARCHAR(100) PRIMARY KEY,
+    restaurant_id VARCHAR(50) NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    order_number VARCHAR(100) NOT NULL,
+    customer_name VARCHAR(150) NOT NULL,
+    customer_phone VARCHAR(20) NOT NULL,
+    delivery_address TEXT NOT NULL,
+    delivery_coordinates JSONB,
+    customer_notes TEXT,
+    items JSONB NOT NULL,
+    subtotal_paise INTEGER NOT NULL,
+    tax_paise INTEGER NOT NULL DEFAULT 0,
+    total_paise INTEGER NOT NULL,
+    status VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'preparing', 'out_for_delivery', 'delivered', 'cancelled')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Alter restaurants to add online delivery attributes if missing
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='restaurants' AND column_name='store_slug') THEN
+        ALTER TABLE restaurants ADD COLUMN store_slug VARCHAR(100) UNIQUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='restaurants' AND column_name='custom_domain') THEN
+        ALTER TABLE restaurants ADD COLUMN custom_domain VARCHAR(150);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='restaurants' AND column_name='online_ordering_enabled') THEN
+        ALTER TABLE restaurants ADD COLUMN online_ordering_enabled BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='restaurants' AND column_name='online_menu') THEN
+        ALTER TABLE restaurants ADD COLUMN online_menu JSONB DEFAULT '[]'::jsonb;
+    END IF;
+END $$;
+
 -- Enable RLS and Permissive Policies for Hinopt Admin Service Role
 ALTER TABLE restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE licenses ENABLE ROW LEVEL SECURITY;
@@ -95,6 +131,7 @@ ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cloud_backups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE revoked_hwids ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upgrade_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE online_orders ENABLE ROW LEVEL SECURITY;
 
 -- Allow full access with service_role / apikey
 DROP POLICY IF EXISTS "Allow full access for service role" ON restaurants;
@@ -114,3 +151,6 @@ CREATE POLICY "Allow full access for service role" ON revoked_hwids FOR ALL USIN
 
 DROP POLICY IF EXISTS "Allow full access for service role" ON upgrade_requests;
 CREATE POLICY "Allow full access for service role" ON upgrade_requests FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Allow full access for service role" ON online_orders;
+CREATE POLICY "Allow full access for service role" ON online_orders FOR ALL USING (true);

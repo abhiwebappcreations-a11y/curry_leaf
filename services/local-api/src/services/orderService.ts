@@ -17,6 +17,11 @@ export interface CreateOrderInput {
   customerNotes?: string;
   guestCount?: number;
   items?: CreateOrderItemInput[];
+  orderType?: 'dine_in' | 'takeaway' | 'delivery';
+  customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  deliveryCoordinates?: { lat: number; lng: number };
 }
 
 export class OrderService {
@@ -27,7 +32,8 @@ export class OrderService {
   }
 
   public static async createOrder(input: CreateOrderInput, deviceId?: string): Promise<OrderRecord> {
-    const isTakeaway = input.tableId.startsWith('TA-') || input.tableId.toLowerCase().includes('takeaway');
+    const isTakeaway = input.orderType === 'takeaway' || input.tableId.startsWith('TA-') || input.tableId.toLowerCase().includes('takeaway');
+    const isDelivery = input.orderType === 'delivery' || input.tableId.startsWith('DEL-') || input.tableId.toLowerCase().includes('delivery');
     let table = inMemoryStore.tables.get(input.tableId);
     if (!table && isTakeaway) {
       table = {
@@ -40,12 +46,23 @@ export class OrderService {
         activeOrderId: null,
         sortOrder: 999,
       };
+    } else if (!table && isDelivery) {
+      table = {
+        id: input.tableId,
+        tableNumber: input.tableId,
+        displayName: `🛵 Delivery ${input.customerName ? `(${input.customerName})` : input.tableId}`,
+        section: 'Delivery',
+        capacity: 1,
+        status: 'occupied',
+        activeOrderId: null,
+        sortOrder: 998,
+      };
     } else if (!table) {
       throw new NotFoundError('Table', input.tableId);
     }
 
     // Check if table already has an active open order (only for physical dine-in tables)
-    if (!isTakeaway && table.activeOrderId) {
+    if (!isTakeaway && !isDelivery && table.activeOrderId) {
       const existing = inMemoryStore.orders.get(table.activeOrderId);
       if (existing && !['settled', 'cancelled'].includes(existing.status)) {
         throw new ConflictError(
@@ -59,6 +76,9 @@ export class OrderService {
     const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
+    const resolvedOrderType: 'dine_in' | 'takeaway' | 'delivery' =
+      input.orderType || (isDelivery ? 'delivery' : (isTakeaway ? 'takeaway' : 'dine_in'));
+
     const order: OrderRecord = {
       id: orderId,
       orderNumber: this.generateOrderNumber(),
@@ -66,6 +86,11 @@ export class OrderService {
       tableName: table.displayName || table.tableNumber,
       captainDeviceId: deviceId,
       status: 'active',
+      orderType: resolvedOrderType,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      deliveryAddress: input.deliveryAddress,
+      deliveryCoordinates: input.deliveryCoordinates,
       customerNotes: input.customerNotes,
       guestCount: input.guestCount || 1,
       subtotalPaise: 0,

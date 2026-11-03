@@ -4,13 +4,36 @@ import 'package:provider/provider.dart';
 import '../models/printer_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
+import '../services/mock_counter_data.dart';
 
-class PrinterSettingsView extends StatelessWidget {
+class PrinterSettingsView extends StatefulWidget {
   const PrinterSettingsView({super.key});
+
+  @override
+  State<PrinterSettingsView> createState() => _PrinterSettingsViewState();
+}
+
+class _PrinterSettingsViewState extends State<PrinterSettingsView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<CounterProvider>();
+      if (provider.discoveredPrinters.isEmpty && !provider.isDiscoveringPrinters) {
+        provider.autoDiscoverPrinters();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
+    final printerList = provider.printers.isNotEmpty
+        ? provider.printers
+        : MockCounterData.getPrinters();
+    final displayPrinters = provider.isSinglePrinterMode
+        ? [printerList.firstWhere((p) => p.role == PrinterRole.counterBill, orElse: () => printerList.first)]
+        : printerList;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -24,27 +47,64 @@ class PrinterSettingsView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Thermal Printer Configurations',
-                    style: TextStyle(
-                      fontSize: isMobile ? 19 : 22,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.5,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Thermal Printers',
+                          style: TextStyle(
+                            fontSize: isMobile ? 19 : 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Automatic Wi-Fi, Ethernet & USB Detection (Zero IP addresses or drivers needed for Wi-Fi)',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    isMobile
-                        ? 'Durable print queues for Counter & Kitchen (USB & Ethernet)'
-                        : 'Independent durable queues for Counter Bill Printer and Kitchen KOT Printer (supports USB Windows Drivers & Ethernet TCP Port 9100)',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ElevatedButton.icon(
+                    onPressed: provider.isDiscoveringPrinters
+                        ? null
+                        : () async {
+                            await provider.autoDiscoverPrinters();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AppColors.success,
+                                  content: Text(
+                                    provider.discoveredPrinters.isNotEmpty
+                                        ? 'Found ${provider.discoveredPrinters.length} thermal printers (Wi-Fi & USB ready)!'
+                                        : 'Scan complete. If using a Wi-Fi printer, ensure it is powered on and connected to this Wi-Fi.',
+                                  ),
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          },
+                    icon: provider.isDiscoveringPrinters
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.wifi_find, size: 18),
+                    label: Text(provider.isDiscoveringPrinters ? 'Scanning...' : 'Auto-Detect Connected Printers'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
                 ],
               ),
+
+              const SizedBox(height: 14),
 
               // 2-Option Mode Selector
               Container(
@@ -96,9 +156,9 @@ class PrinterSettingsView extends StatelessWidget {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('1. Single Printer Setup', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        Text('1. Single Printer Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                         Text(
-                                          'Only 1 printer available. Captain KOTs, Counter KOTs & Customer Bills all print to this printer.',
+                                          'Customer Bills and Kitchen KOTs all print to one counter thermal printer.',
                                           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                         ),
                                       ],
@@ -136,9 +196,9 @@ class PrinterSettingsView extends StatelessWidget {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('2. Double Printer Setup (Normal)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        Text('2. Two Printers Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                         Text(
-                                          'Separate printers: Kitchen printer only prints KOTs; Counter printer only prints Customer Bills.',
+                                          'Customer Bills print at Counter, and Kitchen KOTs print separately in the Kitchen.',
                                           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                         ),
                                       ],
@@ -155,30 +215,33 @@ class PrinterSettingsView extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Cards Layout: Vertical ListView on Mobile, Two-Column Row on Desktop
+              // Printers Grid
               Expanded(
                 child: isMobile
-                    ? ListView(
-                        children: (provider.isSinglePrinterMode
-                            ? [provider.printers.firstWhere((p) => p.role == PrinterRole.counterBill, orElse: () => provider.printers.first)]
-                            : provider.printers).map((printer) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: _buildPrinterCard(context, provider, printer, isMobile: true),
-                          );
-                        }).toList(),
+                    ? ListView.separated(
+                        itemCount: displayPrinters.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) => _buildPrinterCard(
+                          context,
+                          provider,
+                          displayPrinters[index],
+                          isMobile: true,
+                        ),
                       )
                     : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: (provider.isSinglePrinterMode
-                            ? [provider.printers.firstWhere((p) => p.role == PrinterRole.counterBill, orElse: () => provider.printers.first)]
-                            : provider.printers).map((printer) {
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: displayPrinters.map((printer) {
                           return Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: _buildPrinterCard(context, provider, printer, isMobile: false),
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: _buildPrinterCard(
+                                context,
+                                provider,
+                                printer,
+                                isMobile: false,
+                              ),
                             ),
                           );
                         }).toList(),
@@ -204,6 +267,13 @@ class PrinterSettingsView extends StatelessWidget {
 
     final isEthernet = printer.address.contains(':');
 
+    String displayName = printer.name;
+    if (isEthernet) {
+      displayName = isBill ? 'Counter Wi-Fi Thermal Printer' : 'Kitchen Wi-Fi Thermal Printer';
+    } else if (printer.address.isNotEmpty && !printer.address.contains(':')) {
+      displayName = printer.address;
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -228,12 +298,12 @@ class PrinterSettingsView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isBill ? AppColors.primary : AppColors.accentLight,
+                  color: isBill ? AppColors.primary : const Color(0xFFE65100),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   isBill ? Icons.receipt_long : Icons.kitchen,
-                  color: isBill ? Colors.white : AppColors.primaryDark,
+                  color: Colors.white,
                   size: 22,
                 ),
               ),
@@ -247,8 +317,8 @@ class PrinterSettingsView extends StatelessWidget {
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                     ),
                     Text(
-                      printer.name,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      displayName,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -274,7 +344,7 @@ class PrinterSettingsView extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      printer.isConnected ? 'CONFIGURED' : 'OFFLINE',
+                      printer.isConnected ? 'READY' : 'OFFLINE',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
@@ -289,20 +359,20 @@ class PrinterSettingsView extends StatelessWidget {
 
           const Divider(color: AppColors.borderLight, height: 20),
 
-          // Configuration Details
+          // Configuration Details (Zero IP Jargon)
           _buildConfigItem(
-            'Connection Mode',
-            isEthernet ? 'Ethernet LAN (TCP Socket Port 9100)' : 'USB Port (Windows Print Spooler)',
-            isEthernet ? Icons.lan : Icons.usb,
+            'Assigned Printer',
+            displayName,
+            isEthernet ? Icons.wifi : Icons.print,
           ),
           const SizedBox(height: 8),
           _buildConfigItem(
-            isEthernet ? 'Ethernet Target IP & Port' : 'USB Windows Printer Name',
-            printer.address,
-            isEthernet ? Icons.settings_ethernet : Icons.print,
+            'Connection Type',
+            isEthernet ? 'Wi-Fi / Ethernet Network (No Drivers Needed)' : 'USB Cable (Windows Spooler)',
+            isEthernet ? Icons.wifi_protected_setup : Icons.usb,
           ),
           const SizedBox(height: 8),
-          _buildConfigItem('Paper Width', '${printer.paperWidthMm}mm Thermal Paper (Standard)', Icons.straighten),
+          _buildConfigItem('Paper Roll Width', '${printer.paperWidthMm}mm Standard Thermal Roll', Icons.straighten),
           const SizedBox(height: 8),
           _buildConfigItem('Last Test Print', lastTestStr, Icons.history),
 
@@ -313,7 +383,7 @@ class PrinterSettingsView extends StatelessWidget {
 
           const Divider(color: AppColors.borderLight, height: 20),
 
-          // Action Buttons: Send Test Print & Configure IP
+          // Action Buttons: Send Test Print & Choose Printer
           Row(
             children: [
               Expanded(
@@ -321,36 +391,36 @@ class PrinterSettingsView extends StatelessWidget {
                   onPressed: provider.isLicenseLocked
                       ? null
                       : () async {
-                    await provider.testPrint(printer.role);
-                    if (context.mounted) {
-                      final updated = provider.printers
-                          .where((p) => p.role == printer.role)
-                          .firstOrNull;
-                      final succeeded = updated?.isConnected ?? false;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: succeeded ? AppColors.success : AppColors.error,
-                          content: Row(
-                            children: [
-                              Icon(
-                                succeeded ? Icons.check_circle : Icons.error_outline,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  succeeded
-                                      ? 'Test ticket sent to "${printer.address}" via ${isEthernet ? "Ethernet" : "USB"}!'
-                                      : 'Print dispatch failed to "${printer.address}". Check that printer is powered on and connected.',
+                          await provider.testPrint(printer.role);
+                          if (context.mounted) {
+                            final updated = provider.printers
+                                .where((p) => p.role == printer.role)
+                                .firstOrNull;
+                            final succeeded = updated?.isConnected ?? false;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: succeeded ? AppColors.success : AppColors.error,
+                                content: Row(
+                                  children: [
+                                    Icon(
+                                      succeeded ? Icons.check_circle : Icons.error_outline,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        succeeded
+                                            ? 'Test slip printed successfully on $displayName!'
+                                            : 'Failed to print test ticket. Ensure printer is powered on and connected.',
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                duration: const Duration(seconds: 4),
                               ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 5),
-                        ),
-                      );
-                    }
-                  },
+                            );
+                          }
+                        },
                   icon: const Icon(Icons.print, size: 16),
                   label: const Text('Send Test Print'),
                   style: ElevatedButton.styleFrom(
@@ -361,11 +431,11 @@ class PrinterSettingsView extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
-                onPressed: () => _showEditPrinterDialog(context, provider, printer),
-                icon: Icon(isEthernet ? Icons.settings_ethernet : Icons.usb, size: 16),
-                label: const Text('Configure (USB / LAN)'),
+                onPressed: () => _showSelectPrinterDialog(context, provider, printer),
+                icon: const Icon(Icons.touch_app, size: 16),
+                label: const Text('Select Printer'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
             ],
@@ -375,32 +445,19 @@ class PrinterSettingsView extends StatelessWidget {
     );
   }
 
-  void _showEditPrinterDialog(
+  void _showSelectPrinterDialog(
     BuildContext context,
     CounterProvider provider,
     ThermalPrinterConfig printer,
   ) async {
-    // 1. Pre-fetch detected system Windows printers
-    final detectedPrinters = await provider.fetchSystemPrinters();
-
+    if (provider.discoveredPrinters.isEmpty) {
+      await provider.autoDiscoverPrinters();
+    }
     if (!context.mounted) return;
 
-    bool isEthernetMode = printer.address.contains(':');
-    final ipController = TextEditingController(
-      text: isEthernetMode ? printer.address : '192.168.1.200:9100',
-    );
-    final customUsbController = TextEditingController(
-      text: isEthernetMode ? '' : printer.address,
-    );
-
-    String? selectedUsbPrinter;
-    if (!isEthernetMode && detectedPrinters.contains(printer.address)) {
-      selectedUsbPrinter = printer.address;
-    } else if (detectedPrinters.isNotEmpty) {
-      selectedUsbPrinter = detectedPrinters.first;
-    }
-
+    final discovered = provider.discoveredPrinters;
     int selectedWidth = printer.paperWidthMm;
+    final manualIpController = TextEditingController(text: printer.address.contains(':') ? printer.address : '');
 
     showDialog(
       context: context,
@@ -409,220 +466,219 @@ class PrinterSettingsView extends StatelessWidget {
           builder: (context, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              contentPadding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               title: Row(
                 children: [
-                  Icon(
-                    isEthernetMode ? Icons.lan : Icons.usb,
-                    color: AppColors.primary,
-                    size: 24,
-                  ),
+                  const Icon(Icons.print, color: AppColors.primary, size: 24),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      'Configure ${printer.role.label}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Select ${printer.role.label}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                        const Text('Choose from auto-detected Wi-Fi and USB printers', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      ],
                     ),
                   ),
                 ],
               ),
               content: SizedBox(
-                width: 480,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Mode Selector Tabs (USB vs Ethernet)
+                width: 460,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (discovered.isEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: AppColors.textSecondary),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'No printers auto-detected yet. You can tap "Scan Again" or type the printer IP below.',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
                       const Text(
-                        'Select Connection Interface:',
+                        'Available Detected Printers:',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              avatar: const Icon(Icons.usb, size: 16),
-                              label: const Text('USB Cable (Windows Drivers)'),
-                              selected: !isEthernetMode,
-                              selectedColor: AppColors.primary,
-                              labelStyle: TextStyle(
-                                color: !isEthernetMode ? Colors.white : AppColors.textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
-                              onSelected: (_) {
-                                setDialogState(() => isEthernetMode = false);
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ChoiceChip(
-                              avatar: const Icon(Icons.lan, size: 16),
-                              label: const Text('Ethernet LAN (Port 9100)'),
-                              selected: isEthernetMode,
-                              selectedColor: AppColors.primary,
-                              labelStyle: TextStyle(
-                                color: isEthernetMode ? Colors.white : AppColors.textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
-                              onSelected: (_) {
-                                setDialogState(() => isEthernetMode = true);
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (!isEthernetMode) ...[
-                        // USB Driver Selector
-                        const Text(
-                          'Detected Windows USB Printers:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 6),
-                        if (detectedPrinters.isNotEmpty) ...[
-                          DropdownButtonFormField<String>(
-                            value: selectedUsbPrinter,
-                            decoration: InputDecoration(
-                              prefixIcon: const Icon(Icons.print, size: 18),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                            items: detectedPrinters.map((p) {
-                              return DropdownMenuItem(value: p, child: Text(p));
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setDialogState(() {
-                                  selectedUsbPrinter = val;
-                                  customUsbController.text = val;
-                                });
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Or type custom Windows printer queue name:',
-                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                          ),
-                          const SizedBox(height: 4),
-                        ],
-                        TextField(
-                          controller: customUsbController,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. EPSON TM-T82X Receipt',
-                            prefixIcon: const Icon(Icons.edit, size: 16),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          onChanged: (val) {
-                            selectedUsbPrinter = val;
+                      for (final p in discovered) ...[
+                        InkWell(
+                          onTap: () async {
+                            final target = (p['target'] ?? '').toString();
+                            await provider.updatePrinterAddress(printer.role, target, selectedWidth);
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AppColors.success,
+                                  content: Text('Assigned "${p['name']}" to ${printer.role.label}!'),
+                                ),
+                              );
+                            }
                           },
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Windows will send ESC/POS binary directly via the native spooler driver.',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                        ),
-                      ] else ...[
-                        // Ethernet IP & Port
-                        const Text(
-                          'Ethernet Printer IP & Port:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: ipController,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. 192.168.1.200:9100',
-                            prefixIcon: const Icon(Icons.settings_ethernet, size: 18),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: ['192.168.1.200:9100', '192.168.0.200:9100', '192.168.29.200:9100'].map((preset) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ActionChip(
-                                label: Text(preset, style: const TextStyle(fontSize: 10)),
-                                onPressed: () {
-                                  setDialogState(() => ipController.text = preset);
-                                },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: printer.address == p['target']
+                                  ? AppColors.primary.withValues(alpha: 0.08)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: printer.address == p['target'] ? AppColors.primary : AppColors.border,
+                                width: printer.address == p['target'] ? 2 : 1,
                               ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Direct raw TCP socket dispatch over port 9100.',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  p['type'] == 'network' ? Icons.wifi : Icons.usb,
+                                  color: p['type'] == 'network' ? const Color(0xFF0284C7) : AppColors.primary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p['name']?.toString() ?? 'Printer',
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                      ),
+                                      Text(
+                                        p['type'] == 'network'
+                                            ? 'Connected via Wi-Fi / LAN (No Drivers Needed)'
+                                            : 'Connected via USB Cable (Windows Spooler)',
+                                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (printer.address == p['target'])
+                                  const Icon(Icons.check_circle, color: AppColors.primary, size: 18),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
-
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        'Thermal Paper Roll Width:',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<int>(
-                        value: selectedWidth,
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 80, child: Text('80mm Standard Thermal Roll (3 inches)')),
-                          DropdownMenuItem(value: 58, child: Text('58mm Narrow Thermal Roll (2 inches)')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setDialogState(() => selectedWidth = val);
-                          }
-                        },
-                      ),
                     ],
-                  ),
+                    const SizedBox(height: 12),
+                    // Manual IP Entry Box (e.g., from feed self-test slip 192.168.1.45)
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Or Enter Thermal Printer IP directly (from Self-Test Slip):',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: manualIpController,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. 192.168.1.45 or 192.168.1.45:9100',
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                                    fillColor: Colors.white,
+                                    filled: true,
+                                  ),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  String input = manualIpController.text.trim();
+                                  if (input.isNotEmpty) {
+                                    if (!input.contains(':')) {
+                                      input = '$input:9100';
+                                    }
+                                    await provider.updatePrinterAddress(printer.role, input, selectedWidth);
+                                    if (ctx.mounted) {
+                                      Navigator.pop(ctx);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: AppColors.success,
+                                          content: Text('Saved "${printer.role.label}" target: $input!'),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                ),
+                                child: const Text('Connect', style: TextStyle(fontSize: 12, color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () async {
+                            await provider.autoDiscoverPrinters();
+                            setDialogState(() {});
+                          },
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Scan Again'),
+                        ),
+                        Row(
+                          children: [
+                            const Text('Paper Width: ', style: TextStyle(fontSize: 12)),
+                            DropdownButton<int>(
+                              value: selectedWidth,
+                              items: const [
+                                DropdownMenuItem(value: 80, child: Text('80mm (3-inch)')),
+                                DropdownMenuItem(value: 58, child: Text('58mm (2-inch)')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setDialogState(() => selectedWidth = val);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    String finalTarget = '';
-                    if (isEthernetMode) {
-                      finalTarget = ipController.text.trim();
-                    } else {
-                      finalTarget = customUsbController.text.trim().isNotEmpty
-                          ? customUsbController.text.trim()
-                          : (selectedUsbPrinter ?? 'EPSON TM-T82X Receipt');
-                    }
-
-                    if (finalTarget.isNotEmpty) {
-                      await provider.updatePrinterAddress(printer.role, finalTarget, selectedWidth);
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: AppColors.success,
-                            content: Text('${printer.name} target updated to "$finalTarget"!'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                  child: const Text('Save & Apply'),
+                  child: const Text('Close'),
                 ),
               ],
             );
@@ -642,20 +698,10 @@ class PrinterSettingsView extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 16, color: AppColors.textSecondary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
         ],
       ),
     );

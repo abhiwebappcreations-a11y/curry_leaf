@@ -31,31 +31,52 @@ class MenuItemCard extends StatelessWidget {
 
     final isAvailable = item.isAvailable;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isAvailable ? AppColors.surface : AppColors.surfaceMuted,
+    return Material(
+      color: isAvailable ? AppColors.surface : AppColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: !isAvailable
+            ? null
+            : () {
+                if (item.variants.isNotEmpty || item.addons.isNotEmpty) {
+                  if (onCustomize != null) {
+                    onCustomize!();
+                  } else if (draftQuantity == 0) {
+                    onAdd();
+                  } else {
+                    onIncrement();
+                  }
+                } else if (draftQuantity == 0) {
+                  onAdd();
+                } else {
+                  onIncrement();
+                }
+              },
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: !isAvailable
-              ? AppColors.border
-              : draftQuantity > 0
-                  ? AppColors.primary
-                  : AppColors.border,
-          width: draftQuantity > 0 ? 1.5 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: !isAvailable
+                  ? AppColors.border
+                  : draftQuantity > 0
+                      ? AppColors.primary
+                      : AppColors.border,
+              width: draftQuantity > 0 ? 1.5 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Top Row: Veg/Non-Veg indicator + Category badge + Customization
             Row(
               children: [
@@ -192,12 +213,22 @@ class MenuItemCard extends StatelessWidget {
                   )
                 else if (draftQuantity == 0)
                   ElevatedButton(
-                    onPressed: onAdd,
+                    onPressed: () {
+                      if (item.variants.isNotEmpty || item.addons.isNotEmpty) {
+                        if (onCustomize != null) {
+                          onCustomize!();
+                        } else {
+                          onAdd();
+                        }
+                      } else {
+                        onAdd();
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      minimumSize: const Size(48, 28),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: const Size(54, 30),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -206,7 +237,7 @@ class MenuItemCard extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add, size: 13),
+                        Icon(Icons.add, size: 14),
                         SizedBox(width: 2),
                         Text(
                           'ADD',
@@ -224,11 +255,15 @@ class MenuItemCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        InkWell(
-                          onTap: onDecrement,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            child: Icon(Icons.remove, size: 13, color: Colors.white),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onDecrement,
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                              child: Icon(Icons.remove, size: 15, color: Colors.white),
+                            ),
                           ),
                         ),
                         Padding(
@@ -237,16 +272,20 @@ class MenuItemCard extends StatelessWidget {
                             '$draftQuantity',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                        InkWell(
-                          onTap: onIncrement,
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            child: Icon(Icons.add, size: 13, color: Colors.white),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onIncrement,
+                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                              child: Icon(Icons.add, size: 15, color: Colors.white),
+                            ),
                           ),
                         ),
                       ],
@@ -257,6 +296,8 @@ class MenuItemCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }

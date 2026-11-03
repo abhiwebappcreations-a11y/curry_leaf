@@ -1,65 +1,44 @@
 [
-  {
-    "id": "upg_1793108723271_29f9f5",
-    "restaurantId": "rest-01-2564",
-    "restaurantName": "curry leaf restaurant",
-    "licenseKey": "HINOPT-2026-XT5T-4614",
-    "currentLimits": {
-      "menuItems": 200,
-      "counterPcs": 1,
-      "captainDevices": 5
+    {
+        "id":  "upg_1793108723271_29f9f5",
+        "restaurantId":  "rest-01-2564",
+        "restaurantName":  "curry leaf restaurant",
+        "licenseKey":  "HINOPT-2026-XT5T-4614",
+        "currentLimits":  {
+                              "menuItems":  200,
+                              "counterPcs":  1,
+                              "captainDevices":  5
+                          },
+        "requestedLimits":  {
+                                "menuItems":  300,
+                                "counterPcs":  1,
+                                "captainDevices":  6
+                            },
+        "contactPhone":  "+91 93812 76889",
+        "notes":  "",
+        "status":  "approved",
+        "createdAt":  "2026-10-27T13:45:23.271+00:00",
+        "approvedAt":  "2026-10-27T13:45:34.707Z"
     },
-    "requestedLimits": {
-      "menuItems": 300,
-      "counterPcs": 1,
-      "captainDevices": 6
-    },
-    "contactPhone": "+91 93812 76889",
-    "notes": "",
-    "status": "approved",
-    "createdAt": "2026-10-27T13:45:23.271+00:00",
-    "approvedAt": "2026-10-27T13:45:34.707Z"
-  },
-  {
-    "id": "upg_",
-    "restaurantId": "rest-01-0435",
-    "restaurantName": "curry leaf restaurant",
-    "licenseKey": "HINOPT-2026-1RE3-1878",
-    "currentLimits": {
-      "menuItems": 100,
-      "counterPcs": 1,
-      "captainDevices": 2
-    },
-    "requestedLimits": {
-      "menuItems": 200,
-      "counterPcs": 1,
-      "captainDevices": 8
-    },
-    "contactPhone": "+91 78939 38366",
-    "notes": "Client requested limit upgrade for additional captain tablets",
-    "status": "rejected",
-    "createdAt": "2026-10-27T11:52:02.220349+00:00",
-    "rejectedAt": "2026-10-27T12:54:23.762Z"
-  },
-  {
-    "id": "upg_1792855894097_ce9166",
-    "restaurantId": "rest_hinopt_lic_any",
-    "restaurantName": "Hinopt Client Restaurant",
-    "licenseKey": "HINOPT-LIC-ANY",
-    "currentLimits": {
-      "menuItems": 100,
-      "captainDevices": 5,
-      "counterPcs": 1
-    },
-    "requestedLimits": {
-      "menuItems": 250,
-      "captainDevices": 10,
-      "counterPcs": 2
-    },
-    "contactPhone": "+91 98490 12345",
-    "notes": "Need more dishes for new party menu and 5 more captain phones",
-    "status": "rejected",
-    "createdAt": "2026-10-24T15:31:34.097Z",
-    "rejectedAt": "2026-10-27T12:54:22.265Z"
-  }
+    {
+        "id":  "upg_1792855894097_ce9166",
+        "restaurantId":  "rest_hinopt_lic_any",
+        "restaurantName":  "Hinopt Client Restaurant",
+        "licenseKey":  "HINOPT-LIC-ANY",
+        "currentLimits":  {
+                              "menuItems":  100,
+                              "captainDevices":  5,
+                              "counterPcs":  1
+                          },
+        "requestedLimits":  {
+                                "menuItems":  250,
+                                "captainDevices":  10,
+                                "counterPcs":  2
+                            },
+        "contactPhone":  "+91 98490 12345",
+        "notes":  "Need more dishes for new party menu and 5 more captain phones",
+        "status":  "rejected",
+        "createdAt":  "2026-10-24T15:31:34.097Z",
+        "rejectedAt":  "2026-10-27T12:54:22.265Z"
+    }
 ]

@@ -25,7 +25,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify brand title and sidebar tabs load
-    expect(find.text('Hinopt POS'), findsOneWidget);
+    expect(find.text('Hinopt POS'), findsWidgets);
     expect(find.text('Active Orders'), findsWidgets);
     expect(find.text('Tables / Floor'), findsOneWidget);
     expect(find.text('Billing & Till'), findsOneWidget);

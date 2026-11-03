@@ -72,6 +72,12 @@ healthRouter.get('/', async (req: Request, res: Response) => {
           limits: license.limits,
           usage: license.usage,
         },
+        onlineOrdering: {
+          enabled: Boolean(license.onlineOrderingEnabled),
+          storeUrl: license.storeUrl || '',
+          customDomain: license.customDomain || '',
+          storeSlug: license.storeSlug || '',
+        },
       },
     },
   });

@@ -5,6 +5,7 @@ import '../models/bill_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/bill_receipt_preview.dart';
+import '../widgets/takeaway_order_dialog.dart';
 
 class BillingSettlementView extends StatefulWidget {
   const BillingSettlementView({super.key});
@@ -344,33 +345,205 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
     );
 
     if (bill == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.point_of_sale_outlined, size: 64, color: AppColors.textMuted.withValues(alpha: 0.5)),
-              const SizedBox(height: 16),
-              const Text(
-                'No active bill selected for checkout.',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                textAlign: TextAlign.center,
+      final activeOrders = provider.activeOrders;
+
+      return Container(
+        color: AppColors.background,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Billing & Settlement',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -0.5),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Select an active table or parcel to print bill and settle payment',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => TakeawayOrderDialog.show(context, provider),
+                  icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                  label: const Text('+ New Takeaway / Parcel', style: TextStyle(fontWeight: FontWeight.w800)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE65100),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            if (activeOrders.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.point_of_sale_outlined, size: 64, color: AppColors.textMuted.withValues(alpha: 0.4)),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No active orders waiting for checkout.',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Orders punched from Captains or Counter will appear here for settlement.',
+                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => TakeawayOrderDialog.show(context, provider),
+                            icon: const Icon(Icons.shopping_bag_outlined),
+                            label: const Text('Start Takeaway / Parcel'),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE65100), foregroundColor: Colors.white),
+                          ),
+                          const SizedBox(width: 10),
+                          OutlinedButton.icon(
+                            onPressed: () => provider.setActiveTab(CounterTab.tables),
+                            icon: const Icon(Icons.table_restaurant),
+                            label: const Text('View Dining Tables'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Active Orders Ready for Settlement (${activeOrders.length})',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 2.2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: activeOrders.length,
+                        itemBuilder: (ctx, idx) {
+                          final order = activeOrders[idx];
+                          final totalRupees = order.totalPaise / 100.0;
+                          final isTakeaway = order.isTakeaway;
+
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => provider.selectOrder(order),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isTakeaway ? const Color(0xFFE65100).withValues(alpha: 0.4) : AppColors.primary.withValues(alpha: 0.3),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 2)),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              isTakeaway ? Icons.shopping_bag_outlined : Icons.table_restaurant,
+                                              size: 16,
+                                              color: isTakeaway ? const Color(0xFFE65100) : AppColors.primary,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              order.tableName,
+                                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                                            ),
+                                          ],
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isTakeaway ? const Color(0xFFFFF3E0) : AppColors.primaryLight.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            isTakeaway ? 'TAKEAWAY' : 'DINE-IN',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: isTakeaway ? const Color(0xFFE65100) : AppColors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      '${order.items.length} items • ${order.customerName.isNotEmpty ? order.customerName : "Guest"}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          currencyFormatter.format(totalRupees),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 16,
+                                            color: isTakeaway ? const Color(0xFFE65100) : AppColors.primary,
+                                          ),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => provider.selectOrder(order),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: isTakeaway ? const Color(0xFFE65100) : AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            minimumSize: const Size(60, 26),
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                          child: const Text('CHECKOUT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Select an active order from the "Active Orders" or "Tables / Floor" tab to begin checkout.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () => provider.setActiveTab(CounterTab.orders),
-                icon: const Icon(Icons.receipt_long),
-                label: const Text('View Active Orders'),
-              ),
-            ],
-          ),
+          ],
         ),
       );
     }
@@ -467,7 +640,7 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
                     ),
                   ),
                   Text(
-                    'Order #${bill.orderId} • Cashier: Deepa',
+                    'Order #${bill.orderId} • Cashier: ${bill.cashierName}',
                     style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ],
@@ -567,6 +740,62 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
 
         const Divider(color: AppColors.border, height: 16),
 
+        // GST Quick Switch Banner
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: provider.isGstEnabled
+                ? AppColors.primary.withValues(alpha: 0.06)
+                : AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: provider.isGstEnabled
+                  ? AppColors.primary.withValues(alpha: 0.25)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    provider.isGstEnabled ? Icons.receipt_long : Icons.money_off,
+                    size: 16,
+                    color: provider.isGstEnabled ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        provider.isGstEnabled ? 'GST Billing: ${provider.gstRatePercent.toStringAsFixed(0)}% Active' : 'GST Billing: 0% Non-GST Mode',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: provider.isGstEnabled ? AppColors.primary : AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        provider.isGstEnabled
+                            ? 'CGST ${provider.cgstRatePercent.toStringAsFixed(1).replaceAll(".0", "")}% + SGST ${provider.sgstRatePercent.toStringAsFixed(1).replaceAll(".0", "")}% applied'
+                            : 'Exempt / Non-GST Bill of Supply',
+                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Switch(
+                value: provider.isGstEnabled,
+                activeColor: AppColors.primary,
+                onChanged: (val) => provider.toggleGst(val),
+              ),
+            ],
+          ),
+        ),
+
         // Financial Totals
         _buildTotalRow('Subtotal', currencyFormatter.format(bill.subtotalRupees)),
         if (bill.discountPaise > 0)
@@ -575,8 +804,12 @@ class _BillingSettlementViewState extends State<BillingSettlementView> {
             '- ${currencyFormatter.format(bill.discountRupees)}',
             textColor: AppColors.error,
           ),
-        _buildTotalRow('CGST (2.5%)', currencyFormatter.format(bill.cgstRupees)),
-        _buildTotalRow('SGST (2.5%)', currencyFormatter.format(bill.sgstRupees)),
+        if (provider.isGstEnabled) ...[
+          _buildTotalRow('CGST (${provider.cgstRatePercent.toStringAsFixed(1).replaceAll(".0", "")}%)', currencyFormatter.format(bill.cgstRupees)),
+          _buildTotalRow('SGST (${provider.sgstRatePercent.toStringAsFixed(1).replaceAll(".0", "")}%)', currencyFormatter.format(bill.sgstRupees)),
+        ] else ...[
+          _buildTotalRow('GST (0% Non-GST Bill of Supply)', '₹ 0.00', textColor: AppColors.textMuted),
+        ],
 
         const Divider(color: AppColors.primary, height: 16, thickness: 1.5),
 

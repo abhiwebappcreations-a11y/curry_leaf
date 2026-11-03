@@ -44,6 +44,7 @@ export interface MenuItemRecord {
   pricePaise: number;
   taxRatePercent: number;
   isAvailable: boolean;
+  isDeliveryAvailable?: boolean;
   isVeg: boolean;
   imageUrl?: string;
   variants: Array<{ id: string; name: string; pricePaise: number }>;
@@ -77,6 +78,11 @@ export interface OrderRecord {
   tableName?: string;
   captainDeviceId?: string;
   status: 'draft' | 'active' | 'preparing' | 'ready' | 'billed' | 'settled' | 'cancelled';
+  orderType?: 'dine_in' | 'takeaway' | 'delivery';
+  customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  deliveryCoordinates?: { lat: number; lng: number };
   customerNotes?: string;
   guestCount: number;
   subtotalPaise: number;

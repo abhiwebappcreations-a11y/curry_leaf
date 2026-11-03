@@ -1,7 +1,5 @@
 // ==============================================================================
-// Hinopt Universal Cloud Storefront — Dynamic Cloud Client
-// Resolves restaurant by URL path (/curryleaf) or subdomain (delivery.curryleaf.com)
-// Connects directly to Supabase Cloud so it works on Vercel anywhere in the world!
+// Hinopt Universal Cloud Storefront — Multi-Tenant Dynamic Client
 // ==============================================================================
 
 const SUPABASE_URL = 'https://ybalhfhqaduqsbjotbni.supabase.co';
@@ -27,20 +25,28 @@ function resolveRestaurantIdentifier() {
     return { type: 'slug', value: path };
   }
 
-  // 2. If subdomain: e.g. curryleaf.orders.hinopt.com
+  // 2. If custom subdomain: e.g. delivery.curryleaf.com or curryleaf.orders.hinopt.com
   const subParts = host.split('.');
   if (subParts.length > 2 && subParts[0] !== 'www' && subParts[0] !== 'orders' && !host.includes('vercel.app')) {
     return { type: 'subdomain', value: host };
   }
 
-  // 3. Fallback default to 'curryleaf'
-  return { type: 'slug', value: 'curryleaf' };
+  // 3. Root directory (e.g. orders.hinopt.com/ or hinopt-pos-online-orders.vercel.app/)
+  return null;
 }
 
 // Initial Boot
 document.addEventListener('DOMContentLoaded', async () => {
   loadLocalStoredData();
-  await loadRestaurantAndMenu();
+  const target = resolveRestaurantIdentifier();
+
+  if (!target) {
+    // User opened the main Hinopt portal directly without a restaurant slug
+    await renderRestaurantDirectory();
+  } else {
+    // User opened a specific restaurant slug or subdomain
+    await loadRestaurantAndMenu(target);
+  }
 });
 
 // Load Profile and Location from LocalStorage
@@ -64,10 +70,81 @@ function loadLocalStoredData() {
   }
 }
 
-// Fetch Restaurant & Deliverable Menu directly from Supabase Cloud
-async function loadRestaurantAndMenu() {
+// Render Hinopt Central Portal / Restaurant Directory
+async function renderRestaurantDirectory() {
+  document.getElementById('restaurantName').textContent = 'HINOPT RESTAURANTS';
+  document.getElementById('restaurantCity').textContent = 'Direct Online Delivery Network';
+  document.title = 'Hinopt Orders - Choose Your Restaurant';
+  
+  // Hide location banner & search on directory home
+  const locBanner = document.querySelector('.location-banner');
+  if (locBanner) locBanner.style.display = 'none';
+  const searchWrap = document.querySelector('.search-wrapper');
+  if (searchWrap) searchWrap.style.display = 'none';
+  const catNav = document.querySelector('.category-nav-wrapper');
+  if (catNav) catNav.style.display = 'none';
+
   const container = document.getElementById('menuContainer');
-  const target = resolveRestaurantIdentifier();
+  container.innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Discovering partner restaurants...</p>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/restaurants?online_ordering_enabled=eq.true&select=*`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    const list = await res.json();
+
+    if (!Array.isArray(list) || list.length === 0) {
+      container.innerHTML = `
+        <div class="loading-state" style="padding: 40px 16px;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🏪</div>
+          <p style="font-size: 16px; font-weight: 800; color: #0f172a;">No Restaurants Currently Delivering</p>
+          <p style="font-size: 13px; color: #64748b; margin-top: 6px; max-width: 360px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+            No restaurants currently have the Online Delivery module active in their Hinopt plan.
+          </p>
+        </div>
+      `;
+      return;
+    }
+
+    // Render List of Active Delivery Restaurants
+    const cardsHtml = list.map(r => {
+      const slug = r.store_slug || r.id;
+      return `
+        <div class="category-group" style="padding: 16px; margin-bottom: 12px; cursor: pointer; transition: transform 0.15s ease;" onclick="window.location.href='/${slug}'">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 15px; font-weight: 800; color: #0f172a;">${escapeHtml(r.name.toUpperCase())}</div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 2px;">📍 ${escapeHtml(r.city || 'Direct Delivery')}</div>
+            </div>
+            <button class="btn-add-item" style="font-size: 12px; padding: 6px 14px;">View Menu ➔</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="margin-bottom: 14px;">
+        <h3 style="font-size: 14px; font-weight: 800; color: #334155; text-transform: uppercase;">Choose Your Restaurant</h3>
+      </div>
+      ${cardsHtml}
+    `;
+  } catch (err) {
+    container.innerHTML = `
+      <div class="loading-state">
+        <p style="color: #dc2626; font-weight: 700;">Could not connect to Hinopt Cloud network.</p>
+      </div>
+    `;
+  }
+}
+
+// Fetch Specific Restaurant & Deliverable Menu from Supabase Cloud
+async function loadRestaurantAndMenu(target) {
+  const container = document.getElementById('menuContainer');
 
   try {
     let queryUrl = '';
@@ -77,23 +154,22 @@ async function loadRestaurantAndMenu() {
       queryUrl = `${SUPABASE_URL}/rest/v1/restaurants?or=(store_slug.eq.${encodeURIComponent(target.value)},id.eq.${encodeURIComponent(target.value)})&select=*`;
     }
 
-    let res = await fetch(queryUrl, {
+    const res = await fetch(queryUrl, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
     });
-    let list = await res.json();
+    const list = await res.json();
 
-    // Fallback if not found by specific slug, load primary restaurant
-    if (!list || list.length === 0) {
-      const fbRes = await fetch(`${SUPABASE_URL}/rest/v1/restaurants?select=*&limit=1`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      });
-      list = await fbRes.json();
-    }
-
-    if (!list || list.length === 0) {
+    if (!Array.isArray(list) || list.length === 0) {
       container.innerHTML = `
-        <div class="loading-state">
-          <p style="color: #dc2626; font-weight: 700;">⚠️ Restaurant storefront not found.</p>
+        <div class="loading-state" style="padding: 40px 16px;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
+          <p style="font-size: 16px; font-weight: 800; color: #dc2626;">Restaurant Not Found</p>
+          <p style="font-size: 13px; color: #64748b; margin-top: 6px;">
+            The link "<strong>${escapeHtml(target.value)}</strong>" does not match any registered restaurant on Hinopt.
+          </p>
+          <button class="btn-modal-primary" style="margin-top: 16px;" onclick="window.location.href='/'">
+            View All Restaurants
+          </button>
         </div>
       `;
       return;
@@ -110,12 +186,18 @@ async function loadRestaurantAndMenu() {
       document.getElementById('restaurantCity').textContent = `${currentRestaurant.city} • Direct Delivery`;
     }
 
-    // Check if Online Delivery is active for this restaurant
+    // STRICT PERMISSION CHECK: Must be toggled ON in Hinopt Admin
     if (!currentRestaurant.online_ordering_enabled) {
       container.innerHTML = `
-        <div class="loading-state">
-          <p style="color: #b45309; font-weight: 700;">🛵 Online delivery is currently closed for this restaurant.</p>
-          <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Please check back during restaurant operating hours.</p>
+        <div class="loading-state" style="padding: 40px 16px;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🔒</div>
+          <p style="font-size: 16px; font-weight: 800; color: #b45309;">Online Delivery Not Active</p>
+          <p style="font-size: 13px; color: #64748b; margin-top: 6px; max-width: 380px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+            Online ordering has not been enabled for <strong>${escapeHtml(currentRestaurant.name)}</strong> by the restaurant administration.
+          </p>
+          <button class="btn-modal-cancel" style="margin-top: 16px;" onclick="window.location.href='/'">
+            Back to Directory
+          </button>
         </div>
       `;
       return;
@@ -126,9 +208,12 @@ async function loadRestaurantAndMenu() {
 
     if (allMenuItems.length === 0) {
       container.innerHTML = `
-        <div class="loading-state">
-          <p style="font-weight: 700;">No dishes currently available for delivery.</p>
-          <p style="font-size: 12px; color: #64748b; margin-top: 4px;">The kitchen has not enabled any deliverable items yet.</p>
+        <div class="loading-state" style="padding: 40px 16px;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🍽️</div>
+          <p style="font-size: 16px; font-weight: 800; color: #0f172a;">Menu Being Prepared</p>
+          <p style="font-size: 13px; color: #64748b; margin-top: 6px;">
+            The restaurant is currently updating its delivery menu items. Please check back shortly.
+          </p>
         </div>
       `;
       return;

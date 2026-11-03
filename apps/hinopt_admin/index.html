@@ -378,6 +378,74 @@
               Counter POS cannot accept more captains or create more menu dishes than these specified limits.
             </small>
           </div>
+
+          <!-- Plan Modules & Add-Ons -->
+          <div style="background: var(--surface-muted); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--primary-dark); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center;">
+              <span>Client Plan & Feature Modules</span>
+              <span style="font-size: 11px; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 12px; font-weight: 700;">Modular Plan Control</span>
+            </div>
+
+            <!-- Toggle 1: Core Billing & POS System -->
+            <div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <div style="font-weight: 700; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                  <span style="color: #2e7d32;">✔</span> Core POS & LAN Billing System
+                  <span style="font-size: 10px; background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 10px; font-weight: 600;">Base Plan</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                  Counter Windows app, Captain Android LAN sync, KOT & Bill thermal printers, Offline Dine-in & Takeaway.
+                </div>
+              </div>
+              <div style="margin-left: 12px;">
+                <input type="checkbox" id="reg-plan-core" checked disabled style="transform: scale(1.2); accent-color: var(--primary);">
+              </div>
+            </div>
+
+            <!-- Toggle 2: Direct Online Orders & Own Delivery -->
+            <div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-weight: 700; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    🛵 Direct Online Orders & Own Delivery
+                    <span style="font-size: 10px; background: #fef3c7; color: #d97706; padding: 1px 6px; border-radius: 10px; font-weight: 700;">Add-On Module</span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                    Customer online ordering website, real-time incoming order chime on Counter PC, and own delivery rider routing.
+                  </div>
+                </div>
+                <div style="margin-left: 12px;">
+                  <label class="switch">
+                    <input type="checkbox" id="reg-plan-delivery" onchange="toggleDeliveryOptions('reg')">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Expandable Custom Domain & URL Box when Delivery is ON -->
+              <div id="reg-delivery-settings" style="display: none; border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 4px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label class="form-label" style="font-size: 11px; margin-bottom: 4px;">Default Online Storefront Link</label>
+                    <input type="text" id="reg-store-url" class="form-input" style="font-size: 12px; font-family: monospace; background: var(--surface-muted);" readonly>
+                    <small style="font-size: 10px; color: var(--text-muted);">Auto-generated managed link ready out of the box</small>
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size: 11px; margin-bottom: 4px;">Custom Subdomain / Domain (Optional)</label>
+                    <input type="text" id="reg-custom-domain" class="form-input" placeholder="e.g. delivery.curryleaf.com" style="font-size: 12px;" oninput="updateDnsHelper('reg')">
+                    <small style="font-size: 10px; color: var(--text-muted);">If client owns their domain, enter their delivery subdomain</small>
+                  </div>
+                </div>
+                <div id="reg-dns-helper" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8px 10px; margin-top: 8px;">
+                  <div style="font-size: 11px; color: #1e40af; font-weight: 700;">Client DNS Setup Instructions:</div>
+                  <div style="font-size: 11px; color: #1e3a8a; margin-top: 2px;">
+                    Ask client to add in GoDaddy/Cloudflare/Hostinger:
+                    <code style="background: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 4px;">Type: CNAME | Host: <span id="reg-dns-host">delivery</span> | Target: orders.hinopt.com</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="form-group">
             <label class="form-label">Installation Notes</label>
             <textarea id="reg-notes" class="form-textarea" rows="2" placeholder="e.g. 1 Counter PC, 4 Captain devices, 2 printers"></textarea>
@@ -487,6 +555,74 @@
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label" style="font-size: 11px;">Counter PCs Limit</label>
                 <input type="number" id="edit-limit-counters" class="form-input" value="1" min="1" max="20" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plan Modules & Add-Ons for Existing Client -->
+          <div style="background: var(--surface-muted); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--primary-dark); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center;">
+              <span>Client Plan & Feature Modules</span>
+              <span id="edit-plan-badge" style="font-size: 11px; background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 12px; font-weight: 700;">Modular Plan Control</span>
+            </div>
+
+            <!-- Toggle 1: Core Billing & POS System -->
+            <div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <div style="font-weight: 700; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                  <span style="color: #2e7d32;">✔</span> Core POS & LAN Billing System
+                  <span style="font-size: 10px; background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 10px; font-weight: 600;">Base Plan</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                  Counter Windows app, Captain Android LAN sync, KOT & Bill thermal printers, Offline Dine-in & Takeaway.
+                </div>
+              </div>
+              <div style="margin-left: 12px;">
+                <input type="checkbox" id="edit-plan-core" checked disabled style="transform: scale(1.2); accent-color: var(--primary);">
+              </div>
+            </div>
+
+            <!-- Toggle 2: Direct Online Orders & Own Delivery -->
+            <div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-weight: 700; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    🛵 Direct Online Orders & Own Delivery
+                    <span id="edit-delivery-tag" style="font-size: 10px; background: #fef3c7; color: #d97706; padding: 1px 6px; border-radius: 10px; font-weight: 700;">Add-On Module</span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                    Customer online ordering website, real-time incoming order chime on Counter PC, and own delivery rider routing.
+                  </div>
+                </div>
+                <div style="margin-left: 12px;">
+                  <label class="switch">
+                    <input type="checkbox" id="edit-plan-delivery" onchange="toggleDeliveryOptions('edit')">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Expandable Custom Domain & URL Box when Delivery is ON -->
+              <div id="edit-delivery-settings" style="display: none; border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 4px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label class="form-label" style="font-size: 11px; margin-bottom: 4px;">Default Online Storefront Link</label>
+                    <input type="text" id="edit-store-url" class="form-input" style="font-size: 12px; font-family: monospace; background: var(--surface-muted);" readonly>
+                    <small style="font-size: 10px; color: var(--text-muted);">Auto-generated managed link ready out of the box</small>
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size: 11px; margin-bottom: 4px;">Custom Subdomain / Domain (Optional)</label>
+                    <input type="text" id="edit-custom-domain" class="form-input" placeholder="e.g. delivery.curryleaf.com" style="font-size: 12px;" oninput="updateDnsHelper('edit')">
+                    <small style="font-size: 10px; color: var(--text-muted);">If client owns their domain, enter their delivery subdomain</small>
+                  </div>
+                </div>
+                <div id="edit-dns-helper" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8px 10px; margin-top: 8px;">
+                  <div style="font-size: 11px; color: #1e40af; font-weight: 700;">Client DNS Setup Instructions:</div>
+                  <div style="font-size: 11px; color: #1e3a8a; margin-top: 2px;">
+                    Ask client to add in GoDaddy/Cloudflare/Hostinger:
+                    <code style="background: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 4px;">Type: CNAME | Host: <span id="edit-dns-host">delivery</span> | Target: orders.hinopt.com</code>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

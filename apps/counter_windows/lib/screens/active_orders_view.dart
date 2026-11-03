@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/takeaway_order_dialog.dart';
 
 class ActiveOrdersView extends StatelessWidget {
   const ActiveOrdersView({super.key});
@@ -19,7 +20,17 @@ class ActiveOrdersView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
-    final orders = provider.activeOrders;
+    final allOrders = provider.activeOrders;
+    final activeFilter = provider.activeOrderFilter;
+    final deliveryCount = allOrders.where((o) => o.isDelivery).length;
+    final takeawayCount = allOrders.where((o) => o.isTakeaway && !o.isDelivery).length;
+    final dineInCount = allOrders.where((o) => !o.isTakeaway && !o.isDelivery).length;
+    final orders = allOrders.where((o) {
+      if (activeFilter == 'delivery') return o.isDelivery;
+      if (activeFilter == 'takeaway') return o.isTakeaway && !o.isDelivery;
+      if (activeFilter == 'dine_in') return !o.isTakeaway && !o.isDelivery;
+      return true;
+    }).toList();
     final currencyFormatter = NumberFormat.currency(
       locale: 'en_IN',
       symbol: '₹ ',
@@ -52,15 +63,31 @@ class ActiveOrdersView extends StatelessWidget {
                         letterSpacing: -0.5,
                       ),
                     ),
-                    ElevatedButton.icon(
-                      onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Take Order / Fire KOT'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: provider.isLicenseLocked ? null : () => _showTakeawayDialog(context, provider),
+                          icon: const Icon(Icons.shopping_bag_outlined, size: 15),
+                          label: const Text('Takeaway'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE65100),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        ElevatedButton.icon(
+                          onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
+                          icon: const Icon(Icons.add, size: 15),
+                          label: const Text('Tables'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -96,20 +123,75 @@ class ActiveOrdersView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Take Order / Fire KOT'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: provider.isLicenseLocked ? null : () => _showTakeawayDialog(context, provider),
+                          icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                          label: const Text('+ New Takeaway / Parcel'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE65100),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: provider.isLicenseLocked ? null : () => provider.setActiveTab(CounterTab.tables),
+                          icon: const Icon(Icons.table_restaurant, size: 18),
+                          label: const Text('Floor Tables / Fire KOT'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
 
               const SizedBox(height: 16),
+
+              // Filter Tabs (All / Dine-in / Takeaway)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    _buildFilterPill(
+                      label: 'All Orders (${allOrders.length})',
+                      isSelected: activeFilter == 'all',
+                      onTap: () => provider.setActiveOrderFilter('all'),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterPill(
+                      label: '🍽️ Dine-In Tables ($dineInCount)',
+                      isSelected: activeFilter == 'dine_in',
+                      onTap: () => provider.setActiveOrderFilter('dine_in'),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterPill(
+                      label: '🛍️ Takeaway / Parcel ($takeawayCount)',
+                      isSelected: activeFilter == 'takeaway',
+                      color: const Color(0xFFE65100),
+                      onTap: () => provider.setActiveOrderFilter('takeaway'),
+                    ),
+                    if (provider.isOnlineOrderingEnabled || deliveryCount > 0) ...[
+                      const SizedBox(width: 8),
+                      _buildFilterPill(
+                        label: '🛵 Online Delivery ($deliveryCount)',
+                        isSelected: activeFilter == 'delivery',
+                        color: const Color(0xFF0D9488),
+                        onTap: () => provider.setActiveOrderFilter('delivery'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
 
               // Orders List with Pull-to-Refresh
               Expanded(
@@ -179,7 +261,9 @@ class ActiveOrdersView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: order.isDelivery
+                      ? const Color(0xFF0D9488)
+                      : (order.isTakeaway ? const Color(0xFFE65100) : AppColors.primary),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -228,6 +312,24 @@ class ActiveOrdersView extends StatelessWidget {
                       '${order.guestCount} Guests • ${_formatElapsed(order.createdAt)}',
                       style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
+                    if (order.isDelivery && order.deliveryAddress.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 11, color: Color(0xFF0D9488)),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                order.deliveryAddress,
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -260,9 +362,7 @@ class ActiveOrdersView extends StatelessWidget {
                 child: Text(
                   '${item.quantity}x ${item.name}',
                   style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w700,
                   ),
                 ),
               );
@@ -319,7 +419,9 @@ class ActiveOrdersView extends StatelessWidget {
             width: 80,
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: order.isDelivery
+                  ? const Color(0xFF0D9488)
+                  : (order.isTakeaway ? const Color(0xFFE65100) : AppColors.primary),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -398,9 +500,7 @@ class ActiveOrdersView extends StatelessWidget {
                       child: Text(
                         '${item.quantity}x ${item.name}',
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 15, color: AppColors.textPrimary, fontWeight: FontWeight.w700,
                         ),
                       ),
                     );
@@ -445,5 +545,39 @@ class ActiveOrdersView extends StatelessWidget {
         ],
       ),
     );
+  }
+  static Widget _buildFilterPill({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    Color color = AppColors.primary,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? color : AppColors.border),
+          boxShadow: isSelected
+              ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  static void _showTakeawayDialog(BuildContext context, CounterProvider provider) {
+    TakeawayOrderDialog.show(context, provider);
   }
 }

@@ -13,12 +13,54 @@ import 'menu_management_view.dart';
 import 'printer_settings_view.dart';
 import 'reports_view.dart';
 
-class MainLayout extends StatelessWidget {
+class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
+
+  @override
+  State<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends State<MainLayout> {
+  bool _hasPromptedLicense = false;
+  String? _currentlyPromptedDeviceId;
+  bool _isDeviceDialogShowing = false;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CounterProvider>();
+
+    if (!_hasPromptedLicense && provider.isLicenseLocked) {
+      _hasPromptedLicense = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && provider.isLicenseLocked) {
+          showLicenseActivationDialog(context, provider);
+        }
+      });
+    }
+
+    final pending = provider.pendingDevices;
+    if (pending.isNotEmpty && !_isDeviceDialogShowing) {
+      final firstDevice = pending.first;
+      final devId = firstDevice['id']?.toString() ?? '';
+      if (_currentlyPromptedDeviceId != devId) {
+        _currentlyPromptedDeviceId = devId;
+        _isDeviceDialogShowing = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && provider.pendingDevices.any((d) => d['id'] == devId)) {
+            _showDeviceApprovalModal(context, provider, firstDevice).then((_) {
+              if (mounted) {
+                setState(() {
+                  _isDeviceDialogShowing = false;
+                  _currentlyPromptedDeviceId = null;
+                });
+              }
+            });
+          } else {
+            _isDeviceDialogShowing = false;
+          }
+        });
+      }
+    }
 
     Widget content;
     switch (provider.activeTab) {
@@ -73,11 +115,11 @@ class MainLayout extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "SUBSCRIPTION EXPIRED / LOCKED -- RESTAURANT OPERATIONS STOPPED",
+                              "License Activation Required",
                               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
                             ),
                             Text(
-                              "KOT dispatch, bill finalization, payment settlement, and thermal printing are disabled until renewed in Hinopt Admin.",
+                              "Enter your license key in Terminal Settings to unlock full features.",
                               style: TextStyle(color: Colors.white70, fontSize: 11),
                             ),
                           ],
@@ -91,7 +133,7 @@ class MainLayout extends StatelessWidget {
                         ),
                         onPressed: () => showLicenseActivationDialog(context, provider),
                         icon: const Icon(Icons.vpn_key, size: 14),
-                        label: const Text("ENTER LICENSE KEY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                        label: const Text("ACTIVATE LICENSE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                       ),
                     ],
                   ),
@@ -126,11 +168,11 @@ class MainLayout extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "SUBSCRIPTION EXPIRED / LOCKED -- RESTAURANT OPERATIONS STOPPED",
+                              "License Activation Required",
                               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
                             ),
                             Text(
-                              "KOT dispatch, bill finalization, payment settlement, and thermal printing are disabled until renewed in Hinopt Admin.",
+                              "Enter your license key in Terminal Settings to unlock full features.",
                               style: TextStyle(color: Colors.white70, fontSize: 11),
                             ),
                           ],
@@ -144,7 +186,7 @@ class MainLayout extends StatelessWidget {
                         ),
                         onPressed: () => showLicenseActivationDialog(context, provider),
                         icon: const Icon(Icons.vpn_key, size: 14),
-                        label: const Text("ENTER LICENSE KEY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                        label: const Text("ACTIVATE LICENSE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                       ),
                     ],
                   ),
@@ -160,6 +202,201 @@ class MainLayout extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showDeviceApprovalModal(
+    BuildContext context,
+    CounterProvider provider,
+    Map<String, dynamic> device,
+  ) async {
+    final id = device['id']?.toString() ?? '';
+    final name = device['deviceName']?.toString() ?? 'Captain Device';
+    final ip = device['deviceIp']?.toString() ?? 'Wi-Fi';
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 24,
+          child: Container(
+            width: 480,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Glowing Icon Header
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.phone_android_rounded,
+                    size: 36,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                const Text(
+                  'New Captain Connection Request',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'A waiter phone is requesting permission to connect and take orders.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // Device Card Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.person_pin, size: 22, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              'ID: $id',
+                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              'IP: $ip',
+                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Active Captains: ${provider.captainDevicesUsage} / ${provider.captainDevicesLimit} allowed',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: provider.isCaptainDeviceLimitReached ? AppColors.error : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await provider.rejectDevice(id);
+                        },
+                        child: const Text('Decline Request', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 2,
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          final res = await provider.approveDeviceWithResult(id);
+                          if (context.mounted) {
+                            if (!res.success && provider.isCaptainDeviceLimitReached) {
+                              UpgradeRequestDialog.show(context);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: res.success ? AppColors.success : AppColors.error,
+                                  content: Text(res.success
+                                      ? 'Captain "$name" connected & activated!'
+                                      : (res.errorMessage ?? 'Failed to approve device.')),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text(
+                          'ACCEPT & ACTIVATE',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

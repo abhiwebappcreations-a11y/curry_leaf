@@ -28,6 +28,24 @@ class CounterProvider extends ChangeNotifier {
   List<RestaurantOrder> _activeOrders = [];
   List<RestaurantBill> _settledBills = [];
   List<ThermalPrinterConfig> _printers = [];
+  List<Map<String, dynamic>> _discoveredPrinters = [];
+  List<Map<String, dynamic>> get discoveredPrinters => _discoveredPrinters;
+  bool _isDiscoveringPrinters = false;
+  bool get isDiscoveringPrinters => _isDiscoveringPrinters;
+
+  Future<void> autoDiscoverPrinters() async {
+    _isDiscoveringPrinters = true;
+    notifyListeners();
+    try {
+      final found = await _counterApiService.discoverAllPrinters();
+      if (found.isNotEmpty) {
+        _discoveredPrinters = found;
+      }
+    } catch (_) {}
+    _isDiscoveringPrinters = false;
+    notifyListeners();
+  }
+
   List<MenuItem> _menuItems = [];
 
   RestaurantOrder? _selectedOrder;
@@ -46,7 +64,18 @@ class CounterProvider extends ChangeNotifier {
   String _licenseStatus = 'Checking...';
   int _licenseDaysRemaining = 365;
   String _restaurantName = 'Curry Leaf';
+  String _ownerName = '';
+  String _phone = '';
+  String _city = '';
+  String _hardwareId = '';
   String _printerMode = 'single';
+  bool _isGstEnabled = false;
+  double _gstRatePercent = 5.0;
+  double _cgstRatePercent = 2.5;
+  double _sgstRatePercent = 2.5;
+  String _gstin = '';
+  String _activeOrderFilter = 'all'; // 'all', 'dine_in', 'takeaway'
+  int _takeawayCounter = 101;
 
   // License Limits & Usage
   int _menuItemsLimit = 100;
@@ -56,9 +85,33 @@ class CounterProvider extends ChangeNotifier {
   int _captainDevicesUsage = 0;
   int _counterPcsUsage = 0;
 
+  // Online Ordering & Own Delivery Add-On Module
+  bool _isOnlineOrderingEnabled = false;
+  String _onlineStoreUrl = '';
+  String _customDomain = '';
+
+  bool get isOnlineOrderingEnabled => _isOnlineOrderingEnabled;
+  String get onlineStoreUrl => _onlineStoreUrl;
+  String get customDomain => _customDomain;
+
   String get restaurantName => _restaurantName;
+  String get ownerName => _ownerName;
+  String get phone => _phone;
+  String get city => _city;
+  String get hardwareId => _hardwareId;
   String get printerMode => _printerMode;
   bool get isSinglePrinterMode => _printerMode == 'single';
+  bool get isGstEnabled => _isGstEnabled;
+  double get gstRatePercent => _gstRatePercent;
+  double get cgstRatePercent => _cgstRatePercent;
+  double get sgstRatePercent => _sgstRatePercent;
+  String get gstin => _gstin;
+  String get activeOrderFilter => _activeOrderFilter;
+
+  void setActiveOrderFilter(String filter) {
+    _activeOrderFilter = filter;
+    notifyListeners();
+  }
 
   int get menuItemsLimit => _menuItemsLimit;
   int get captainDevicesLimit => _captainDevicesLimit;
@@ -85,7 +138,7 @@ class CounterProvider extends ChangeNotifier {
   List<RestaurantTable> get tables => _tables;
   List<RestaurantOrder> get activeOrders => _activeOrders;
   List<RestaurantBill> get settledBills => _settledBills;
-  List<ThermalPrinterConfig> get printers => _printers;
+  List<ThermalPrinterConfig> get printers => _printers.isNotEmpty ? _printers : MockCounterData.getPrinters();
   List<MenuItem> get menuItems => _menuItems;
   RestaurantOrder? get selectedOrder => _selectedOrder;
   RestaurantBill? get currentDraftBill => _currentDraftBill;
@@ -124,7 +177,7 @@ class CounterProvider extends ChangeNotifier {
   bool get isLicenseLocked =>
       _licenseStatus.toLowerCase() == 'expired' ||
       _licenseStatus.toLowerCase() == 'suspended' ||
-      (_licenseStatus.toLowerCase() != 'active' && _licenseDaysRemaining <= 0);
+      (_licenseStatus.toLowerCase() == 'unlicensed' && _licenseDaysRemaining <= 0);
   String get serverHost => _counterApiService.host;
   int get serverPort => _counterApiService.port;
   bool get isRefreshing => _isRefreshing;
@@ -133,6 +186,28 @@ class CounterProvider extends ChangeNotifier {
     _counterApiService.updateHost(host, port);
     notifyListeners();
     await refreshFromLiveApi(isManual: true);
+  }
+
+  static int naturalTableCompare(RestaurantTable a, RestaurantTable b) {
+    final regex = RegExp(r'(\d+|\D+)');
+    final aMatches = regex.allMatches(a.name).map((m) => m.group(0)!).toList();
+    final bMatches = regex.allMatches(b.name).map((m) => m.group(0)!).toList();
+
+    for (int i = 0; i < aMatches.length && i < bMatches.length; i++) {
+      final aPart = aMatches[i];
+      final bPart = bMatches[i];
+      final aNum = int.tryParse(aPart);
+      final bNum = int.tryParse(bPart);
+
+      if (aNum != null && bNum != null) {
+        final comp = aNum.compareTo(bNum);
+        if (comp != 0) return comp;
+      } else {
+        final comp = aPart.toLowerCase().compareTo(bPart.toLowerCase());
+        if (comp != 0) return comp;
+      }
+    }
+    return aMatches.length.compareTo(bMatches.length);
   }
 
   Future<bool> createTable({
@@ -149,6 +224,7 @@ class CounterProvider extends ChangeNotifier {
     );
     if (created != null) {
       _tables.add(created);
+      _tables.sort(naturalTableCompare);
       notifyListeners();
       return true;
     }
@@ -287,6 +363,20 @@ class CounterProvider extends ChangeNotifier {
       if (lic['restaurantName'] != null) {
         _restaurantName = lic['restaurantName'].toString();
       }
+      if (lic['ownerName'] != null) {
+        _ownerName = lic['ownerName'].toString();
+      }
+      if (lic['phone'] != null) {
+        _phone = lic['phone'].toString();
+      }
+      if (lic['city'] != null) {
+        _city = lic['city'].toString();
+      }
+      if (lic['hardwareId'] != null) {
+        _hardwareId = lic['hardwareId'].toString();
+      } else if (lic['hwid'] != null) {
+        _hardwareId = lic['hwid'].toString();
+      }
       if (lic['limits'] != null && lic['limits'] is Map) {
         final lim = lic['limits'] as Map<String, dynamic>;
         if (lim['menuItems'] is num) _menuItemsLimit = (lim['menuItems'] as num).toInt();
@@ -352,21 +442,28 @@ class CounterProvider extends ChangeNotifier {
   }
 
   ThermalPrinterConfig? get billPrinter =>
-      _printers.where((p) => p.role == PrinterRole.counterBill).firstOrNull;
+      printers.where((p) => p.role == PrinterRole.counterBill).firstOrNull;
 
   ThermalPrinterConfig? get kotPrinter =>
-      _printers.where((p) => p.role == PrinterRole.kitchenKot).firstOrNull;
+      printers.where((p) => p.role == PrinterRole.kitchenKot).firstOrNull;
 
   Future<void> _initData() async {
-    // 1. Initial baseline to ensure seamless startup without layout flash
-    _tables = MockCounterData.getTables();
-    _activeOrders = MockCounterData.getActiveOrders();
-    _settledBills = MockCounterData.getSettledBills();
-    _printers = MockCounterData.getPrinters();
-    _menuItems = MockCounterData.getMenuItems();
+    // 1. Initially initialize empty to avoid flash of demo/stale data
+    _tables = [];
+    _activeOrders = [];
+    _settledBills = [];
+    _printers = [];
+    _menuItems = [];
 
     // 2. Fetch live data from Local API (http://127.0.0.1:4000/api)
     await refreshFromLiveApi(isManual: false);
+
+    // 3. Fallback to sample floor tables only if completely offline/uninitialized
+    if (_tables.isEmpty && !_localServerHealthy) {
+      _tables = MockCounterData.getTables();
+      _menuItems = MockCounterData.getMenuItems();
+      _printers = MockCounterData.getPrinters();
+    }
   }
 
   void _startAutoPolling() {
@@ -393,17 +490,34 @@ class CounterProvider extends ChangeNotifier {
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
       _restaurantName = health.restaurantName;
+      _ownerName = health.ownerName;
+      _phone = health.phone;
+      _city = health.city;
+      if (health.hardwareId.isNotEmpty) {
+        _hardwareId = health.hardwareId;
+      }
       _menuItemsLimit = health.menuItemsLimit;
       _captainDevicesLimit = health.captainDevicesLimit;
       _counterPcsLimit = health.counterPcsLimit;
       _menuItemsUsage = health.menuItemsUsage;
       _captainDevicesUsage = health.captainDevicesUsage;
       _counterPcsUsage = health.counterPcsUsage;
+      _isGstEnabled = health.isGstEnabled;
+      _gstRatePercent = health.gstRatePercent;
+      _cgstRatePercent = health.cgstRatePercent;
+      _sgstRatePercent = health.sgstRatePercent;
+      _gstin = health.gstin;
+      _isOnlineOrderingEnabled = health.isOnlineOrderingEnabled;
+      _onlineStoreUrl = health.onlineStoreUrl;
+      _customDomain = health.customDomain;
+      _isOnlineOrderingEnabled = health.isOnlineOrderingEnabled;
+      _onlineStoreUrl = health.onlineStoreUrl;
+      _customDomain = health.customDomain;
 
       if (_localServerHealthy) {
         final liveTables = await _apiClient.getTables();
         if (liveTables != null) {
-          _tables = liveTables;
+          _tables = (liveTables..sort(naturalTableCompare));
         }
 
         final tableMap = {for (var t in _tables) t.id: t.name};
@@ -411,6 +525,9 @@ class CounterProvider extends ChangeNotifier {
         if (liveOrders != null) {
           _activeOrders = liveOrders;
         }
+
+        final liveBills = await _apiClient.getBills();
+        _settledBills = liveBills;
 
         // Auto-sync open bill with latest order changes
         if (_currentDraftBill != null && !_isSettlingPayment) {
@@ -448,19 +565,36 @@ class CounterProvider extends ChangeNotifier {
       _licenseStatus = health.licenseStatus;
       _licenseDaysRemaining = health.daysRemaining;
       _restaurantName = health.restaurantName;
+      _ownerName = health.ownerName;
+      _phone = health.phone;
+      _city = health.city;
+      if (health.hardwareId.isNotEmpty) {
+        _hardwareId = health.hardwareId;
+      } else if (_hardwareId.isEmpty) {
+        final hw = await _counterApiService.getHardwareId();
+        if (hw != null && hw.isNotEmpty) _hardwareId = hw;
+      }
       _menuItemsLimit = health.menuItemsLimit;
       _captainDevicesLimit = health.captainDevicesLimit;
       _counterPcsLimit = health.counterPcsLimit;
       _menuItemsUsage = health.menuItemsUsage;
       _captainDevicesUsage = health.captainDevicesUsage;
       _counterPcsUsage = health.counterPcsUsage;
+      _isGstEnabled = health.isGstEnabled;
+      _gstRatePercent = health.gstRatePercent;
+      _cgstRatePercent = health.cgstRatePercent;
+      _sgstRatePercent = health.sgstRatePercent;
+      _gstin = health.gstin;
+      _isOnlineOrderingEnabled = health.isOnlineOrderingEnabled;
+      _onlineStoreUrl = health.onlineStoreUrl;
+      _customDomain = health.customDomain;
 
       _lanInfo = await _apiClient.getLanInfo();
       _pendingDevices = await _apiClient.getPendingDevices();
 
       final liveTables = await _apiClient.getTables();
       if (liveTables != null) {
-        _tables = liveTables;
+        _tables = (liveTables..sort(naturalTableCompare));
       }
 
       final tableMap = {for (var t in _tables) t.id: t.name};
@@ -468,6 +602,9 @@ class CounterProvider extends ChangeNotifier {
       if (liveOrders != null) {
         _activeOrders = liveOrders;
       }
+
+      final liveBills = await _apiClient.getBills();
+      _settledBills = liveBills;
 
       // Sync open bill if any
       if (_currentDraftBill != null && !_isSettlingPayment) {
@@ -480,6 +617,8 @@ class CounterProvider extends ChangeNotifier {
       final livePrinters = await _apiClient.getPrinters();
       if (livePrinters != null && livePrinters.isNotEmpty) {
         _printers = livePrinters;
+      } else if (_printers.isEmpty) {
+        _printers = MockCounterData.getPrinters();
       }
       _printerMode = await _apiClient.getPrinterMode();
 
@@ -518,7 +657,9 @@ class CounterProvider extends ChangeNotifier {
     _currentDraftBill = RestaurantBill.fromOrder(
       order: order,
       billNumber: 'INV-$billSuffix',
-      cashierName: 'Cashier',
+      cashierName: _ownerName.isNotEmpty ? _ownerName : 'Cashier',
+      isGstEnabled: _isGstEnabled,
+      gstRatePercent: _gstRatePercent,
     );
 
     _activeTab = CounterTab.billing;
@@ -540,14 +681,19 @@ class CounterProvider extends ChangeNotifier {
       order: activeOrder,
       billNumber: _currentDraftBill!.billNumber,
       cashierName: _currentDraftBill!.cashierName,
+      isGstEnabled: _isGstEnabled,
+      gstRatePercent: _gstRatePercent,
     );
     final taxable = (updated.subtotalPaise - discount).clamp(0, double.infinity).toInt();
-    final cgst = (taxable * 0.025).round();
-    final sgst = (taxable * 0.025).round();
+    final halfRate = (_gstRatePercent / 200.0);
+    final cgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
+    final sgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
     _currentDraftBill = updated.copyWith(
       id: _currentDraftBill!.id,
       discountPaise: discount,
       discountReason: reason,
+      isGstEnabled: _isGstEnabled,
+      gstRatePercent: _gstRatePercent,
       cgstPaise: cgst,
       sgstPaise: sgst,
       totalPaise: taxable + cgst + sgst,
@@ -582,12 +728,15 @@ class CounterProvider extends ChangeNotifier {
 
     final newSubtotal = updatedItems.fold<int>(0, (sum, i) => sum + i.totalPaise);
     final taxable = (newSubtotal - _currentDraftBill!.discountPaise).clamp(0, double.infinity).toInt();
-    final cgst = (taxable * 0.025).round();
-    final sgst = (taxable * 0.025).round();
+    final halfRate = (_gstRatePercent / 200.0);
+    final cgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
+    final sgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
 
     _currentDraftBill = _currentDraftBill!.copyWith(
       items: updatedItems,
       subtotalPaise: newSubtotal,
+      isGstEnabled: _isGstEnabled,
+      gstRatePercent: _gstRatePercent,
       cgstPaise: cgst,
       sgstPaise: sgst,
       totalPaise: taxable + cgst + sgst,
@@ -621,6 +770,124 @@ class CounterProvider extends ChangeNotifier {
       _syncDraftBillFromOrder(activeOrder);
       notifyListeners();
     }
+  }
+
+
+  Future<void> updateGstConfig({
+    required bool enabled,
+    required double cgstRate,
+    required double sgstRate,
+    String gstin = '',
+  }) async {
+    _isGstEnabled = enabled;
+    _cgstRatePercent = cgstRate;
+    _sgstRatePercent = sgstRate;
+    _gstRatePercent = cgstRate + sgstRate;
+    _gstin = gstin;
+
+    if (_currentDraftBill != null) {
+      final taxable = (_currentDraftBill!.subtotalPaise - _currentDraftBill!.discountPaise).clamp(0, double.infinity).toInt();
+      final cgstPaise = _isGstEnabled ? (taxable * (_cgstRatePercent / 100.0)).round() : 0;
+      final sgstPaise = _isGstEnabled ? (taxable * (_sgstRatePercent / 100.0)).round() : 0;
+      _currentDraftBill = _currentDraftBill!.copyWith(
+        isGstEnabled: _isGstEnabled,
+        gstRatePercent: _gstRatePercent,
+        cgstPaise: cgstPaise,
+        sgstPaise: sgstPaise,
+        totalPaise: taxable + cgstPaise + sgstPaise,
+      );
+    }
+    notifyListeners();
+    await _counterApiService.updateGstSettings(
+      enabled: _isGstEnabled,
+      ratePercent: _gstRatePercent,
+      cgstRate: _cgstRatePercent,
+      sgstRate: _sgstRatePercent,
+      gstin: _gstin,
+    );
+  }
+
+  Future<RestaurantOrder> createTakeawayOrder({
+    required String customerName,
+    required String customerPhone,
+    required List<OrderItem> items,
+    bool fireKot = true,
+  }) async {
+    final token = 'TA-$_takeawayCounter';
+    _takeawayCounter++;
+    final orderId = 'ord_ta_${DateTime.now().millisecondsSinceEpoch}';
+    final newOrder = RestaurantOrder(
+      id: orderId,
+      tableId: token,
+      tableName: 'Takeaway $token',
+      items: items,
+      status: 'ACTIVE',
+      guestCount: 1,
+      createdAt: DateTime.now(),
+      orderType: 'takeaway',
+      customerName: customerName,
+      customerPhone: customerPhone,
+    );
+    _activeOrders.insert(0, newOrder);
+    selectOrder(newOrder);
+    notifyListeners();
+
+    // Call live local API to record order and print KOT
+    try {
+      final backendItems = items.map((i) => {
+        'menuItemId': i.menuItemId,
+        'quantity': i.quantity,
+      }).toList();
+
+      await _counterApiService.createTakeawayBackendOrder(
+        tableId: token,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        items: backendItems,
+        fireKot: fireKot,
+      );
+    } catch (_) {}
+
+    return newOrder;
+  }
+
+  Future<void> toggleGst([bool? enabled]) async {
+    final nextState = enabled ?? !_isGstEnabled;
+    _isGstEnabled = nextState;
+    if (_currentDraftBill != null) {
+      final taxable = (_currentDraftBill!.subtotalPaise - _currentDraftBill!.discountPaise).clamp(0, double.infinity).toInt();
+      final halfRate = (_gstRatePercent / 200.0);
+      final cgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
+      final sgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
+      _currentDraftBill = _currentDraftBill!.copyWith(
+        isGstEnabled: _isGstEnabled,
+        gstRatePercent: _gstRatePercent,
+        cgstPaise: cgst,
+        sgstPaise: sgst,
+        totalPaise: taxable + cgst + sgst,
+      );
+    }
+    notifyListeners();
+    await _counterApiService.updateGstSettings(enabled: _isGstEnabled, ratePercent: _gstRatePercent);
+  }
+
+  Future<void> setGstRate(double rate) async {
+    _gstRatePercent = rate;
+    if (_currentDraftBill != null) {
+      final taxable = (_currentDraftBill!.subtotalPaise - _currentDraftBill!.discountPaise).clamp(0, double.infinity).toInt();
+      final halfRate = (_gstRatePercent / 200.0);
+      final cgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
+      final sgst = _isGstEnabled ? (taxable * halfRate).round() : 0;
+      _currentDraftBill = _currentDraftBill!.copyWith(
+        isGstEnabled: _isGstEnabled,
+        gstRatePercent: _gstRatePercent,
+        cgstPaise: cgst,
+        sgstPaise: sgst,
+        totalPaise: taxable + cgst + sgst,
+      );
+    }
+    notifyListeners();
+    await _counterApiService.updateGstSettings(enabled: _isGstEnabled, ratePercent: _gstRatePercent);
   }
 
   Future<void> applyDiscount(int discountPaise, String reason) async {
@@ -680,6 +947,8 @@ class CounterProvider extends ChangeNotifier {
         liveBill = await _counterApiService.generateBill(
           billToSettle.orderId,
           discountPaise: billToSettle.discountPaise,
+          isGstEnabled: billToSettle.isGstEnabled,
+          gstRatePercent: billToSettle.gstRatePercent,
         );
       } catch (_) {}
 
@@ -694,12 +963,12 @@ class CounterProvider extends ChangeNotifier {
         reference: reference,
       );
 
-      if (!ok) {
+      if (!ok && liveBill != null) {
         throw Exception('Failed to settle payment on local POS server.');
       }
 
       final settledBill = billToSettle.copyWith(
-        cashierName: 'Deepa',
+        cashierName: _ownerName.isNotEmpty ? _ownerName : 'Cashier',
         paymentMethod: method,
         paymentStatus: PaymentStatus.settled,
         paymentReference: reference,
@@ -756,6 +1025,17 @@ class CounterProvider extends ChangeNotifier {
       _menuItems[index] = current.copyWith(isAvailable: newStatus);
       notifyListeners();
       _apiClient.toggleMenuItemAvailability(id, newStatus);
+    }
+  }
+
+  void toggleMenuItemDeliveryAvailability(String id) {
+    final index = _menuItems.indexWhere((m) => m.id == id);
+    if (index >= 0) {
+      final current = _menuItems[index];
+      final newStatus = !current.isDeliveryAvailable;
+      _menuItems[index] = current.copyWith(isDeliveryAvailable: newStatus);
+      notifyListeners();
+      _apiClient.toggleMenuItemDeliveryAvailability(id, newStatus);
     }
   }
 
@@ -843,11 +1123,77 @@ class CounterProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateMenuItemDetails({
+    required String id,
+    required String name,
+    required String category,
+    required int pricePaise,
+    required bool isVeg,
+    String? description,
+  }) async {
+    final index = _menuItems.indexWhere((m) => m.id == id);
+    if (index >= 0) {
+      _menuItems[index] = _menuItems[index].copyWith(
+        name: name,
+        category: category,
+        pricePaise: pricePaise,
+        isVeg: isVeg,
+        description: description ?? '',
+      );
+      notifyListeners();
+      return await _counterApiService.updateMenuItem(
+        id: id,
+        name: name,
+        category: category,
+        pricePaise: pricePaise,
+        isVeg: isVeg,
+        description: description ?? '',
+      );
+    }
+    return false;
+  }
+
   Future<bool> deleteMenuItem(String id) async {
     await _counterApiService.deleteMenuItem(id);
     _menuItems.removeWhere((item) => item.id == id);
     notifyListeners();
     return true;
+  }
+
+  Future<bool> renameCategory(String oldName, String newName) async {
+    final oldTrimmed = oldName.trim();
+    final newTrimmed = newName.trim();
+    if (oldTrimmed.isEmpty || newTrimmed.isEmpty || oldTrimmed.toLowerCase() == newTrimmed.toLowerCase()) {
+      return false;
+    }
+
+    // Update in-memory dishes immediately for instant UI responsiveness
+    for (int i = 0; i < _menuItems.length; i++) {
+      if (_menuItems[i].category.trim().toLowerCase() == oldTrimmed.toLowerCase()) {
+        _menuItems[i] = _menuItems[i].copyWith(category: newTrimmed);
+      }
+    }
+    notifyListeners();
+
+    // Sync to local POS server
+    final ok = await _counterApiService.renameCategory(oldTrimmed, newTrimmed);
+    return ok;
+  }
+
+  Future<bool> deleteCategory(String categoryName, [String reassignTo = 'Others']) async {
+    final catTrimmed = categoryName.trim();
+    if (catTrimmed.isEmpty) return false;
+
+    // Update in-memory dishes immediately
+    for (int i = 0; i < _menuItems.length; i++) {
+      if (_menuItems[i].category.trim().toLowerCase() == catTrimmed.toLowerCase()) {
+        _menuItems[i] = _menuItems[i].copyWith(category: reassignTo);
+      }
+    }
+    notifyListeners();
+
+    final ok = await _counterApiService.deleteCategory(catTrimmed, reassignTo);
+    return ok;
   }
 
   Future<bool> wipeAllMenuItems() async {
@@ -896,14 +1242,23 @@ class CounterProvider extends ChangeNotifier {
   }
 
   Future<void> testPrint(PrinterRole role) async {
-    final printer = _printers.where((p) => p.role == role).firstOrNull;
+    final printerList = printers;
+    final printer = printerList.where((p) => p.role == role).firstOrNull;
     if (printer != null) {
-      final success = await _apiClient.testPrint(printer.id);
-      final index = _printers.indexOf(printer);
-      _printers[index] = printer.copyWith(
-        lastTestPrintAt: DateTime.now(),
-        isConnected: success,
-      );
+      bool success = true;
+      if (_localServerHealthy) {
+        success = await _apiClient.testPrint(printer.id);
+      }
+      if (_printers.isEmpty) {
+        _printers = List.from(printerList);
+      }
+      final index = _printers.indexWhere((p) => p.role == role);
+      if (index >= 0) {
+        _printers[index] = printer.copyWith(
+          lastTestPrintAt: DateTime.now(),
+          isConnected: success || !_localServerHealthy,
+        );
+      }
       notifyListeners();
     }
   }

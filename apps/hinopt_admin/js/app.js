@@ -28,6 +28,15 @@ async function initApp() {
           const captainLimit = limits.captainDevices !== undefined ? parseInt(limits.captainDevices, 10) : (lic && lic.max_devices ? parseInt(lic.max_devices, 10) : 5);
           const counterLimit = limits.counterPcs !== undefined ? parseInt(limits.counterPcs, 10) : 1;
 
+          const isOnlineOrdering = Boolean(
+            payload.onlineOrderingEnabled ||
+            payload.online_ordering_enabled ||
+            (lic && lic.features && lic.features.includes('ONLINE_ORDERING'))
+          );
+          const storeSlug = payload.storeSlug || (r.name ? r.name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'store');
+          const customDomain = payload.customDomain || '';
+          const storeUrl = payload.storeUrl || (customDomain ? `https://${customDomain}` : `https://orders.hinopt.com/${storeSlug}`);
+
           return {
             id: r.id,
             name: r.name,
@@ -49,6 +58,10 @@ async function initApp() {
               captainDevices: captainLimit,
               counterPcs: counterLimit,
             },
+            onlineOrderingEnabled: isOnlineOrdering,
+            storeSlug: storeSlug,
+            customDomain: customDomain,
+            storeUrl: storeUrl,
             notes: r.notes || ''
           };
         });
@@ -137,11 +150,16 @@ function setupEventListeners() {
       const counterPcsLimit = document.getElementById('reg-limit-counters') ? parseInt(document.getElementById('reg-limit-counters').value, 10) : 1;
       const maxDevices = captainDevicesLimit;
       const notes = document.getElementById('reg-notes').value.trim();
+      const onlineOrderingEnabled = document.getElementById('reg-plan-delivery') ? document.getElementById('reg-plan-delivery').checked : false;
+      const customDomain = document.getElementById('reg-custom-domain') ? document.getElementById('reg-custom-domain').value.trim() : '';
+      const storeSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'store';
+      const storeUrl = customDomain ? `https://${customDomain}` : `https://orders.hinopt.com/${storeSlug}`;
 
       if (name) {
         showToast(`Registering "${name}" in Supabase...`);
         const newRest = await window.LicenseService.registerRestaurant({
-          name, city, contactName, phone, hwid, counterIp, expiresAt, maxDevices, menuItemsLimit, captainDevicesLimit, counterPcsLimit, notes
+          name, city, contactName, phone, hwid, counterIp, expiresAt, maxDevices, menuItemsLimit, captainDevicesLimit, counterPcsLimit, notes,
+          onlineOrderingEnabled, customDomain, storeSlug, storeUrl
         });
         closeModal('modal-register');
         regForm.reset();
@@ -170,10 +188,15 @@ function setupEventListeners() {
       const counterPcsLimit = document.getElementById('edit-limit-counters') ? parseInt(document.getElementById('edit-limit-counters').value, 10) : 1;
       const maxDevices = captainDevicesLimit;
       const notes = document.getElementById('edit-notes').value.trim();
+      const onlineOrderingEnabled = document.getElementById('edit-plan-delivery') ? document.getElementById('edit-plan-delivery').checked : false;
+      const customDomain = document.getElementById('edit-custom-domain') ? document.getElementById('edit-custom-domain').value.trim() : '';
+      const storeSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '') || 'store';
+      const storeUrl = customDomain ? `https://${customDomain}` : `https://orders.hinopt.com/${storeSlug}`;
 
       showToast(`Saving changes for "${name}" to Supabase...`);
       await window.LicenseService.updateRestaurantDetails(id, {
-        name, city, contactName, phone, hwid, counterIp, status, expiresAt, maxDevices, menuItemsLimit, captainDevicesLimit, counterPcsLimit, notes
+        name, city, contactName, phone, hwid, counterIp, status, expiresAt, maxDevices, menuItemsLimit, captainDevicesLimit, counterPcsLimit, notes,
+        onlineOrderingEnabled, customDomain, storeSlug, storeUrl
       });
 
       closeModal('modal-edit-restaurant');
@@ -230,6 +253,22 @@ function renderRestaurants() {
           <td>
             <div style="font-weight: 800; font-size: 14px;">${r.name}</div>
             <div style="font-size: 11px; color: var(--text-secondary);">${r.city}</div>
+            ${r.onlineOrderingEnabled ? `
+              <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 10px; font-weight: 700; width: fit-content;">
+                  🛵 Online Delivery Active
+                </span>
+                <span style="font-size: 10px; color: #0284c7; font-family: monospace;">
+                  ${r.customDomain ? `🌐 ${r.customDomain}` : (r.storeSlug ? `🌐 orders.hinopt.com/${r.storeSlug}` : '')}
+                </span>
+              </div>
+            ` : `
+              <div style="margin-top: 3px;">
+                <span style="font-size: 10px; background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 10px; font-weight: 600;">
+                  Billing Only
+                </span>
+              </div>
+            `}
           </td>
           <td>
             <div style="font-weight: 600;">${r.contactName}</div>
@@ -267,6 +306,22 @@ function renderRestaurants() {
           <td>
             <div style="font-weight: 800; font-size: 14px;">${r.name}</div>
             <div style="font-size: 11px; color: var(--text-secondary);">${r.city} &bull; IP: ${r.counterIp || '192.168.1.100'}</div>
+            ${r.onlineOrderingEnabled ? `
+              <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 2px;">
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 10px; font-weight: 700; width: fit-content;">
+                  🛵 Online Delivery Active
+                </span>
+                <span style="font-size: 10px; color: #0284c7; font-family: monospace;">
+                  ${r.customDomain ? `🌐 ${r.customDomain}` : (r.storeSlug ? `🌐 orders.hinopt.com/${r.storeSlug}` : '')}
+                </span>
+              </div>
+            ` : `
+              <div style="margin-top: 3px;">
+                <span style="font-size: 10px; background: #f1f5f9; color: #64748b; padding: 1px 6px; border-radius: 10px; font-weight: 600;">
+                  Billing Only
+                </span>
+              </div>
+            `}
           </td>
           <td>
             <div style="font-weight: 600;">${r.contactName}</div>
@@ -377,6 +432,45 @@ window.closeModal = function (id) {
   if (modal) modal.classList.remove('active');
 };
 
+// Plan & Delivery Module Helpers
+window.toggleDeliveryOptions = function(prefix) {
+  const checkbox = document.getElementById(`${prefix}-plan-delivery`);
+  if (!checkbox) return;
+  const isChecked = checkbox.checked;
+  const settingsDiv = document.getElementById(`${prefix}-delivery-settings`);
+  const storeUrlInput = document.getElementById(`${prefix}-store-url`);
+  const nameInput = document.getElementById(`${prefix}-name`);
+
+  if (settingsDiv) {
+    settingsDiv.style.display = isChecked ? 'block' : 'none';
+  }
+
+  if (isChecked && storeUrlInput) {
+    const rawName = nameInput ? nameInput.value.trim() : 'store';
+    const slug = rawName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'store';
+    storeUrlInput.value = `https://orders.hinopt.com/${slug}`;
+  }
+  window.updateDnsHelper(prefix);
+};
+
+window.updateDnsHelper = function(prefix) {
+  const customDomainInput = document.getElementById(`${prefix}-custom-domain`);
+  const helperBox = document.getElementById(`${prefix}-dns-helper`);
+  const hostSpan = document.getElementById(`${prefix}-dns-host`);
+
+  if (!customDomainInput || !helperBox || !hostSpan) return;
+
+  const val = customDomainInput.value.trim().toLowerCase();
+  if (val && val.includes('.')) {
+    const parts = val.split('.');
+    const host = parts.length > 2 ? parts[0] : val;
+    hostSpan.textContent = host;
+    helperBox.style.display = 'block';
+  } else {
+    helperBox.style.display = 'none';
+  }
+};
+
 // Open Edit Modal for a restaurant
 window.openEditModal = function (restaurantId) {
   const r = window.HinoptData.restaurants.find(item => item.id === restaurantId);
@@ -397,6 +491,28 @@ window.openEditModal = function (restaurantId) {
   if (document.getElementById('edit-limit-counters')) document.getElementById('edit-limit-counters').value = r.counterPcsLimit || r.limits?.counterPcs || 1;
   if (document.getElementById('edit-devices')) document.getElementById('edit-devices').value = r.captainDevicesLimit || r.maxDevices || 5;
   document.getElementById('edit-notes').value = r.notes || '';
+
+  const isOnline = Boolean(r.onlineOrderingEnabled);
+  const editDeliveryCheckbox = document.getElementById('edit-plan-delivery');
+  if (editDeliveryCheckbox) {
+    editDeliveryCheckbox.checked = isOnline;
+  }
+  const editDomainInput = document.getElementById('edit-custom-domain');
+  if (editDomainInput) {
+    editDomainInput.value = r.customDomain || '';
+  }
+  const editStoreUrl = document.getElementById('edit-store-url');
+  if (editStoreUrl) {
+    const slug = r.storeSlug || (r.name ? r.name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'store');
+    editStoreUrl.value = `https://orders.hinopt.com/${slug}`;
+  }
+  const badge = document.getElementById('edit-plan-badge');
+  if (badge) {
+    badge.textContent = isOnline ? 'POS + Online Delivery Plan' : 'Standard POS Only';
+    badge.style.background = isOnline ? '#ecfdf5' : '#f1f5f9';
+    badge.style.color = isOnline ? '#047857' : '#64748b';
+  }
+  window.toggleDeliveryOptions('edit');
 
   openModal('modal-edit-restaurant');
 };

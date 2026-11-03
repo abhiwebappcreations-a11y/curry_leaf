@@ -90,6 +90,8 @@ class RestaurantBill {
   final int cgstPaise;
   final int sgstPaise;
   final int totalPaise;
+  final bool isGstEnabled;
+  final double gstRatePercent;
   final PaymentMethod paymentMethod;
   final PaymentStatus paymentStatus;
   final String? paymentReference;
@@ -112,6 +114,8 @@ class RestaurantBill {
     required this.cgstPaise,
     required this.sgstPaise,
     required this.totalPaise,
+    this.isGstEnabled = true,
+    this.gstRatePercent = 5.0,
     this.paymentMethod = PaymentMethod.cash,
     this.paymentStatus = PaymentStatus.pending,
     this.paymentReference,
@@ -142,6 +146,8 @@ class RestaurantBill {
     int? cgstPaise,
     int? sgstPaise,
     int? totalPaise,
+    bool? isGstEnabled,
+    double? gstRatePercent,
     PaymentMethod? paymentMethod,
     PaymentStatus? paymentStatus,
     String? paymentReference,
@@ -164,6 +170,8 @@ class RestaurantBill {
       cgstPaise: cgstPaise ?? this.cgstPaise,
       sgstPaise: sgstPaise ?? this.sgstPaise,
       totalPaise: totalPaise ?? this.totalPaise,
+      isGstEnabled: isGstEnabled ?? this.isGstEnabled,
+      gstRatePercent: gstRatePercent ?? this.gstRatePercent,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paymentReference: paymentReference ?? this.paymentReference,
@@ -179,7 +187,9 @@ class RestaurantBill {
     required String billNumber,
     int discountPaise = 0,
     String? discountReason,
-    String cashierName = 'Deepa',
+    String cashierName = 'Cashier',
+    bool isGstEnabled = true,
+    double gstRatePercent = 5.0,
   }) {
     final snapshots = order.activeItems.map((item) {
       return BillItemSnapshot(
@@ -193,9 +203,9 @@ class RestaurantBill {
 
     final subtotal = order.totalPaise;
     final taxable = (subtotal - discountPaise).clamp(0, double.infinity).toInt();
-    // 5% GST divided into 2.5% CGST + 2.5% SGST
-    final cgst = (taxable * 0.025).round();
-    final sgst = (taxable * 0.025).round();
+    final halfRate = (gstRatePercent / 2.0) / 100.0;
+    final cgst = isGstEnabled ? (taxable * halfRate).round() : 0;
+    final sgst = isGstEnabled ? (taxable * halfRate).round() : 0;
     final total = taxable + cgst + sgst;
 
     return RestaurantBill(
@@ -212,6 +222,8 @@ class RestaurantBill {
       cgstPaise: cgst,
       sgstPaise: sgst,
       totalPaise: total,
+      isGstEnabled: isGstEnabled,
+      gstRatePercent: gstRatePercent,
       createdAt: DateTime.now(),
     );
   }
@@ -234,6 +246,8 @@ class RestaurantBill {
     final cgst = (tax / 2).round();
     final sgst = tax - cgst;
     final total = json['totalPaise'] as int? ?? (subtotal + tax - discount);
+    final isGstEnabled = json['isGstEnabled'] as bool? ?? (tax > 0);
+    final gstRatePercent = (json['gstRatePercent'] as num?)?.toDouble() ?? 5.0;
 
     return RestaurantBill(
       id: json['id'] as String,
@@ -241,7 +255,7 @@ class RestaurantBill {
       orderId: json['orderId'] as String? ?? '',
       tableId: json['tableId'] as String? ?? '',
       tableName: json['tableName'] as String? ?? '',
-      cashierName: json['cashierName'] as String? ?? 'Deepa',
+      cashierName: json['cashierName'] as String? ?? 'Cashier',
       items: itemsList,
       subtotalPaise: subtotal,
       discountPaise: discount,
@@ -249,6 +263,8 @@ class RestaurantBill {
       cgstPaise: cgst,
       sgstPaise: sgst,
       totalPaise: total,
+      isGstEnabled: isGstEnabled,
+      gstRatePercent: gstRatePercent,
       paymentMethod: PaymentMethod.values.firstWhere(
         (m) => m.name.toLowerCase() == (json['paymentMethod'] as String? ?? 'cash').toLowerCase(),
         orElse: () => PaymentMethod.cash,

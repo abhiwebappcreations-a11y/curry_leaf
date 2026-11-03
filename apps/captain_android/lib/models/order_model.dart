@@ -88,20 +88,45 @@ class OrderItem {
   }
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
+    String? variant;
+    if (json['selectedVariant'] != null) {
+      variant = json['selectedVariant'].toString();
+    } else if (json['selectedVariants'] != null &&
+        json['selectedVariants'] is List &&
+        (json['selectedVariants'] as List).isNotEmpty) {
+      final first = (json['selectedVariants'] as List).first;
+      variant = first is Map ? first['name']?.toString() : first?.toString();
+    }
+
+    final addons = <String>[];
+    if (json['selectedAddons'] != null && json['selectedAddons'] is List) {
+      for (final a in json['selectedAddons'] as List) {
+        if (a is Map && a['name'] != null) {
+          addons.add(a['name'].toString());
+        } else if (a != null) {
+          addons.add(a.toString());
+        }
+      }
+    }
+
+    final rawStatus = (json['status'] as String? ?? 'sentToKitchen')
+        .replaceAll('_', '')
+        .toLowerCase();
+
     return OrderItem(
-      id: json['id'] as String,
-      menuItemId: json['menuItemId'] as String,
-      name: json['name'] as String,
+      id: (json['id'] ?? 'item-${DateTime.now().millisecondsSinceEpoch}').toString(),
+      menuItemId: (json['menuItemId'] ?? json['id'] ?? '').toString(),
+      name: (json['nameSnapshot'] ?? json['name'] ?? 'Item').toString(),
       quantity: json['quantity'] as int? ?? 1,
-      pricePaise: json['pricePaise'] as int? ?? 0,
+      pricePaise: (json['pricePaiseSnapshot'] ?? json['pricePaise'] ?? 0) as int,
       isVeg: json['isVeg'] as bool? ?? true,
-      notes: json['notes'] as String?,
-      selectedVariant: json['selectedVariant'] as String?,
-      selectedAddons: (json['selectedAddons'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      isDraft: json['isDraft'] as bool? ?? false,
-      sentAt: json['sentAt'] != null ? DateTime.tryParse(json['sentAt']) : null,
+      notes: (json['itemNotes'] ?? json['notes']) as String?,
+      selectedVariant: variant,
+      selectedAddons: addons,
+      isDraft: json['isDraft'] as bool? ?? (rawStatus == 'draft'),
+      sentAt: json['sentAt'] != null ? DateTime.tryParse(json['sentAt'].toString()) : null,
       status: OrderItemStatus.values.firstWhere(
-        (e) => e.name.toLowerCase() == (json['status'] as String? ?? 'sentToKitchen').toLowerCase(),
+        (e) => e.name.toLowerCase() == rawStatus,
         orElse: () => OrderItemStatus.sentToKitchen,
       ),
     );
@@ -177,17 +202,24 @@ class RestaurantOrder {
 
   factory RestaurantOrder.fromJson(Map<String, dynamic> json) {
     return RestaurantOrder(
-      id: json['id'] as String,
-      tableId: json['tableId'] as String,
-      tableName: json['tableName'] as String? ?? '',
+      id: (json['id'] ?? 'ord-${DateTime.now().millisecondsSinceEpoch}').toString(),
+      tableId: (json['tableId'] ?? '').toString(),
+      tableName: (json['tableName'] ?? '').toString(),
       items: (json['items'] as List<dynamic>?)
-              ?.map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
+              ?.map((e) {
+                try {
+                  return OrderItem.fromJson(e as Map<String, dynamic>);
+                } catch (_) {
+                  return null;
+                }
+              })
+              .whereType<OrderItem>()
               .toList() ??
           [],
-      status: json['status'] as String? ?? 'ACTIVE',
+      status: (json['status'] ?? 'ACTIVE').toString(),
       guestCount: json['guestCount'] as int? ?? 2,
       createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+          ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
     );
   }

@@ -11,6 +11,7 @@ class ConnectionSettingsScreen extends StatefulWidget {
 }
 
 class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
+  late TextEditingController _nameController;
   late TextEditingController _hostController;
   late TextEditingController _portController;
   late bool _demoMode;
@@ -22,6 +23,7 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
   void initState() {
     super.initState();
     final provider = context.read<PosProvider>();
+    _nameController = TextEditingController(text: provider.deviceName);
     _hostController = TextEditingController(text: provider.apiService.host);
     _portController = TextEditingController(text: provider.apiService.port.toString());
     _demoMode = provider.apiService.useDemoMode;
@@ -29,6 +31,7 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _hostController.dispose();
     _portController.dispose();
     super.dispose();
@@ -43,10 +46,12 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
 
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 4000;
+    final posProvider = context.read<PosProvider>();
 
     await Future.delayed(const Duration(milliseconds: 600));
 
     if (_demoMode) {
+      if (!mounted) return;
       setState(() {
         _isTesting = false;
         _testSuccess = true;
@@ -54,8 +59,6 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
       });
       return;
     }
-
-    final posProvider = context.read<PosProvider>();
 
     try {
       final success = await posProvider.apiService.checkHealth(customHost: host, customPort: port);
@@ -80,12 +83,17 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
   void _saveSettings() {
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 4000;
+    final name = _nameController.text.trim();
 
-    context.read<PosProvider>().updateServerConfig(host, port, _demoMode);
+    final provider = context.read<PosProvider>();
+    provider.updateServerConfig(host, port, _demoMode);
+    if (name.isNotEmpty) {
+      provider.updateDeviceName(name);
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Connection configuration saved.'),
+        content: Text('Connection configuration and device name saved.'),
         backgroundColor: AppColors.success,
       ),
     );
@@ -107,7 +115,7 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
             decoration: BoxDecoration(
               color: AppColors.infoBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.info.withOpacity(0.3)),
+              border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,7 +136,24 @@ class _ConnectionSettingsScreenState extends State<ConnectionSettingsScreen> {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          // Waiter / Captain Name input
+          const Text(
+            'Waiter / Captain Device Name',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              hintText: 'e.g. Ramesh (Captain 1), Suresh, Patio Floor',
+              prefixIcon: Icon(Icons.person, size: 20),
+            ),
+          ),
+
+          const SizedBox(height: 20),
 
           // Demo Mode Switch
           Container(

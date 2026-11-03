@@ -1,4 +1,5 @@
 import { LicenseService } from '../services/licenseService.js';
+import { CloudOrderSyncService } from '../services/cloudOrderSyncService.js';
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { inMemoryStore, MenuItemRecord } from '../db/inMemoryStore.js';
@@ -126,7 +127,8 @@ menuRouter.post(
 );
 
 const toggleAvailabilitySchema = z.object({
-  isAvailable: z.boolean(),
+  isAvailable: z.boolean().optional(),
+  isDeliveryAvailable: z.boolean().optional(),
 });
 
 // PATCH /api/menu/items/:id/availability - Toggle item 86/available state (Counter / Admin)
@@ -142,7 +144,47 @@ menuRouter.patch(
         throw new NotFoundError('Menu Item', id);
       }
 
-      item.isAvailable = req.body.isAvailable;
+      if (req.body.isAvailable !== undefined) {
+        item.isAvailable = req.body.isAvailable;
+      }
+      if (req.body.isDeliveryAvailable !== undefined) {
+        item.isDeliveryAvailable = req.body.isDeliveryAvailable;
+      }
+      inMemoryStore.saveToDisk();
+      CloudOrderSyncService.syncDeliverableMenuToCloud().catch(() => {});
+
+      res.json({
+        success: true,
+        data: {
+          item,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const toggleDeliveryAvailabilitySchema = z.object({
+  isDeliveryAvailable: z.boolean(),
+});
+
+// PATCH /api/menu/items/:id/delivery-availability - Toggle exclusive online delivery state
+menuRouter.patch(
+  '/items/:id/delivery-availability',
+  requireRole('counter', 'admin'),
+  validateBody(toggleDeliveryAvailabilitySchema),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const item = inMemoryStore.menuItems.get(id);
+      if (!item) {
+        throw new NotFoundError('Menu Item', id);
+      }
+
+      item.isDeliveryAvailable = req.body.isDeliveryAvailable;
+      inMemoryStore.saveToDisk();
+      CloudOrderSyncService.syncDeliverableMenuToCloud().catch(() => {});
 
       res.json({
         success: true,
@@ -164,6 +206,7 @@ const createMenuItemSchema = z.object({
   pricePaise: z.number().int().positive(),
   taxRatePercent: z.number().min(0).default(5.0),
   isAvailable: z.boolean().default(true),
+  isDeliveryAvailable: z.boolean().default(true),
   isVeg: z.boolean().default(true),
   imageUrl: z.string().nullable().optional(),
   variants: z
@@ -261,6 +304,7 @@ menuRouter.post(
         pricePaise,
         taxRatePercent: taxRatePercent ?? 5.0,
         isAvailable: isAvailable ?? true,
+        isDeliveryAvailable: req.body.isDeliveryAvailable ?? true,
         isVeg: isVeg ?? true,
         imageUrl: imageUrl || undefined,
         variants: variants || [],
@@ -294,72 +338,73 @@ const updateItemSchema = z.object({
   pricePaise: z.number().int().positive().optional(),
   isVeg: z.boolean().optional(),
   isAvailable: z.boolean().optional(),
+  isDeliveryAvailable: z.boolean().optional(),
   description: z.string().optional(),
 });
 
-// PATCH /api/menu/items/:id - Update dish details (Counter / Admin)
-menuRouter.patch(
-  '/items/:id',
-  requireRole('counter', 'admin'),
-  validateBody(updateItemSchema),
-  (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const id = req.params.id as string;
-      const item = inMemoryStore.menuItems.get(id);
-      if (!item) {
-        throw new NotFoundError('Menu Item', id);
-      }
+// PATCH or PUT /api/menu/items/:id - Update dish details (Counter / Admin)
+const handleUpdateMenuItem = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const item = inMemoryStore.menuItems.get(id);
+    if (!item) {
+      throw new NotFoundError('Menu Item', id);
+    }
 
-      if (req.body.name) item.name = req.body.name;
-      if (req.body.pricePaise) item.pricePaise = req.body.pricePaise;
-      if (req.body.isVeg !== undefined) item.isVeg = req.body.isVeg;
-      if (req.body.isAvailable !== undefined) item.isAvailable = req.body.isAvailable;
-      if (req.body.description !== undefined) item.description = req.body.description;
+    if (req.body.name) item.name = req.body.name;
+    if (req.body.pricePaise) item.pricePaise = req.body.pricePaise;
+    if (req.body.isVeg !== undefined) item.isVeg = req.body.isVeg;
+    if (req.body.isAvailable !== undefined) item.isAvailable = req.body.isAvailable;
+    if (req.body.isDeliveryAvailable !== undefined) item.isDeliveryAvailable = req.body.isDeliveryAvailable;
+    if (req.body.description !== undefined) item.description = req.body.description;
 
-      const catInput = req.body.categoryId || req.body.category;
-      if (catInput) {
-        const catById = inMemoryStore.categories.get(catInput);
-        if (catById) {
-          item.categoryId = catById.id;
+    const catInput = req.body.categoryId || req.body.category;
+    if (catInput) {
+      const catById = inMemoryStore.categories.get(catInput);
+      if (catById) {
+        item.categoryId = catById.id;
+      } else {
+        const found = Array.from(inMemoryStore.categories.values()).find(
+          (c) => c.name.toLowerCase() === catInput.trim().toLowerCase()
+        );
+        if (found) {
+          item.categoryId = found.id;
         } else {
-          const found = Array.from(inMemoryStore.categories.values()).find(
-            (c) => c.name.toLowerCase() === catInput.trim().toLowerCase()
-          );
-          if (found) {
-            item.categoryId = found.id;
-          } else {
-            const trimmed = catInput.trim();
-            const newCatId = `cat_${Date.now()}_${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-            const newCat = {
-              id: newCatId,
-              name: trimmed,
-              sortOrder: inMemoryStore.categories.size + 1,
-              isActive: true,
-            };
-            inMemoryStore.categories.set(newCatId, newCat);
-            item.categoryId = newCatId;
-          }
+          const trimmed = catInput.trim();
+          const newCatId = `cat_${Date.now()}_${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+          const newCat = {
+            id: newCatId,
+            name: trimmed,
+            sortOrder: inMemoryStore.categories.size + 1,
+            isActive: true,
+          };
+          inMemoryStore.categories.set(newCatId, newCat);
+          item.categoryId = newCatId;
         }
       }
-
-      inMemoryStore.saveToDisk();
-
-      const cat = inMemoryStore.categories.get(item.categoryId);
-      res.json({
-        success: true,
-        data: {
-          item: {
-            ...item,
-            category: cat ? cat.name : item.categoryId,
-            categoryName: cat ? cat.name : item.categoryId,
-          },
-        },
-      });
-    } catch (err) {
-      next(err);
     }
+
+    inMemoryStore.saveToDisk();
+    CloudOrderSyncService.syncDeliverableMenuToCloud().catch(() => {});
+
+    const cat = inMemoryStore.categories.get(item.categoryId);
+    res.json({
+      success: true,
+      data: {
+        item: {
+          ...item,
+          category: cat ? cat.name : item.categoryId,
+          categoryName: cat ? cat.name : item.categoryId,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
   }
-);
+};
+
+menuRouter.patch('/items/:id', requireRole('counter', 'admin'), validateBody(updateItemSchema), handleUpdateMenuItem);
+menuRouter.put('/items/:id', requireRole('counter', 'admin'), validateBody(updateItemSchema), handleUpdateMenuItem);
 
 const updatePriceSchema = z.object({
   pricePaise: z.number().int().positive(),
@@ -385,6 +430,129 @@ menuRouter.patch(
         success: true,
         data: {
           item,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PUT /api/menu/categories/rename - Rename a category across all dishes and categories
+menuRouter.put(
+  '/categories/rename',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { oldName, newName } = req.body;
+      if (!oldName || !newName || typeof oldName !== 'string' || typeof newName !== 'string') {
+        return res.status(400).json({ success: false, error: { message: 'oldName and newName are required' } });
+      }
+
+      const trimmedOld = oldName.trim();
+      const trimmedNew = newName.trim();
+
+      // Find or rename category in inMemoryStore.categories
+      let targetCat = Array.from(inMemoryStore.categories.values()).find(
+        (c) => c.name.toLowerCase() === trimmedOld.toLowerCase()
+      );
+      if (targetCat) {
+        targetCat.name = trimmedNew;
+      } else {
+        // Create the new category record if it didn't exist
+        const newCatId = `cat_${Date.now()}_${trimmedNew.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        targetCat = {
+          id: newCatId,
+          name: trimmedNew,
+          sortOrder: inMemoryStore.categories.size + 1,
+          isActive: true,
+        };
+        inMemoryStore.categories.set(newCatId, targetCat);
+      }
+
+      // Update all dishes using this category name or ID
+      let updatedCount = 0;
+      for (const item of inMemoryStore.menuItems.values()) {
+        const cat = inMemoryStore.categories.get(item.categoryId);
+        const matchByName = cat ? cat.name.toLowerCase() === trimmedOld.toLowerCase() : false;
+        const matchByRaw = item.categoryId ? item.categoryId.toLowerCase() === trimmedOld.toLowerCase() : false;
+
+        if (matchByName || matchByRaw) {
+          item.categoryId = targetCat.id;
+          updatedCount++;
+        }
+      }
+
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: `Category "${trimmedOld}" renamed to "${trimmedNew}" across ${updatedCount} dishes.`,
+          oldName: trimmedOld,
+          newName: trimmedNew,
+          updatedCount,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// DELETE /api/menu/categories/:name - Delete a category and reassign dishes to another category
+menuRouter.delete(
+  '/categories/:name',
+  requireRole('counter', 'admin'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const catName = decodeURIComponent(req.params.name as string).trim();
+      const reassignTo = (req.query.reassignTo as string || 'Others').trim();
+
+      // Find or create reassign category
+      let reassignCat = Array.from(inMemoryStore.categories.values()).find(
+        (c) => c.name.toLowerCase() === reassignTo.toLowerCase()
+      );
+      if (!reassignCat) {
+        const newCatId = `cat_${Date.now()}_${reassignTo.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        reassignCat = {
+          id: newCatId,
+          name: reassignTo,
+          sortOrder: inMemoryStore.categories.size + 1,
+          isActive: true,
+        };
+        inMemoryStore.categories.set(newCatId, reassignCat);
+      }
+
+      // Find category to delete
+      const catToDelete = Array.from(inMemoryStore.categories.values()).find(
+        (c) => c.name.toLowerCase() === catName.toLowerCase() || c.id === catName
+      );
+
+      let movedCount = 0;
+      for (const item of inMemoryStore.menuItems.values()) {
+        const cat = inMemoryStore.categories.get(item.categoryId);
+        const isMatch = (cat && cat.id === catToDelete?.id) ||
+                        (cat && cat.name.toLowerCase() === catName.toLowerCase()) ||
+                        (item.categoryId && item.categoryId.toLowerCase() === catName.toLowerCase());
+
+        if (isMatch) {
+          item.categoryId = reassignCat.id;
+          movedCount++;
+        }
+      }
+
+      if (catToDelete) {
+        inMemoryStore.categories.delete(catToDelete.id);
+      }
+
+      inMemoryStore.saveToDisk();
+
+      res.json({
+        success: true,
+        data: {
+          message: `Category "${catName}" deleted. ${movedCount} dishes moved to "${reassignTo}".`,
+          movedCount,
         },
       });
     } catch (err) {

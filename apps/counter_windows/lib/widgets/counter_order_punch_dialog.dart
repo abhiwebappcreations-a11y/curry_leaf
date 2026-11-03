@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/table_model.dart';
+import '../models/menu_model.dart';
 import '../providers/counter_provider.dart';
 import '../theme/app_colors.dart';
+import '../services/mock_counter_data.dart';
 
 class CounterOrderPunchDialog extends StatefulWidget {
   final RestaurantTable initialTable;
@@ -42,12 +44,16 @@ class _CounterOrderPunchDialogState extends State<CounterOrderPunchDialog> {
     super.dispose();
   }
 
+  List<MenuItem> get _availableMenuItems => widget.provider.menuItems.isNotEmpty
+      ? widget.provider.menuItems
+      : MockCounterData.getMenuItems();
+
   int get _totalItems => _cart.values.fold(0, (sum, q) => sum + q);
 
   int get _subtotalPaise {
     int total = 0;
     for (final entry in _cart.entries) {
-      final item = widget.provider.menuItems.where((m) => m.id == entry.key).firstOrNull;
+      final item = _availableMenuItems.where((m) => m.id == entry.key).firstOrNull;
       if (item != null) {
         total += item.pricePaise * entry.value;
       }
@@ -55,7 +61,9 @@ class _CounterOrderPunchDialogState extends State<CounterOrderPunchDialog> {
     return total;
   }
 
-  int get _taxPaise => (_subtotalPaise * 0.05).round();
+  int get _taxPaise => widget.provider.isGstEnabled
+      ? (_subtotalPaise * (widget.provider.gstRatePercent / 100.0)).round()
+      : 0;
   int get _grandTotalPaise => _subtotalPaise + _taxPaise;
 
   void _addItem(String id) {
@@ -77,7 +85,7 @@ class _CounterOrderPunchDialogState extends State<CounterOrderPunchDialog> {
   List<Map<String, dynamic>> _buildOrderPayload() {
     final list = <Map<String, dynamic>>[];
     for (final entry in _cart.entries) {
-      final item = widget.provider.menuItems.where((m) => m.id == entry.key).firstOrNull;
+      final item = _availableMenuItems.where((m) => m.id == entry.key).firstOrNull;
       if (item != null) {
         list.add({
           'menuItemId': item.id,
@@ -130,21 +138,28 @@ class _CounterOrderPunchDialogState extends State<CounterOrderPunchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final categories = ['All', ...widget.provider.menuItems.map((m) => m.category).toSet()];
-    final filteredItems = widget.provider.menuItems.where((item) {
+    final menuItems = _availableMenuItems;
+    final categories = ['All', ...menuItems.map((m) => m.category).where((c) => c.isNotEmpty).toSet()];
+    final filteredItems = menuItems.where((item) {
       final matchesCat = _selectedCategory == 'All' || item.category == _selectedCategory;
       final matchesSearch = _searchQuery.isEmpty || item.name.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesCat && matchesSearch;
     }).toList();
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 960,
-        height: 640,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dialogWidth = (constraints.maxWidth * 0.92).clamp(700.0, 1020.0);
+        final dialogHeight = (constraints.maxHeight * 0.90).clamp(480.0, 700.0);
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Container(
+            width: dialogWidth,
+            height: dialogHeight,
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
             // Header
             Row(
               children: [
@@ -413,14 +428,16 @@ class _CounterOrderPunchDialogState extends State<CounterOrderPunchDialog> {
                               Text(currencyFormatter.format(_subtotalPaise / 100), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('GST Tax (5%):', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              Text(currencyFormatter.format(_taxPaise / 100), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                          if (widget.provider.isGstEnabled) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('GST Tax (${widget.provider.gstRatePercent.toStringAsFixed(0)}%):', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                Text(currencyFormatter.format(_taxPaise / 100), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ],
                           const Divider(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -466,6 +483,8 @@ class _CounterOrderPunchDialogState extends State<CounterOrderPunchDialog> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

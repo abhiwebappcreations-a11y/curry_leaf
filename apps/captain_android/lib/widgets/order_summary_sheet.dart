@@ -404,20 +404,25 @@ class OrderSummarySheet extends StatelessWidget {
                   children: [
                     InkWell(
                       onTap: () => provider.updateDraftQuantity(item.id, -1),
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)),
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        child: Icon(Icons.remove, size: 14),
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: Icon(Icons.remove, size: 16),
                       ),
                     ),
-                    Text(
-                      '${item.quantity}',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        '${item.quantity}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
                     ),
                     InkWell(
                       onTap: () => provider.updateDraftQuantity(item.id, 1),
+                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        child: Icon(Icons.add, size: 14),
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: Icon(Icons.add, size: 16),
                       ),
                     ),
                   ],

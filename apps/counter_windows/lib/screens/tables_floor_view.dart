@@ -1,4 +1,5 @@
 import '../widgets/counter_order_punch_dialog.dart';
+import '../widgets/takeaway_order_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -450,44 +451,6 @@ class TablesFloorView extends StatelessWidget {
     );
   }
 
-  void _confirmWipeAllData(BuildContext context, CounterProvider provider) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Row(
-          children: [
-            Icon(Icons.restart_alt, color: AppColors.error, size: 24),
-            SizedBox(width: 8),
-            Text('Reset to Fresh Client Setup?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-          ],
-        ),
-        content: const Text(
-          'This will wipe all sample demo tables, sample orders, test KOTs, and bills.\n\nYour restaurant floor plan will be a 100% clean canvas, ready to set up your client\'s real rooms and tables.\n\nAre you sure you want to proceed?',
-          style: TextStyle(fontSize: 13, height: 1.4),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final ok = await provider.wipeAllDemoData();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(ok ? 'Fresh client setup complete! Floor plan is now clean.' : 'Could not wipe demo data.'),
-                    backgroundColor: ok ? AppColors.success : AppColors.error,
-                  ),
-                );
-              }
-            },
-            child: const Text('Wipe All Demo Data (Fresh Setup)'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -550,17 +513,18 @@ class TablesFloorView extends StatelessWidget {
                   ),
                   Row(
                     children: [
-                      // Fresh Client Setup Wipe Button
-                      OutlinedButton.icon(
-                        onPressed: () => _confirmWipeAllData(context, provider),
-                        icon: const Icon(Icons.restart_alt, size: 14, color: AppColors.error),
+                      // Prominent Takeaway / Parcel Button
+                      ElevatedButton.icon(
+                        onPressed: () => TakeawayOrderDialog.show(context, provider),
+                        icon: const Icon(Icons.shopping_bag_outlined, size: 16),
                         label: Text(
-                          isMobile ? 'Reset' : 'Fresh Client Reset',
-                          style: const TextStyle(color: AppColors.error),
+                          isMobile ? 'Takeaway' : '+ Takeaway / Parcel',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE65100),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -700,173 +664,215 @@ class TablesFloorView extends StatelessWidget {
     }
 
     final isOccupied = table.status == TableStatus.occupied || table.status == TableStatus.billed;
+    final activeOrder = provider.activeOrders.where((o) => o.tableId == table.id).firstOrNull;
+    String diningDuration = '';
+    if (activeOrder != null) {
+      final diff = DateTime.now().difference(activeOrder.createdAt);
+      if (diff.inMinutes < 60) {
+        diningDuration = '⏱️ ${diff.inMinutes}m';
+      } else {
+        diningDuration = '⏱️ ${diff.inHours}h ${diff.inMinutes % 60}m';
+      }
+    }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isOccupied ? statusColor.withValues(alpha: 0.4) : AppColors.border,
-          width: isOccupied ? 1.5 : 1,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 4,
-            offset: Offset(0, 2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          if (isOccupied) {
+            provider.selectOrderByTableId(table.id);
+            provider.setActiveTab(CounterTab.billing);
+          } else {
+            _openOrderPunchDialog(context, provider, table);
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isOccupied ? statusColor.withValues(alpha: 0.6) : AppColors.border,
+              width: isOccupied ? 1.6 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isOccupied ? statusColor.withValues(alpha: 0.08) : const Color(0x08000000),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      padding: EdgeInsets.all(isMobile ? 10 : 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+          padding: EdgeInsets.all(isMobile ? 10 : 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                table.name,
-                style: TextStyle(
-                  fontSize: isMobile ? 16 : 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                ),
-              ),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      statusLabel,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
+                  Row(
+                    children: [
+                      Text(
+                        table.name,
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
+                      if (diningDuration.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          diningDuration,
+                          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ],
                   ),
-                  PopupMenuButton<String>(
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
-                    onSelected: (val) {
-                      if (val == 'cancel_order') {
-                        _showPetpoojaCancelDialog(context, provider, table);
-                      } else if (val == 'edit') {
-                        _showEditTableDialog(context, provider, table);
-                      } else if (val == 'delete') {
-                        _confirmDeleteTable(context, provider, table);
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      if (isOccupied)
-                        const PopupMenuItem(
-                          value: 'cancel_order',
-                          child: Row(
-                            children: [
-                              Icon(Icons.cancel, size: 16, color: AppColors.error),
-                              SizedBox(width: 8),
-                              Text('Cancel Order (Void)', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
-                            ],
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: statusColor,
                           ),
                         ),
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 16, color: AppColors.primary),
-                            SizedBox(width: 8),
-                            Text('Edit Table'),
-                          ],
-                        ),
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                            SizedBox(width: 8),
-                            Text('Delete Table', style: TextStyle(color: AppColors.error)),
-                          ],
-                        ),
+                      PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+                        onSelected: (val) {
+                          if (val == 'cancel_order') {
+                            _showPetpoojaCancelDialog(context, provider, table);
+                          } else if (val == 'edit') {
+                            _showEditTableDialog(context, provider, table);
+                          } else if (val == 'delete') {
+                            _confirmDeleteTable(context, provider, table);
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          if (isOccupied)
+                            const PopupMenuItem(
+                              value: 'cancel_order',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.cancel, size: 16, color: AppColors.error),
+                                  SizedBox(width: 8),
+                                  Text('Cancel Order (Void)', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                            ),
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 16, color: AppColors.primary),
+                                SizedBox(width: 8),
+                                Text('Edit Table'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                SizedBox(width: 8),
+                                Text('Delete Table', style: TextStyle(color: AppColors.error)),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ],
               ),
-            ],
-          ),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  '${table.section} • ${table.capacity}S',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${table.section} • ${table.capacity} Seats',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (table.activeOrderTotalPaise > 0)
+                    Text(
+                      currencyFormatter.format(table.activeOrderTotalRupees),
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                ],
               ),
-              if (table.activeOrderTotalPaise > 0)
-                Text(
-                  currencyFormatter.format(table.activeOrderTotalRupees),
-                  style: TextStyle(
-                    fontSize: isMobile ? 13 : 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
+
+              const Divider(color: AppColors.borderLight, height: 6),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (isOccupied) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _openOrderPunchDialog(context, provider, table),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(60, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.add, size: 12),
+                      label: const Text('Add KOT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 6),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        provider.selectOrderByTableId(table.id);
+                        provider.setActiveTab(CounterTab.billing);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: const Size(70, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.receipt_long, size: 12),
+                      label: const Text('Bill & Pay', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ] else ...[
+                    ElevatedButton.icon(
+                      onPressed: () => _openOrderPunchDialog(context, provider, table),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        minimumSize: const Size(90, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.add, size: 13),
+                      label: const Text('Punch Order', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
-
-          const Divider(color: AppColors.borderLight, height: 6),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (isOccupied) ...[
-                OutlinedButton(
-                  onPressed: () => _openOrderPunchDialog(context, provider, table),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: const Size(50, 26),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('+ KOT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(width: 6),
-                ElevatedButton(
-                  onPressed: () => provider.selectOrderByTableId(table.id),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    minimumSize: const Size(60, 26),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text('View Bill', style: TextStyle(fontSize: 11)),
-                ),
-              ] else ...[
-                ElevatedButton.icon(
-                  onPressed: () => _openOrderPunchDialog(context, provider, table),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: const Size(80, 26),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  icon: const Icon(Icons.add, size: 12),
-                  label: const Text('Take Order / KOT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

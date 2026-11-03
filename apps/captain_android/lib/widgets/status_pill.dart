@@ -105,7 +105,7 @@ class StatusPill extends StatelessWidget {
         color: backgroundColor,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: textColor.withOpacity(0.2),
+          color: textColor.withValues(alpha: 0.2),
           width: 0.8,
         ),
       ),

@@ -30,6 +30,10 @@ export interface LicenseStatusResult {
   isOfflineGraceActive: boolean;
   features: string[];
   limits?: LicenseLimits;
+  onlineOrderingEnabled?: boolean;
+  storeUrl?: string;
+  customDomain?: string;
+  storeSlug?: string;
   usage?: {
     menuItems: number;
     captainDevices: number;
@@ -327,6 +331,14 @@ export class LicenseService {
       isOfflineGraceActive: effectiveStatus === 'grace',
       features: (license.signedPayload.features as string[]) || ['pos', 'kot', 'billing'],
       limits,
+      onlineOrderingEnabled: Boolean(
+        license.signedPayload.onlineOrderingEnabled ||
+        (Array.isArray(license.signedPayload.allowedFeatures) && license.signedPayload.allowedFeatures.includes('ONLINE_ORDERING')) ||
+        (Array.isArray(license.signedPayload.features) && license.signedPayload.features.includes('ONLINE_ORDERING'))
+      ),
+      storeUrl: (license.signedPayload.storeUrl as string) || '',
+      customDomain: (license.signedPayload.customDomain as string) || '',
+      storeSlug: (license.signedPayload.storeSlug as string) || '',
       usage: {
         menuItems,
         captainDevices: approvedCaptains,
@@ -864,6 +876,12 @@ export class LicenseService {
           const cloudLic = lics[0];
           const cloudPayload = cloudLic.signed_payload || {};
           const cloudLimits = cloudPayload.limits;
+          const cloudIsOnline = Boolean(
+            cloudPayload.onlineOrderingEnabled ||
+            (Array.isArray(cloudLic.features) && cloudLic.features.includes('ONLINE_ORDERING'))
+          );
+
+          let stateChanged = false;
           if (cloudLimits) {
             const currentLimits = this.getLimits();
             if (
@@ -871,30 +889,46 @@ export class LicenseService {
               cloudLimits.captainDevices !== currentLimits.captainDevices ||
               cloudLimits.counterPcs !== currentLimits.counterPcs
             ) {
-              logger.info({ oldLimits: currentLimits, newLimits: cloudLimits }, 'Auto-detected upgraded license limits in Supabase Cloud! Applying to POS server and caching to disk...');
-              if (!lic.signedPayload) lic.signedPayload = {};
-              lic.signedPayload.limits = cloudLimits;
-
-              // Persist to local disk candidate files
-              const candidates = [
-                path.resolve(process.cwd(), 'license.json'),
-                path.resolve(process.cwd(), '../license.json'),
-                path.resolve(process.cwd(), '../../license.json'),
-              ];
-              for (const cp of candidates) {
-                try {
-                  if (fs.existsSync(cp)) {
-                    const cData = JSON.parse(fs.readFileSync(cp, 'utf8'));
-                    if (cData.signedPayload) {
-                      cData.signedPayload.limits = cloudLimits;
-                      cData.updatedAt = new Date().toISOString();
-                      fs.writeFileSync(cp, JSON.stringify(cData, null, 2), 'utf8');
-                    }
-                  }
-                } catch (_) {}
-              }
-              return true;
+              stateChanged = true;
             }
+          }
+
+          if (cloudPayload.onlineOrderingEnabled !== undefined && lic.signedPayload.onlineOrderingEnabled !== cloudIsOnline) {
+            stateChanged = true;
+          }
+
+          if (stateChanged) {
+            logger.info({ cloudLimits, cloudIsOnline }, 'Auto-detected updated plan or limits in Supabase Cloud! Applying to POS server and caching to disk...');
+            if (!lic.signedPayload) lic.signedPayload = {};
+            if (cloudLimits) lic.signedPayload.limits = cloudLimits;
+            lic.signedPayload.onlineOrderingEnabled = cloudIsOnline;
+            if (cloudPayload.customDomain) lic.signedPayload.customDomain = cloudPayload.customDomain;
+            if (cloudPayload.storeSlug) lic.signedPayload.storeSlug = cloudPayload.storeSlug;
+            if (cloudPayload.storeUrl) lic.signedPayload.storeUrl = cloudPayload.storeUrl;
+
+            // Persist to local disk candidate files
+            const candidates = [
+              path.resolve(process.cwd(), 'license.json'),
+              path.resolve(process.cwd(), '../license.json'),
+              path.resolve(process.cwd(), '../../license.json'),
+            ];
+            for (const cp of candidates) {
+              try {
+                if (fs.existsSync(cp)) {
+                  const cData = JSON.parse(fs.readFileSync(cp, 'utf8'));
+                  if (cData.signedPayload) {
+                    if (cloudLimits) cData.signedPayload.limits = cloudLimits;
+                    cData.signedPayload.onlineOrderingEnabled = cloudIsOnline;
+                    if (cloudPayload.customDomain) cData.signedPayload.customDomain = cloudPayload.customDomain;
+                    if (cloudPayload.storeSlug) cData.signedPayload.storeSlug = cloudPayload.storeSlug;
+                    if (cloudPayload.storeUrl) cData.signedPayload.storeUrl = cloudPayload.storeUrl;
+                    cData.updatedAt = new Date().toISOString();
+                    fs.writeFileSync(cp, JSON.stringify(cData, null, 2), 'utf8');
+                  }
+                }
+              } catch (_) {}
+            }
+            return true;
           }
         }
       }

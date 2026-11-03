@@ -88,6 +88,16 @@ class ThermalPrinterConfig {
     final targetStr = (json['target'] ?? json['address'] ?? 'EPSON TM-T82X Receipt').toString();
     final isUsb = json['connectionType'] == 'usb' || !targetStr.contains(':');
 
+    int parseWidth(dynamic val) {
+      if (val is int) return val;
+      if (val is num) return val.toInt();
+      if (val is String) {
+        final digits = RegExp(r'\d+').firstMatch(val)?.group(0);
+        if (digits != null) return int.tryParse(digits) ?? 80;
+      }
+      return 80;
+    }
+
     return ThermalPrinterConfig(
       id: id,
       role: role,
@@ -95,7 +105,7 @@ class ThermalPrinterConfig {
       connectionType: isUsb ? PrinterConnectionType.usb : PrinterConnectionType.ethernet,
       address: targetStr,
       port: json['port'] as int? ?? 9100,
-      paperWidthMm: (json['paperWidth'] ?? json['paperWidthMm'] ?? 80) as int,
+      paperWidthMm: parseWidth(json['paperWidth'] ?? json['paperWidthMm']),
       isConnected: json['status'] == 'ready' || json['status'] == 'connected' || (json['isConnected'] ?? true),
       lastTestPrintAt: json['lastTestPrintAt'] != null ? DateTime.tryParse(json['lastTestPrintAt']) : null,
     );

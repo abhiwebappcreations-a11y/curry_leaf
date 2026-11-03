@@ -75,6 +75,14 @@ class BillReceiptPreview extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
+          if (counterProv != null && counterProv.ownerName.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Prop: ${counterProv.ownerName}${counterProv.city.isNotEmpty ? " • ${counterProv.city}" : ""}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            ),
+          ],
           const SizedBox(height: 2),
           const Text(
             'Plot 42, Jubilee Hills Road No. 36\nHyderabad, Telangana - 500033\nGSTIN: 36AABCU9603R1ZM | FSSAI: 13621014000412',
@@ -139,7 +147,7 @@ class BillReceiptPreview extends StatelessWidget {
                     flex: 5,
                     child: Text(
                       item.name,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                   ),
                   Expanded(
@@ -187,8 +195,12 @@ class BillReceiptPreview extends StatelessWidget {
               '- ${currencyFormatter.format(bill.discountRupees)}',
               isNegative: true,
             ),
-          _buildSummaryRow('CGST (2.5%):', currencyFormatter.format(bill.cgstRupees)),
-          _buildSummaryRow('SGST (2.5%):', currencyFormatter.format(bill.sgstRupees)),
+          if (bill.cgstPaise > 0 || bill.sgstPaise > 0) ...[
+            _buildSummaryRow('CGST (${(bill.gstRatePercent / 2).toStringAsFixed(1).replaceAll(".0", "")}%):', currencyFormatter.format(bill.cgstRupees)),
+            _buildSummaryRow('SGST (${(bill.gstRatePercent / 2).toStringAsFixed(1).replaceAll(".0", "")}%):', currencyFormatter.format(bill.sgstRupees)),
+          ] else ...[
+            _buildSummaryRow('GST (0% Non-GST):', '₹ 0.00'),
+          ],
 
           const SizedBox(height: 6),
           const Text(

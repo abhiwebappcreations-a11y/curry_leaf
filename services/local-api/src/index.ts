@@ -5,6 +5,7 @@ import { db } from './db/index.js';
 import { LicenseService } from './services/licenseService.js';
 import { DiscoveryService } from './services/discoveryService.js';
 import { PrintService } from './services/printService.js';
+import { CloudOrderSyncService } from './services/cloudOrderSyncService.js';
 
 async function bootstrap() {
   logger.info(
@@ -54,6 +55,9 @@ async function bootstrap() {
     // Start Print Queue Worker (auto-retries any pending thermal print jobs)
     PrintService.initQueueWorker();
 
+    // Start Cloud Online Delivery Order Sync Worker
+    CloudOrderSyncService.start();
+
     // Check Supabase Cloud immediately on boot, then periodically every 20 seconds
     LicenseService.syncCloudLicenseLimits();
     setInterval(() => {
@@ -65,6 +69,7 @@ async function bootstrap() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down Hinopt Local API server gracefully...');
     DiscoveryService.stop();
+    CloudOrderSyncService.stop();
     server.close(async () => {
       await db.close();
       logger.info('Server closed. Operational state preserved.');
