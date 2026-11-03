@@ -147,11 +147,12 @@ async function loadRestaurantAndMenu(target) {
   const container = document.getElementById('menuContainer');
 
   try {
+    // A restaurant MUST have online_ordering_enabled = true AND a registered store_slug
     let queryUrl = '';
     if (target.type === 'subdomain') {
-      queryUrl = `${SUPABASE_URL}/rest/v1/restaurants?custom_domain=eq.${encodeURIComponent(target.value)}&select=*`;
+      queryUrl = `${SUPABASE_URL}/rest/v1/restaurants?custom_domain=eq.${encodeURIComponent(target.value)}&online_ordering_enabled=eq.true&select=*`;
     } else {
-      queryUrl = `${SUPABASE_URL}/rest/v1/restaurants?or=(store_slug.eq.${encodeURIComponent(target.value)},id.eq.${encodeURIComponent(target.value)})&select=*`;
+      queryUrl = `${SUPABASE_URL}/rest/v1/restaurants?or=(store_slug.eq.${encodeURIComponent(target.value)},id.eq.${encodeURIComponent(target.value)})&online_ordering_enabled=eq.true&select=*`;
     }
 
     const res = await fetch(queryUrl, {
@@ -159,16 +160,17 @@ async function loadRestaurantAndMenu(target) {
     });
     const list = await res.json();
 
+    // If no restaurant exists with this slug OR online delivery toggle was not turned on in Hinopt Admin:
     if (!Array.isArray(list) || list.length === 0) {
       container.innerHTML = `
         <div class="loading-state" style="padding: 40px 16px;">
-          <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
-          <p style="font-size: 16px; font-weight: 800; color: #dc2626;">Restaurant Not Found</p>
-          <p style="font-size: 13px; color: #64748b; margin-top: 6px;">
-            The link "<strong>${escapeHtml(target.value)}</strong>" does not match any registered restaurant on Hinopt.
+          <div style="font-size: 40px; margin-bottom: 12px;">🏪</div>
+          <p style="font-size: 16px; font-weight: 800; color: #dc2626;">No Restaurant Found</p>
+          <p style="font-size: 13px; color: #64748b; margin-top: 6px; max-width: 380px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+            The link "<strong>${escapeHtml(target.value)}</strong>" does not exist or has not been activated with the Online Delivery module by Hinopt Admin.
           </p>
           <button class="btn-modal-primary" style="margin-top: 16px;" onclick="window.location.href='/'">
-            View All Restaurants
+            View Active Restaurants
           </button>
         </div>
       `;

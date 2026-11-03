@@ -38,15 +38,7 @@ class MenuItemCard extends StatelessWidget {
         onTap: !isAvailable
             ? null
             : () {
-                if (item.variants.isNotEmpty || item.addons.isNotEmpty) {
-                  if (onCustomize != null) {
-                    onCustomize!();
-                  } else if (draftQuantity == 0) {
-                    onAdd();
-                  } else {
-                    onIncrement();
-                  }
-                } else if (draftQuantity == 0) {
+                if (draftQuantity == 0) {
                   onAdd();
                 } else {
                   onIncrement();
@@ -213,17 +205,7 @@ class MenuItemCard extends StatelessWidget {
                   )
                 else if (draftQuantity == 0)
                   ElevatedButton(
-                    onPressed: () {
-                      if (item.variants.isNotEmpty || item.addons.isNotEmpty) {
-                        if (onCustomize != null) {
-                          onCustomize!();
-                        } else {
-                          onAdd();
-                        }
-                      } else {
-                        onAdd();
-                      }
-                    },
+                    onPressed: onAdd,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,

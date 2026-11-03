@@ -7,11 +7,13 @@ import 'status_pill.dart';
 class TableCard extends StatelessWidget {
   final RestaurantTable table;
   final VoidCallback onTap;
+  final int draftCount;
 
   const TableCard({
     super.key,
     required this.table,
     required this.onTap,
+    this.draftCount = 0,
   });
 
   String _formatDuration(DateTime? since) {
@@ -33,6 +35,7 @@ class TableCard extends StatelessWidget {
 
     final isOccupied = table.status == TableStatus.occupied;
     final isBilled = table.status == TableStatus.billed;
+    final hasDraft = draftCount > 0;
 
     return Material(
       color: Colors.transparent,
@@ -44,10 +47,12 @@ class TableCard extends StatelessWidget {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isBilled
-                  ? AppColors.billed.withValues(alpha: 0.4)
-                  : (isOccupied ? AppColors.info.withValues(alpha: 0.3) : AppColors.border),
-              width: (isOccupied || isBilled) ? 1.5 : 1,
+              color: hasDraft
+                  ? AppColors.warning
+                  : (isBilled
+                      ? AppColors.billed.withValues(alpha: 0.4)
+                      : (isOccupied ? AppColors.info.withValues(alpha: 0.3) : AppColors.border)),
+              width: (hasDraft || isOccupied || isBilled) ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -66,14 +71,44 @@ class TableCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    table.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.5,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        table.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      if (hasDraft) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.warningBg,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.warning),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.edit_note, size: 12, color: AppColors.warning),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Draft ($draftCount)',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   Row(
                     children: [

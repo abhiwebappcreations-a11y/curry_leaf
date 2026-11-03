@@ -358,12 +358,33 @@ class PosProvider extends ChangeNotifier {
             await prefs.setString('captain_api_key', res['apiKey'].toString());
           }
 
-          _tables = await _apiService.fetchTables();
+          _tables = (await _apiService.fetchTables())..sort(naturalTableCompare);
           _menuItems = await _apiService.fetchMenu();
           final liveOrders = await _apiService.fetchActiveOrders();
           _ordersByTableId.clear();
           for (var o in liveOrders) {
-            _ordersByTableId[o.tableId] = o;
+            final localDrafts = _localDraftsByTableId[o.tableId] ?? [];
+            if (localDrafts.isNotEmpty) {
+              final serverSubmitted = o.items.where((i) => !i.isDraft).toList();
+              _ordersByTableId[o.tableId] = o.copyWith(
+                items: [...serverSubmitted, ...localDrafts],
+              );
+            } else {
+              _ordersByTableId[o.tableId] = o;
+            }
+          }
+          for (var entry in _localDraftsByTableId.entries) {
+            if (entry.value.isNotEmpty && !_ordersByTableId.containsKey(entry.key)) {
+              final tbl = _tables.where((t) => t.id == entry.key).firstOrNull;
+              _ordersByTableId[entry.key] = RestaurantOrder(
+                id: tbl?.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
+                tableId: entry.key,
+                tableName: tbl?.name ?? 'Table',
+                items: List.from(entry.value),
+                createdAt: DateTime.now(),
+                guestCount: tbl?.capacity ?? 4,
+              );
+            }
           }
 
           await pollLatestState();
@@ -409,30 +430,47 @@ class PosProvider extends ChangeNotifier {
       _isConnected = healthy;
       if (healthy && !_apiService.useDemoMode) {
         final liveTables = await _apiService.fetchTables();
-        _tables = liveTables;
+        _tables = liveTables..sort(naturalTableCompare);
 
         final liveOrders = await _apiService.fetchActiveOrders();
         final serverTableIds = <String>{};
         for (var o in liveOrders) {
           serverTableIds.add(o.tableId);
-          // Preserve local unsent draft items if captain has drafts on this table
-          final existing = _ordersByTableId[o.tableId];
-          final existingDrafts = existing?.draftItems ?? [];
-          if (existingDrafts.isNotEmpty) {
+          // Always preserve local unsent drafts on this device
+          final localDrafts = _localDraftsByTableId[o.tableId] ??
+              _ordersByTableId[o.tableId]?.draftItems ??
+              [];
+          if (localDrafts.isNotEmpty) {
+            _localDraftsByTableId[o.tableId] = localDrafts;
             final serverSubmitted = o.items.where((i) => !i.isDraft).toList();
             _ordersByTableId[o.tableId] = o.copyWith(
-              items: [...serverSubmitted, ...existingDrafts],
+              items: [...serverSubmitted, ...localDrafts],
             );
           } else {
             _ordersByTableId[o.tableId] = o;
           }
         }
 
+        // For tables with unsent local drafts that don't have a server order yet
+        for (var entry in _localDraftsByTableId.entries) {
+          if (entry.value.isNotEmpty && !serverTableIds.contains(entry.key)) {
+            final tbl = _tables.where((t) => t.id == entry.key).firstOrNull;
+            _ordersByTableId[entry.key] = RestaurantOrder(
+              id: tbl?.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
+              tableId: entry.key,
+              tableName: tbl?.name ?? 'Table',
+              items: List.from(entry.value),
+              createdAt: DateTime.now(),
+              guestCount: tbl?.capacity ?? 4,
+            );
+          }
+        }
+
         // Clean up settled tables that no longer have server orders AND have no local drafts
-        // Never purge the table the captain is currently viewing
         _ordersByTableId.removeWhere((tblId, ord) =>
             tblId != _currentTable?.id &&
             !serverTableIds.contains(tblId) &&
+            (_localDraftsByTableId[tblId]?.isEmpty ?? true) &&
             ord.draftItems.isEmpty);
 
         if (_currentTable != null) {
@@ -441,28 +479,23 @@ class PosProvider extends ChangeNotifier {
             _currentTable = updatedTable;
           }
 
-          // Ensure active order object exists for the table being edited
           _ensureActiveOrder();
 
-          // Keep current active order synchronized without duplicating drafts
           if (_currentOrder != null) {
             final serverOrder = liveOrders.where((o) => o.tableId == _currentTable!.id).firstOrNull;
-            final localDrafts = _currentOrder!.draftItems;
+            final localDrafts = _localDraftsByTableId[_currentTable!.id] ?? _currentOrder!.draftItems;
 
             if (serverOrder != null) {
-              // Server has an active order for this table: keep server's submitted items and local unsent drafts
               final serverSubmitted = serverOrder.items.where((i) => !i.isDraft).toList();
-              if (localDrafts.isNotEmpty) {
-                _currentOrder = serverOrder.copyWith(
-                  items: [...serverSubmitted, ...localDrafts],
-                );
-              } else {
-                _currentOrder = serverOrder;
-              }
+              _currentOrder = serverOrder.copyWith(
+                items: [...serverSubmitted, ...localDrafts],
+              );
               _ordersByTableId[_currentTable!.id] = _currentOrder!;
             } else {
-              // No server order for this table yet (e.g. fresh table with unsent drafts).
-              // Keep _currentOrder intact: NEVER duplicate local drafts!
+              final submitted = _currentOrder!.items.where((i) => !i.isDraft).toList();
+              _currentOrder = _currentOrder!.copyWith(
+                items: [...submitted, ...localDrafts],
+              );
               _ordersByTableId[_currentTable!.id] = _currentOrder!;
             }
           }
@@ -497,15 +530,22 @@ class PosProvider extends ChangeNotifier {
 
   void selectTable(RestaurantTable table) {
     _currentTable = table;
+    final drafts = _localDraftsByTableId[table.id] ?? [];
+
     if (_ordersByTableId.containsKey(table.id)) {
-      _currentOrder = _ordersByTableId[table.id];
+      final existing = _ordersByTableId[table.id]!;
+      final serverSubmitted = existing.items.where((i) => !i.isDraft).toList();
+      _currentOrder = existing.copyWith(
+        items: [...serverSubmitted, ...drafts],
+      );
+      _ordersByTableId[table.id] = _currentOrder!;
     } else {
       // Start a fresh draft order for this table
       _currentOrder = RestaurantOrder(
         id: table.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
         tableId: table.id,
         tableName: table.name,
-        items: [],
+        items: List.from(drafts),
         createdAt: DateTime.now(),
         guestCount: table.capacity,
       );
@@ -517,19 +557,22 @@ class PosProvider extends ChangeNotifier {
   void _ensureActiveOrder() {
     if (_currentTable == null) return;
     if (_currentOrder == null) {
+      final drafts = _localDraftsByTableId[_currentTable!.id] ?? [];
       if (_ordersByTableId.containsKey(_currentTable!.id)) {
-        _currentOrder = _ordersByTableId[_currentTable!.id];
+        final existing = _ordersByTableId[_currentTable!.id]!;
+        final serverSubmitted = existing.items.where((i) => !i.isDraft).toList();
+        _currentOrder = existing.copyWith(items: [...serverSubmitted, ...drafts]);
       } else {
         _currentOrder = RestaurantOrder(
           id: _currentTable!.activeOrderId ?? 'ord-${DateTime.now().millisecondsSinceEpoch}',
           tableId: _currentTable!.id,
           tableName: _currentTable!.name,
-          items: [],
+          items: List.from(drafts),
           createdAt: DateTime.now(),
           guestCount: _currentTable!.capacity,
         );
-        _ordersByTableId[_currentTable!.id] = _currentOrder!;
       }
+      _ordersByTableId[_currentTable!.id] = _currentOrder!;
     }
   }
 
@@ -585,6 +628,8 @@ class PosProvider extends ChangeNotifier {
 
     _currentOrder = _currentOrder!.copyWith(items: updatedItems);
     _ordersByTableId[_currentTable!.id] = _currentOrder!;
+    _localDraftsByTableId[_currentTable!.id] = _currentOrder!.draftItems;
+    _saveLocalDraftsToPrefs();
     notifyListeners();
   }
 
@@ -609,6 +654,8 @@ class PosProvider extends ChangeNotifier {
 
     _currentOrder = _currentOrder!.copyWith(items: updated);
     _ordersByTableId[_currentTable!.id] = _currentOrder!;
+    _localDraftsByTableId[_currentTable!.id] = _currentOrder!.draftItems;
+    _saveLocalDraftsToPrefs();
     notifyListeners();
   }
 
@@ -620,6 +667,8 @@ class PosProvider extends ChangeNotifier {
 
     _currentOrder = _currentOrder!.copyWith(items: updated);
     _ordersByTableId[_currentTable!.id] = _currentOrder!;
+    _localDraftsByTableId[_currentTable!.id] = _currentOrder!.draftItems;
+    _saveLocalDraftsToPrefs();
     notifyListeners();
   }
 
@@ -692,6 +741,8 @@ class PosProvider extends ChangeNotifier {
       }
 
       _kotHistory.insert(0, ticket);
+      _localDraftsByTableId.remove(_currentTable!.id);
+      await _saveLocalDraftsToPrefs();
       _isSubmittingKot = false;
       notifyListeners();
 

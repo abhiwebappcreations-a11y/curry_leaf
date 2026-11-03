@@ -297,7 +297,7 @@ class OrderScreen extends StatelessWidget {
                             crossAxisCount: crossAxisCount,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
-                            childAspectRatio: 1.25,
+                            childAspectRatio: 1.12,
                           ),
                           itemCount: provider.filteredMenu.length,
                           itemBuilder: (context, index) {
@@ -310,7 +310,10 @@ class OrderScreen extends StatelessWidget {
                             return MenuItemCard(
                               item: item,
                               draftQuantity: draftQty,
-                              onAdd: () => provider.addItemToDraft(item),
+                              onAdd: () => provider.addItemToDraft(
+                                item,
+                                variant: item.variants.isNotEmpty ? item.variants.first : null,
+                              ),
                               onIncrement: () {
                                 final existing = order?.draftItems
                                     .where((i) => i.menuItemId == item.id)
@@ -318,7 +321,10 @@ class OrderScreen extends StatelessWidget {
                                 if (existing != null) {
                                   provider.updateDraftQuantity(existing.id, 1);
                                 } else {
-                                  provider.addItemToDraft(item);
+                                  provider.addItemToDraft(
+                                    item,
+                                    variant: item.variants.isNotEmpty ? item.variants.first : null,
+                                  );
                                 }
                               },
                               onDecrement: () {
